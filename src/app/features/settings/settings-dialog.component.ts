@@ -5,7 +5,10 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AudioOutputsService } from '../../core/audio/audio-outputs.service';
+import { DevToolsService } from '../../core/dev-tools.service';
+import { DocumentService } from '../../core/document.service';
 import type { TranslationKey } from '../../core/i18n/it';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { Language, SettingsService, SnapStep, ThemeMode } from '../../core/settings.service';
@@ -27,10 +30,13 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
   { step: 'half', symbol: '♪', label: 'settings.snap.half' },
 ];
 
-/** Preferences changed rarely: appearance, audio output, editing. Every change applies and is saved at once. */
+/**
+ * Preferences changed rarely: appearance, audio output, editing, developer tools. Every change
+ * is saved at once; the developer tools apply at the next start (or with "restart now").
+ */
 @Component({
   selector: 'app-settings-dialog',
-  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatSelectModule, TranslatePipe],
+  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatSelectModule, MatSlideToggleModule, TranslatePipe],
   template: `
     <h2 mat-dialog-title>{{ 'settings.title' | t }}</h2>
     <mat-dialog-content class="content">
@@ -84,6 +90,20 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
         </mat-button-toggle-group>
       </div>
       <p class="hint">{{ 'settings.snapHint' | t }}</p>
+
+      <h3>{{ 'settings.advanced' | t }}</h3>
+      <mat-slide-toggle [checked]="settings.devTools()" (change)="settings.setDevTools($event.checked)">
+        {{ 'settings.devTools' | t }}
+      </mat-slide-toggle>
+      @if (settings.devTools() !== devTools.active) {
+        <div class="restart">
+          <span class="hint">{{ 'settings.restartNeeded' | t }}</span>
+          <button mat-stroked-button (click)="documents.restartForDevTools()">
+            <mat-icon>restart_alt</mat-icon>
+            {{ 'settings.restartNow' | t }}
+          </button>
+        </div>
+      }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>{{ 'common.close' | t }}</button>
@@ -119,6 +139,15 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       font: var(--mat-sys-body-small);
       margin: 0 0 8px;
     }
+    .restart {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 8px;
+      .hint {
+        margin: 0;
+      }
+    }
     .symbol {
       font-size: 18px;
       margin-right: 2px;
@@ -128,6 +157,8 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
 })
 export class SettingsDialogComponent {
   protected readonly settings = inject(SettingsService);
+  protected readonly devTools = inject(DevToolsService);
+  protected readonly documents = inject(DocumentService);
   private readonly outputs = inject(AudioOutputsService);
 
   protected readonly themes = THEMES;

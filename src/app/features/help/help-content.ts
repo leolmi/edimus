@@ -231,7 +231,7 @@ const IT: HelpContent = {
           title: 'Impostazioni',
           keys: ['Ctrl+,'],
           text: [
-            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita audio; passo di aggancio delle clip alla griglia. Ogni modifica vale subito e resta salvata.',
+            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita audio; passo di aggancio delle clip alla griglia; apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
           ],
         },
         {
@@ -512,7 +512,7 @@ const EN: HelpContent = {
           title: 'Settings',
           keys: ['Ctrl+,'],
           text: [
-            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output; snap step of the clips on the grid. Every change applies at once and is saved.',
+            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output; snap step of the clips on the grid; opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
           ],
         },
         {

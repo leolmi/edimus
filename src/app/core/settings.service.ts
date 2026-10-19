@@ -16,10 +16,12 @@ interface Settings {
   /** Output device of the playback (id and name), null = system default. */
   audioOutput: AudioOutput | null;
   snapStep: SnapStep;
+  /** Opens the developer tools of the window at startup. */
+  devTools: boolean;
 }
 
 const STORAGE_KEY = 'settings';
-const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat' };
+const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat', devTools: false };
 
 /** User preferences (theme, language, listening volume and output), persisted with the Neutralino storage API. */
 @Injectable({ providedIn: 'root' })
@@ -32,6 +34,7 @@ export class SettingsService {
   readonly muted = signal(DEFAULTS.muted);
   readonly audioOutput = signal<AudioOutput | null>(DEFAULTS.audioOutput);
   readonly snapStep = signal<SnapStep>(DEFAULTS.snapStep);
+  readonly devTools = signal(DEFAULTS.devTools);
 
   constructor() {
     effect(() => {
@@ -53,6 +56,7 @@ export class SettingsService {
       if (typeof saved.muted === 'boolean') this.muted.set(saved.muted);
       if (saved.audioOutput?.id) this.audioOutput.set(saved.audioOutput);
       if (saved.snapStep === 'bar' || saved.snapStep === 'beat' || saved.snapStep === 'half') this.snapStep.set(saved.snapStep);
+      if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
     } catch {
       // no saved settings yet (or storage unavailable): keep defaults
     }
@@ -90,6 +94,11 @@ export class SettingsService {
     void this.save();
   }
 
+  setDevTools(open: boolean): void {
+    this.devTools.set(open);
+    void this.save();
+  }
+
   private async save(): Promise<void> {
     const data: Settings = {
       theme: this.theme(),
@@ -98,6 +107,7 @@ export class SettingsService {
       muted: this.muted(),
       audioOutput: this.audioOutput(),
       snapStep: this.snapStep(),
+      devTools: this.devTools(),
     };
     try {
       await storage.setData(STORAGE_KEY, JSON.stringify(data));

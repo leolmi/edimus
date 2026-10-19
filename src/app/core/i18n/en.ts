@@ -212,6 +212,10 @@ export const en: Record<TranslationKey, string> = {
   'settings.snap.bar': 'Bar',
   'settings.snap.beat': 'Quarter note',
   'settings.snap.half': 'Eighth note',
+  'settings.advanced': 'Advanced',
+  'settings.devTools': 'Open the developer tools at startup',
+  'settings.restartNeeded': 'Applies from the next start.',
+  'settings.restartNow': 'Restart now',
   'settings.snapHint':
     'With the bar grid shown, dragged clips move by this step snapping to the other clips (the bar follows the meter of the tempo). Alt while dragging: free move.',
 };

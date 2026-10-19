@@ -6,6 +6,12 @@
   (`filesystem`, `os.execCommand`/processi, `window`, `storage`, `events`).
   `tokenSecurity: none`, server locale su porta casuale; in sviluppo la finestra carica
   `ng serve` su `http://localhost:47815` (vedi `neutralino.config.json`).
+- **Strumenti per sviluppatori**: spenti in `neutralino.config.json` (`enableInspector`,
+  `openInspectorOnStartup` false); `npm run dev` li abilita da riga di comando
+  (`--window-enable-inspector=true`). L'impostazione "Apri gli strumenti per sviluppatori
+  all'avvio" fa riavviare il processo una volta con `--window-enable-inspector=true
+  --window-open-inspector-on-startup=true` (`DevToolsService`): la finestra li prende solo
+  dalla riga di comando, quindi cambiarli richiede un riavvio ("Riavvia ora").
 - **Una istanza = un montaggio.** Il file da aprire all'avvio arriva da riga di comando
   (`InstanceService`, `NL_ARGS`). Più montaggi = più finestre/processi.
 - **Cartella dell'app** (`appPath()`, da `NL_PATH`): contiene `.cache/` per i file PCM

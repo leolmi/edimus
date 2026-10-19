@@ -4,6 +4,12 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.0.1 — 2026-10-19
+
+### Correzioni
+- All'avvio non si aprono più gli strumenti per sviluppatori; diventano un'opzione delle
+  Impostazioni (Avanzate), spenta di default.
+
 ## 1.0.0 — 2026-10-19
 
 Prima versione data in uso.

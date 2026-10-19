@@ -210,6 +210,10 @@ export const it = {
   'settings.snap.bar': 'Battuta',
   'settings.snap.beat': 'Semiminima',
   'settings.snap.half': 'Croma',
+  'settings.advanced': 'Avanzate',
+  'settings.devTools': 'Apri gli strumenti per sviluppatori all’avvio',
+  'settings.restartNeeded': 'Vale dal prossimo avvio.',
+  'settings.restartNow': 'Riavvia ora',
   'settings.snapHint':
     'Con la griglia delle battute visibile, le clip trascinate si spostano a questo passo agganciandosi alle altre clip (la battuta segue il metro del tempo). Alt durante il trascinamento: spostamento libero.',
 } as const;

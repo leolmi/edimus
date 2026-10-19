@@ -1,5 +1,6 @@
 import { ApplicationConfig, inject, provideAppInitializer, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { MatIconRegistry } from '@angular/material/icon';
+import { DevToolsService } from './core/dev-tools.service';
 import { SettingsService } from './core/settings.service';
 
 export const appConfig: ApplicationConfig = {
@@ -7,7 +8,10 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideAppInitializer(() => {
       inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-outlined');
-      return inject(SettingsService).load();
+      const devTools = inject(DevToolsService);
+      return inject(SettingsService)
+        .load()
+        .then(() => devTools.startupCheck());
     }),
   ],
 };

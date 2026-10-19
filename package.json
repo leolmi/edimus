@@ -1,11 +1,11 @@
 {
   "name": "edimus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "ng": "ng",
     "setup": "neu update --latest && npm run licenses",
     "licenses": "node scripts/licenses.mjs",
-    "dev": "neu run",
+    "dev": "neu run -- --window-enable-inspector=true",
     "build": "neu build --release --embed-resources",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "package": "npm run build && npm run mcp:build && node scripts/package.mjs",

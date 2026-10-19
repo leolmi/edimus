@@ -7,6 +7,7 @@ import { RenameDialogComponent, RenameDialogData } from '../features/rename/rena
 import { ExportOptions, ExportService } from './audio/export.service';
 import { AudioDecoderService } from './audio/audio-decoder.service';
 import { MixService } from './audio/mix.service';
+import { DevToolsService } from './dev-tools.service';
 import { DropTarget, DropTargetService } from './drop-target.service';
 import { resolveDroppedFiles } from './dropped-files';
 import { TimelineService } from './timeline/timeline.service';
@@ -15,6 +16,7 @@ import type { TranslationKey } from './i18n/it';
 import { InstanceService } from './instance.service';
 import { AUDIO_EXTENSIONS, MONTAGE_EXTENSION, baseName, dirName, isMontageFile } from './montage/montage.model';
 import { MontageService } from './montage/montage.service';
+import { SettingsService } from './settings.service';
 
 interface StatusMessage {
   key: TranslationKey;
@@ -35,6 +37,8 @@ export class DocumentService {
   private readonly drops = inject(DropTargetService);
   private readonly decoder = inject(AudioDecoderService);
   private readonly timeline = inject(TimelineService);
+  private readonly devTools = inject(DevToolsService);
+  private readonly settings = inject(SettingsService);
   /** Options of the last export, proposed again by the next one. */
   private exportOptions?: ExportOptions;
 
@@ -199,6 +203,11 @@ export class DocumentService {
   /** Closes the window, asking what to do with unsaved changes. */
   async close(): Promise<void> {
     if (await this.confirmDiscard()) await app.exit();
+  }
+
+  /** Restarts the app (asking about unsaved changes) with the developer tools as set. */
+  async restartForDevTools(): Promise<void> {
+    if (await this.confirmDiscard()) await this.devTools.relaunch(this.settings.devTools());
   }
 
   /** With unsaved changes asks whether to save them; false when the user cancels (or saving fails). */
