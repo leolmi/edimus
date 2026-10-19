@@ -1,0 +1,54 @@
+{
+  "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
+  "applicationId": "it.leolmi.edimus",
+  "version": "0.1.0",
+  "defaultMode": "window",
+  "port": 0,
+  "documentRoot": "/build/web/browser/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "none",
+  "logging": {
+    "enabled": true,
+    "writeToLogFile": true
+  },
+  "nativeAllowList": [
+    "app.*",
+    "os.*",
+    "filesystem.*",
+    "window.*",
+    "computer.*",
+    "events.*",
+    "storage.*",
+    "debug.log"
+  ],
+  "modes": {
+    "window": {
+      "title": "edimus",
+      "width": 1280,
+      "height": 800,
+      "minWidth": 800,
+      "minHeight": 500,
+      "center": true,
+      "enableInspector": true,
+      "exitProcessOnClose": false,
+      "icon": "/build/web/browser/icon.png",
+      "injectGlobals": true
+    }
+  },
+  "cli": {
+    "binaryName": "edimus",
+    "resourcesPath": "/build/web/browser/",
+    "extensionsPath": "/extensions/",
+    "frontendLibrary": {
+      "patchFile": "/src/index.html",
+      "devUrl": "http://localhost:47815",
+      "projectPath": "/",
+      "devCommand": "node scripts/licenses.mjs && npx ng serve --port 47815",
+      "buildCommand": "node scripts/licenses.mjs && npx ng build",
+      "waitTimeout": 60000
+    },
+    "binaryVersion": "6.10.0"
+  }
+}

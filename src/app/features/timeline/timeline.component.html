@@ -1,0 +1,86 @@
+<div class="ruler-row">
+  <div class="corner"></div>
+  <app-ruler class="ruler" (pointerdown)="onScrubStart($event)" (pointermove)="onScrubMove($event)" (pointerup)="onScrubEnd($event)" (pointercancel)="onScrubEnd($event)" />
+</div>
+
+<div class="tracks" (wheel)="onWheel($event)">
+  @for (track of montages.montage().tracks; track track.id; let index = $index) {
+    @let source = sourceOf(track);
+    <div class="track" [attr.data-drop-track]="track.id">
+      <div class="header">
+        <div class="name" role="button" tabindex="0" (click)="showInfo(track)" (keydown.enter)="showInfo(track)">
+          <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{ source?.status === 'error' ? 'error' : 'audio_file' }}</mat-icon>
+          <span>{{ track.name }}</span>
+        </div>
+        <div class="track-actions">
+          <button mat-icon-button class="small" [class.active]="track.muted" (click)="toggleMute(track)" [matTooltip]="'track.mute' | t">
+            <mat-icon>{{ track.muted ? 'volume_off' : 'volume_up' }}</mat-icon>
+          </button>
+          <button mat-icon-button class="small" [class.active]="track.solo" (click)="toggleSolo(track)" [matTooltip]="'track.solo' | t">
+            <mat-icon>headphones</mat-icon>
+          </button>
+          <span class="spacer"></span>
+          <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
+            <mat-icon>info</mat-icon>
+          </button>
+          <button mat-icon-button class="small" (click)="removeTrack(track)" [matTooltip]="'track.remove' | t">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+        @if (source?.status === 'probing') {
+          <span class="info">{{ 'source.probing' | t }}</span>
+        } @else if (source?.status === 'decoding') {
+          <mat-progress-bar mode="determinate" [value]="source.progress * 100" />
+          <span class="info">{{ 'source.decoding' | t: { p: (source.progress * 100).toFixed(0) } }}</span>
+        } @else if (source?.status === 'ready') {
+          <span class="info">{{ describe(source.info) }}</span>
+          @if (tempoLabel(track); as tempo) {
+            <span class="info">{{ tempo }}</span>
+          }
+        } @else if (source?.status === 'error') {
+          <span class="info error">{{ 'source.error' | t: { message: source.error } }}</span>
+        }
+      </div>
+      <app-track-lane
+        #lane
+        class="lane"
+        [track]="track"
+        [silent]="!audible().has(track.id)"
+        [activePoint]="activePoint()?.trackId === track.id ? activePoint()!.index : null"
+        (contextmenu)="$event.preventDefault()"
+        (dblclick)="onLaneDoubleClick($event, lane)"
+        (pointerdown)="onLaneDown($event, lane, index)"
+        (pointermove)="onLaneMove($event)"
+        (pointerup)="onLaneUp($event)"
+        (pointercancel)="onLaneUp($event)"
+      />
+    </div>
+  }
+  <!-- empty strips: dropping audio files here adds them as new tracks -->
+  <div class="slots" data-drop-track="new">
+    <div class="slots-header"></div>
+    <div class="slots-lane">
+      <div class="slot-hint">
+        <mat-icon>library_add</mat-icon>
+        <span>{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}</span>
+        <a class="link" href="#" (click)="$event.preventDefault(); documents.openDialog()">{{ 'slots.browse' | t }}</a>
+      </div>
+    </div>
+  </div>
+  <!-- reference for the lanes width -->
+  <div class="lanes-probe"><div class="corner"></div><div #lanes class="probe"></div></div>
+</div>
+
+<div class="scroll-row">
+  <div class="corner"></div>
+  <div #scroller class="scroller" (scroll)="onScrollbar()">
+    <div class="scroll-content" [style.width.px]="scrollWidth()"></div>
+  </div>
+</div>
+
+@if (rangeBox(); as box) {
+  <div class="range" [style.left]="'calc(var(--header-width) + ' + box.left + 'px)'" [style.width.px]="box.width"></div>
+}
+@if (playheadX() !== null && !montages.isEmpty()) {
+  <div class="playhead" [style.left]="'calc(var(--header-width) + ' + playheadX() + 'px)'"></div>
+}

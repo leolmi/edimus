@@ -1,0 +1,227 @@
+:host {
+  --header-width: 240px;
+  --track-height: 120px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ruler-row,
+.scroll-row,
+.track,
+.lanes-probe {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.corner,
+.header {
+  flex: 0 0 var(--header-width);
+  width: var(--header-width);
+}
+
+.ruler-row {
+  height: 28px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.ruler,
+.lane,
+.scroller,
+.probe {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tracks {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* stripes as tall as a track, below the last track, down to the bottom */
+.slots {
+  /* one 1px line at the bottom of every track-high tile */
+  --stripes: linear-gradient(to bottom, transparent calc(100% - 1px), var(--mat-sys-outline-variant) calc(100% - 1px)) 0 0 /
+    100% calc(var(--track-height) + 1px) repeat-y;
+  display: flex;
+  flex: 1 0 calc(var(--track-height) + 1px);
+}
+
+.slots-header {
+  flex: 0 0 var(--header-width);
+  background: var(--stripes), var(--mat-sys-surface-container-low);
+  border-right: 1px solid var(--mat-sys-outline-variant);
+  opacity: 0.6;
+}
+
+.slots-lane {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--stripes);
+}
+
+.slot-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--track-height);
+  margin: 0 12px;
+  border: 1px dashed var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  box-sizing: border-box;
+  transform: scale(0.94);
+}
+
+.link {
+  color: var(--mat-sys-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.track {
+  height: var(--track-height);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px;
+  overflow: hidden;
+  background: var(--mat-sys-surface-container-low);
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+.name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--mat-sys-title-small);
+  /* clickable like the montage title: opens details and rename */
+  margin: 0 -6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-highest);
+  }
+
+  // the icon keeps its size: a long name is ellipsized instead
+  mat-icon {
+    flex: 0 0 auto;
+  }
+
+  span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.info {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  color: var(--mat-sys-error);
+}
+
+.lanes-probe {
+  height: 0;
+}
+
+.scroll-row {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.scroll-content {
+  height: 1px;
+}
+
+.ruler,
+.lane {
+  cursor: text;
+  touch-action: none;
+}
+
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--mat-sys-error);
+  pointer-events: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -5px;
+    border: 5px solid transparent;
+    border-top: 7px solid var(--mat-sys-error);
+  }
+}
+
+.track-actions {
+  display: flex;
+  align-items: center;
+  margin: -4px -8px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+/* compact icon buttons: sized through the Material tokens, so icon and state layer stay aligned */
+.small {
+  --mat-icon-button-state-layer-size: 30px;
+  --mat-icon-button-icon-size: 18px;
+  --mat-icon-button-icon-color: var(--mat-sys-on-surface-variant);
+
+  &.active {
+    --mat-icon-button-icon-color: var(--mat-sys-primary);
+  }
+}
+
+.range {
+  position: absolute;
+  top: 28px;
+  bottom: 0;
+  background: color-mix(in srgb, var(--mat-sys-tertiary) 18%, transparent);
+  border-left: 1px solid var(--mat-sys-tertiary);
+  border-right: 1px solid var(--mat-sys-tertiary);
+  pointer-events: none;
+}
+
+/* drop zone under the files being dragged from the OS */
+.track.drop-over .lane,
+.slots.drop-over .slot-hint {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: -2px;
+  background-color: color-mix(in srgb, var(--mat-sys-primary) 10%, transparent);
+}

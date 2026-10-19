@@ -1,0 +1,113 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.toolbar {
+  gap: 8px;
+  flex: 0 0 auto;
+  background: var(--mat-sys-surface-container);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.logo {
+  color: var(--mat-sys-primary);
+}
+
+.title {
+  font: var(--mat-sys-title-medium);
+  margin-right: 16px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-highest);
+  }
+}
+
+.dirty {
+  color: var(--mat-sys-primary);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.check {
+  margin-left: auto;
+  margin-right: 0;
+  color: var(--mat-sys-primary);
+}
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+
+  app-timeline {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
+
+.time {
+  font: var(--mat-sys-body-medium);
+  font-variant-numeric: tabular-nums;
+  min-width: 130px;
+}
+
+.toggled {
+  color: var(--mat-sys-on-tertiary-container);
+  background: var(--mat-sys-tertiary-container);
+}
+
+.volume {
+  width: 130px;
+  min-width: 130px;
+}
+
+.ai {
+  color: var(--mat-sys-tertiary);
+  margin: 0 4px;
+
+  &.busy {
+    animation: ai-pulse 0.8s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes ai-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: var(--mat-sys-outline-variant);
+}
+
+
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  mat-progress-bar {
+    width: 200px;
+  }
+
+  flex: 0 0 auto;
+  padding: 3px 12px;
+  background: var(--mat-sys-surface-container);
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+

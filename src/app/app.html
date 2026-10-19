@@ -1,0 +1,159 @@
+<mat-toolbar class="toolbar">
+  <mat-icon class="logo">graphic_eq</mat-icon>
+  <span class="title" role="button" tabindex="0" (click)="documents.rename()" (keydown.enter)="documents.rename()" [matTooltip]="'rename.tooltip' | t">
+    {{ documents.title() }}
+    @if (montages.dirty()) {
+      <span class="dirty" [matTooltip]="'montage.dirty' | t">•</span>
+    }
+  </span>
+
+  <button mat-icon-button (click)="documents.reset()" [disabled]="montages.pristine()" [matTooltip]="'action.reset' | t">
+    <mat-icon>restart_alt</mat-icon>
+  </button>
+  <button mat-icon-button (click)="documents.openDialog()" [matTooltip]="'action.open' | t">
+    <mat-icon>folder_open</mat-icon>
+  </button>
+  <button mat-icon-button (click)="documents.save()" [disabled]="montages.isEmpty()" [matTooltip]="'action.save' | t">
+    <mat-icon>save</mat-icon>
+  </button>
+  <button mat-icon-button (click)="documents.saveAs()" [disabled]="montages.isEmpty()" [matTooltip]="'action.saveAs' | t">
+    <mat-icon>save_as</mat-icon>
+  </button>
+  <button mat-icon-button (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
+    <mat-icon>file_export</mat-icon>
+  </button>
+  <span class="divider"></span>
+  <button mat-icon-button (click)="montages.undo()" [disabled]="!montages.canUndo()" [matTooltip]="'action.undo' | t">
+    <mat-icon>undo</mat-icon>
+  </button>
+  <button mat-icon-button (click)="montages.redo()" [disabled]="!montages.canRedo()" [matTooltip]="'action.redo' | t">
+    <mat-icon>redo</mat-icon>
+  </button>
+  @if (!montages.isEmpty()) {
+    <span class="divider"></span>
+    <button
+      mat-icon-button
+      [class.toggled]="timeline.beatGrid()"
+      (click)="timeline.beatGrid.set(!timeline.beatGrid())"
+      [matTooltip]="'tempo.grid' | t"
+    >
+      <mat-icon>music_note</mat-icon>
+    </button>
+    <button mat-icon-button (click)="edits.alignTempo()" [disabled]="!edits.canAlign()" [matTooltip]="'align.title' | t">
+      <mat-icon>sync_alt</mat-icon>
+    </button>
+    <button
+      mat-icon-button
+      [class.toggled]="timeline.envelopeMode()"
+      (click)="timeline.envelopeMode.set(!timeline.envelopeMode())"
+      [matTooltip]="'edit.envelope' | t"
+    >
+      <mat-icon>show_chart</mat-icon>
+    </button>
+    <button mat-icon-button (click)="edits.split()" [matTooltip]="'edit.split' | t">
+      <mat-icon>content_cut</mat-icon>
+    </button>
+    <button mat-icon-button (click)="edits.crop()" [disabled]="!edits.hasRange()" [matTooltip]="'edit.crop' | t">
+      <mat-icon>crop</mat-icon>
+    </button>
+    <button mat-icon-button (click)="edits.delete()" [disabled]="!edits.canDelete()" [matTooltip]="'edit.delete' | t">
+      <mat-icon>delete</mat-icon>
+    </button>
+  }
+
+  @if (!montages.isEmpty()) {
+    <span class="divider"></span>
+    <button mat-icon-button (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
+      <mat-icon>stop</mat-icon>
+    </button>
+    <button mat-icon-button (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
+      <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
+    </button>
+    <span class="time">{{ time() }}</span>
+    <button mat-icon-button (click)="settings.toggleMuted()" [matTooltip]="'volume.mute' | t">
+      <mat-icon>{{ volumeIcon() }}</mat-icon>
+    </button>
+    <app-scale-slider
+      class="volume"
+      compact
+      [min]="0"
+      [max]="100"
+      [step]="1"
+      [majorTicks]="25"
+      [minorTicks]="4"
+      [format]="percentLabel"
+      [disabled]="settings.muted()"
+      [ariaLabel]="'volume.listening' | t"
+      [value]="settings.volume() * 100"
+      (valueChange)="settings.setVolume($event / 100, false)"
+      (committed)="settings.setVolume($event / 100)"
+    />
+  }
+
+  <span class="spacer"></span>
+
+  @if (!montages.isEmpty()) {
+    <button mat-icon-button (click)="timeline.zoomBy(1.5)" [matTooltip]="'zoom.in' | t">
+      <mat-icon>zoom_in</mat-icon>
+    </button>
+    <button mat-icon-button (click)="timeline.zoomBy(1 / 1.5)" [matTooltip]="'zoom.out' | t">
+      <mat-icon>zoom_out</mat-icon>
+    </button>
+    <button mat-icon-button (click)="timeline.fit()" [matTooltip]="'zoom.fit' | t">
+      <mat-icon>fit_screen</mat-icon>
+    </button>
+    <span class="divider"></span>
+  }
+
+  <button mat-icon-button [matMenuTriggerFor]="themeMenu" [matTooltip]="'settings.theme' | t">
+    <mat-icon>{{ themeIcon() }}</mat-icon>
+  </button>
+  <mat-menu #themeMenu="matMenu">
+    @for (theme of themes; track theme.mode) {
+      <button mat-menu-item (click)="settings.setTheme(theme.mode)">
+        <mat-icon>{{ theme.icon }}</mat-icon>
+        <span>{{ theme.label | t }}</span>
+        @if (settings.theme() === theme.mode) {
+          <mat-icon class="check">check</mat-icon>
+        }
+      </button>
+    }
+  </mat-menu>
+
+  <button mat-icon-button [matMenuTriggerFor]="languageMenu" [matTooltip]="'settings.language' | t">
+    <mat-icon>translate</mat-icon>
+  </button>
+  @if (ai.connected()) {
+    <mat-icon class="ai" [class.busy]="ai.busy()" [matTooltip]="(ai.busy() ? 'ai.busy' : 'ai.connected') | t">smart_toy</mat-icon>
+  }
+  <button mat-icon-button (click)="showLicenses()" [matTooltip]="'licenses.title' | t">
+    <mat-icon>info</mat-icon>
+  </button>
+  <mat-menu #languageMenu="matMenu">
+    @for (language of languages; track language.code) {
+      <button mat-menu-item (click)="settings.setLanguage(language.code)">
+        <span>{{ language.label }}</span>
+        @if (settings.language() === language.code) {
+          <mat-icon class="check">check</mat-icon>
+        }
+      </button>
+    }
+  </mat-menu>
+</mat-toolbar>
+
+<main class="workspace">
+  <app-timeline />
+  @if (!montages.isEmpty()) {
+    <!-- always present (fixed height): selecting a clip does not move the tracks -->
+    <app-clip-bar />
+  }
+</main>
+
+<footer class="statusbar">
+  @if (exporter.progress(); as progress) {
+    <span>{{ (progress.stage === 'render' ? 'export.rendering' : 'export.encoding') | t: { p: (progress.progress * 100).toFixed(0) } }}</span>
+    <mat-progress-bar mode="determinate" [value]="progress.progress * 100" />
+  } @else {
+    {{ documents.status() }}
+  }
+</footer>

@@ -1,0 +1,66 @@
+@use '@angular/material' as mat;
+
+html {
+  height: 100%;
+  // "system" theme: follows the OS preference; overridden by the classes below
+  color-scheme: light dark;
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$azure-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: (
+        plain-family: "'Segoe UI', system-ui, sans-serif",
+        brand-family: "'Segoe UI', system-ui, sans-serif",
+      ),
+      density: -2,
+    )
+  );
+
+  &.theme-light {
+    color-scheme: light;
+  }
+  &.theme-dark {
+    color-scheme: dark;
+  }
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+// dialogs use the default density: at -2 the form fields hide their floating labels
+.mat-mdc-dialog-container {
+  @include mat.form-field-density(0);
+}
+
+// dialogs take the width of their content (each sets its own), up to most of the window;
+// the Material default caps them at 560px
+html {
+  @include mat.dialog-overrides(
+    (
+      container-max-width: 92vw,
+    )
+  );
+}
+
+// icons in icon buttons follow the button token --mat-icon-button-icon-size (the Material
+// Symbols class fixes them at 24px otherwise): size the button through the tokens, never the icon
+.mat-mdc-icon-button .mat-icon {
+  font-size: inherit;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
