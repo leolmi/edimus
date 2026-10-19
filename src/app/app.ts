@@ -1,7 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
@@ -12,26 +11,15 @@ import { PlaybackService } from './core/audio/playback.service';
 import { DocumentService } from './core/document.service';
 import { EditService } from './core/edit.service';
 import { formatDuration } from './core/format';
-import type { TranslationKey } from './core/i18n/it';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import { MontageService } from './core/montage/montage.service';
-import { Language, SettingsService, ThemeMode } from './core/settings.service';
+import { SettingsService } from './core/settings.service';
 import { TimelineService } from './core/timeline/timeline.service';
 import { ClipBarComponent } from './features/timeline/clip-bar.component';
-import { LicensesDialogComponent } from './features/licenses/licenses-dialog.component';
+import { HelpDialogComponent, HelpTab } from './features/help/help-dialog.component';
+import { SettingsDialogComponent } from './features/settings/settings-dialog.component';
 import { TimelineComponent } from './features/timeline/timeline.component';
 import { ScaleSliderComponent } from './shared/scale-slider.component';
-
-const THEMES: { mode: ThemeMode; icon: string; label: TranslationKey }[] = [
-  { mode: 'light', icon: 'light_mode', label: 'settings.theme.light' },
-  { mode: 'dark', icon: 'dark_mode', label: 'settings.theme.dark' },
-  { mode: 'system', icon: 'contrast', label: 'settings.theme.system' },
-];
-
-const LANGUAGES: { code: Language; label: string }[] = [
-  { code: 'it', label: 'Italiano' },
-  { code: 'en', label: 'English' },
-];
 
 @Component({
   selector: 'app-root',
@@ -40,7 +28,6 @@ const LANGUAGES: { code: Language; label: string }[] = [
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
-    MatMenuModule,
     MatTooltipModule,
     MatProgressBarModule,
     ScaleSliderComponent,
@@ -59,12 +46,9 @@ export class App {
   protected readonly documents = inject(DocumentService);
   protected readonly edits = inject(EditService);
   protected readonly exporter = inject(ExportService);
-  protected readonly ai = inject(AiBridgeService);
+  /** Started with the app: connects this window to the MCP server when it runs. */
+  private readonly ai = inject(AiBridgeService);
   private readonly dialogs = inject(MatDialog);
-
-  protected readonly themes = THEMES;
-  protected readonly languages = LANGUAGES;
-  protected readonly themeIcon = computed(() => THEMES.find((t) => t.mode === this.settings.theme())!.icon);
 
   protected readonly percentLabel = (value: number) => `${Math.round(value)}%`;
 
@@ -78,16 +62,29 @@ export class App {
     () => `${formatDuration(this.playback.position())} / ${formatDuration(this.timeline.duration())}`,
   );
 
-  protected showLicenses(): void {
-    this.dialogs.open(LicensesDialogComponent, { autoFocus: 'dialog', maxWidth: '95vw' });
+  protected showSettings(): void {
+    if (this.dialogs.openDialogs.some((d) => d.componentInstance instanceof SettingsDialogComponent)) return;
+    this.dialogs.open(SettingsDialogComponent, { autoFocus: 'dialog', maxWidth: '95vw' });
   }
 
-  /** Document (Ctrl+N/O/S/Shift+S/Z/Y), transport (Space, Home, End) and edit (S split, E envelope, B beat grid, Delete, Escape) shortcuts. */
+  protected showHelp(tab: HelpTab = 'guide'): void {
+    if (this.dialogs.openDialogs.some((d) => d.componentInstance instanceof HelpDialogComponent)) return;
+    this.dialogs.open(HelpDialogComponent, { data: tab, autoFocus: 'dialog', maxWidth: '95vw' });
+  }
+
+  /**
+   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y), transport (Space, Home, End) and edit
+   * (S split, E envelope, B beat grid, Delete, Escape) shortcuts.
+   */
   protected onKeydown(event: KeyboardEvent): void {
+    if (event.code === 'F1') {
+      event.preventDefault();
+      return this.showHelp();
+    }
     const editing = event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]');
     if (editing) return;
     if (this.timeline.beatMarking()) {
-      // marking the beats: Enter confirms, Backspace removes the last mark, Escape cancels
+      // marking a bar: Enter confirms, Backspace starts again from the 1, Escape cancels
       const actions: Record<string, () => unknown> = {
         Enter: () => this.edits.confirmBeatMarking(),
         NumpadEnter: () => this.edits.confirmBeatMarking(),
@@ -140,6 +137,8 @@ export class App {
 
   private documentCommand(code: string, shift: boolean): (() => unknown) | undefined {
     switch (code) {
+      case 'Comma':
+        return () => this.showSettings();
       case 'KeyN':
         return () => this.documents.reset();
       case 'KeyO':

@@ -79,6 +79,11 @@ export class TimelineService {
     this.scroll.set(Math.min(max, Math.max(0, time)));
   }
 
+  /** Scrolls so that `time` is in the middle of the view (as close as the ends allow). */
+  centerOn(time: number): void {
+    this.setScroll(time - this.viewWidth() / 2 / this.pxPerSec());
+  }
+
   /** Multiplies the zoom keeping the time under `anchorX` (default: center) still. */
   zoomBy(factor: number, anchorX = this.viewWidth() / 2): void {
     const anchor = this.xToTime(anchorX);

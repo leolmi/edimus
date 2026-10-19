@@ -1,6 +1,6 @@
 {
   "name": "edimus",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "scripts": {
     "ng": "ng",
     "setup": "neu update --latest && npm run licenses",
@@ -8,9 +8,10 @@
     "dev": "neu run",
     "build": "neu build --release --embed-resources",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "package": "npm run build && node scripts/package.mjs",
+    "package": "npm run build && npm run mcp:build && node scripts/package.mjs",
     "mcp:install": "npm --prefix mcp install",
-    "mcp:test": "node mcp/test-client.mjs"
+    "mcp:test": "node mcp/test-client.mjs",
+    "mcp:build": "npm --prefix mcp run build"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

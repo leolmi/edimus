@@ -1,6 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, resource, signal } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialogModule } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -17,14 +15,11 @@ interface LicenseEntry {
   text: string | null;
 }
 
-/** Third-party components with their licenses (full text when available). */
+/** Third-party components with their licenses (full text when available), with a filter. */
 @Component({
-  selector: 'app-licenses-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatExpansionModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, TranslatePipe],
+  selector: 'app-licenses',
+  imports: [MatExpansionModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, TranslatePipe],
   template: `
-    <h2 mat-dialog-title>{{ 'licenses.title' | t }}</h2>
-    <mat-dialog-content class="content">
-      <p class="about">edimus {{ version }} · Neutralinojs {{ neutralino }}</p>
       <p class="intro">{{ 'licenses.intro' | t }}</p>
       <!-- with the dense theme the floating label is hidden: placeholder instead -->
       <mat-form-field class="filter" appearance="outline" subscriptSizing="dynamic">
@@ -54,19 +49,10 @@ interface LicenseEntry {
           </mat-expansion-panel>
         }
       </mat-accordion>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>{{ 'common.close' | t }}</button>
-    </mat-dialog-actions>
   `,
   styles: `
-    .content {
-      width: min(860px, 90vw);
-      max-height: 75vh;
-    }
-    .about {
-      font: var(--mat-sys-title-small);
-      margin-top: 0;
+    :host {
+      display: block;
     }
     .intro,
     .usage,
@@ -119,9 +105,7 @@ interface LicenseEntry {
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class LicensesDialogComponent {
-  protected readonly version = window.NL_APPVERSION ?? '';
-  protected readonly neutralino = window.NL_VERSION ?? '';
+export class LicensesComponent {
   protected readonly filter = signal('');
 
   protected readonly entries = resource({

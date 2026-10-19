@@ -63,13 +63,6 @@
 
   @if (!montages.isEmpty()) {
     <span class="divider"></span>
-    <button mat-icon-button (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
-      <mat-icon>stop</mat-icon>
-    </button>
-    <button mat-icon-button (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
-      <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
-    </button>
-    <span class="time">{{ time() }}</span>
     <button mat-icon-button (click)="settings.toggleMuted()" [matTooltip]="'volume.mute' | t">
       <mat-icon>{{ volumeIcon() }}</mat-icon>
     </button>
@@ -105,40 +98,12 @@
     <span class="divider"></span>
   }
 
-  <button mat-icon-button [matMenuTriggerFor]="themeMenu" [matTooltip]="'settings.theme' | t">
-    <mat-icon>{{ themeIcon() }}</mat-icon>
+  <button mat-icon-button (click)="showSettings()" [matTooltip]="'settings.tooltip' | t">
+    <mat-icon>settings</mat-icon>
   </button>
-  <mat-menu #themeMenu="matMenu">
-    @for (theme of themes; track theme.mode) {
-      <button mat-menu-item (click)="settings.setTheme(theme.mode)">
-        <mat-icon>{{ theme.icon }}</mat-icon>
-        <span>{{ theme.label | t }}</span>
-        @if (settings.theme() === theme.mode) {
-          <mat-icon class="check">check</mat-icon>
-        }
-      </button>
-    }
-  </mat-menu>
-
-  <button mat-icon-button [matMenuTriggerFor]="languageMenu" [matTooltip]="'settings.language' | t">
-    <mat-icon>translate</mat-icon>
+  <button mat-icon-button (click)="showHelp()" [matTooltip]="'help.tooltip' | t">
+    <mat-icon>help</mat-icon>
   </button>
-  @if (ai.connected()) {
-    <mat-icon class="ai" [class.busy]="ai.busy()" [matTooltip]="(ai.busy() ? 'ai.busy' : 'ai.connected') | t">smart_toy</mat-icon>
-  }
-  <button mat-icon-button (click)="showLicenses()" [matTooltip]="'licenses.title' | t">
-    <mat-icon>info</mat-icon>
-  </button>
-  <mat-menu #languageMenu="matMenu">
-    @for (language of languages; track language.code) {
-      <button mat-menu-item (click)="settings.setLanguage(language.code)">
-        <span>{{ language.label }}</span>
-        @if (settings.language() === language.code) {
-          <mat-icon class="check">check</mat-icon>
-        }
-      </button>
-    }
-  </mat-menu>
 </mat-toolbar>
 
 <main class="workspace">
@@ -155,5 +120,29 @@
     <mat-progress-bar mode="determinate" [value]="progress.progress * 100" />
   } @else {
     {{ documents.status() }}
+  }
+  @if (!montages.isEmpty()) {
+    <span class="spacer"></span>
+    <div class="transport">
+      <button mat-icon-button (click)="timeline.centerOn(playback.position())" [matTooltip]="'transport.center' | t">
+        <mat-icon>my_location</mat-icon>
+      </button>
+      <button
+        mat-icon-button
+        [class.toggled]="playback.loop() && edits.hasRange()"
+        [disabled]="!edits.hasRange()"
+        (click)="playback.loop.set(!playback.loop())"
+        [matTooltip]="'transport.loop' | t"
+      >
+        <mat-icon>repeat</mat-icon>
+      </button>
+      <button mat-icon-button (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
+        <mat-icon>stop</mat-icon>
+      </button>
+      <button mat-icon-button (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
+        <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
+      </button>
+      <span class="time">{{ time() }}</span>
+    </div>
   }
 </footer>

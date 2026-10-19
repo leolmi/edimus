@@ -31,6 +31,7 @@ import { EnvelopePoint, curveThroughMidpoint, insertPoint, movePoint, setCurve }
 import { Clip, Montage, Track, audibleTracks, copyName, fileName } from '../../core/montage/montage.model';
 import { MontageService } from '../../core/montage/montage.service';
 import { SettingsService } from '../../core/settings.service';
+import { snapToBeats } from '../../core/timeline/beat-snap';
 import { BarMarking, TimelineService } from '../../core/timeline/timeline.service';
 import { sourceColors } from '../../core/source-colors';
 import { ThemeColorsService } from '../../core/theme-colors.service';
@@ -109,10 +110,17 @@ export class TimelineComponent {
   });
 
   /** Playhead x inside the lanes, null when out of view. */
-  protected readonly playheadX = computed(() => {
-    const x = this.timeline.timeToX(this.playback.position());
-    return x >= 0 && x <= this.timeline.viewWidth() ? Math.round(x) : null;
+  protected readonly playheadX = computed(() => this.visibleX(this.playback.position()));
+  /** Start point of the stops, when set and in view. */
+  protected readonly cueX = computed(() => {
+    const cue = this.playback.cue();
+    return cue === null ? null : this.visibleX(cue);
   });
+
+  private visibleX(time: number): number | null {
+    const x = this.timeline.timeToX(time);
+    return x >= 0 && x <= this.timeline.viewWidth() ? Math.round(x) : null;
+  }
   /** Playing state at the start of a scrub on the ruler. */
   private scrubResume = false;
   /** Gesture in progress on a lane. */
@@ -263,7 +271,15 @@ export class TimelineComponent {
     const time = this.timeAt(event);
     switch (gesture.kind) {
       case 'move': {
-        const start = Math.max(0, gesture.clipStart + time - gesture.pointerTime);
+        let start = Math.max(0, gesture.clipStart + time - gesture.pointerTime);
+        // with the beat grid shown the clip moves beat by beat (Alt: free)
+        if (this.timeline.beatGrid() && !event.altKey) {
+          start = snapToBeats(gesture.from, gesture.clipId, start, gesture.clipStart, time, {
+            tempoOf: (sourceId) => this.tempos.sourceTempo(sourceId),
+            length: (clip) => this.timeline.clipLength(clip),
+            step: this.settings.snapStep(),
+          });
+        }
         const rows = Math.round((event.clientY - gesture.pointerY) / gesture.rowHeight);
         // one row past the last track = a new track, unless the clip is alone on its track
         // (the new track would just replace the one left empty)
@@ -423,7 +439,7 @@ export class TimelineComponent {
     this.montages.updateTrack(track.id, (t) => ({ ...t, solo: !t.solo }));
   }
 
-  /** Click or drag on the ruler (or on a lane) moves the playhead. */
+  /** Click or drag on the ruler moves the playhead; where it is released becomes the start point of the stops. */
   protected onScrubStart(event: PointerEvent): void {
     if (event.button !== 0) return;
     const target = event.currentTarget as HTMLElement;
@@ -441,6 +457,7 @@ export class TimelineComponent {
     const target = event.currentTarget as HTMLElement;
     if (!target.hasPointerCapture(event.pointerId)) return;
     target.releasePointerCapture(event.pointerId);
+    this.playback.setCue(this.playback.position());
     if (this.scrubResume) this.playback.play();
   }
 
@@ -452,18 +469,22 @@ export class TimelineComponent {
     return this.timeline.xToTime(this.xAt(event));
   }
 
-  /** Ctrl+wheel zooms around the pointer, Shift+wheel (or horizontal wheel) scrolls the time. */
+  /**
+   * Shift+wheel (or horizontal wheel) scrolls the time; the wheel on the lanes or the ruler
+   * (Ctrl+wheel anywhere) zooms around the pointer; on the track headers it scrolls the tracks.
+   */
   protected onWheel(event: WheelEvent): void {
     const x = event.clientX - this.lanes().nativeElement.getBoundingClientRect().left;
-    if (event.ctrlKey) {
-      event.preventDefault();
-      this.timeline.zoomBy(event.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, Math.max(0, x));
-      return;
-    }
     const dx = event.shiftKey ? event.deltaY : event.deltaX;
     if (dx) {
       event.preventDefault();
       this.timeline.setScroll(this.timeline.scroll() + dx / this.timeline.pxPerSec());
+      return;
+    }
+    const onTime = event.target instanceof Element && event.target.closest('.lane, .ruler');
+    if (event.deltaY && (event.ctrlKey || onTime)) {
+      event.preventDefault();
+      this.timeline.zoomBy(event.deltaY < 0 ? WHEEL_ZOOM_STEP : 1 / WHEEL_ZOOM_STEP, Math.max(0, x));
     }
   }
 
@@ -499,7 +520,7 @@ export class TimelineComponent {
     ];
     if (info.bitRate) parts.push(`${Math.round(info.bitRate / 1000)} kbps`);
     parts.push(formatDuration(info.duration));
-    return parts.join(' Â· ');
+    return parts.join(' · ');
   }
 
   protected readonly fileName = fileName;

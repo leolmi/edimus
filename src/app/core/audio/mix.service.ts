@@ -24,8 +24,11 @@ export class MixService {
   private readonly timeline = inject(TimelineService);
   private readonly processed = inject(ProcessedAudioService);
 
-  /** Schedules the montage from montage time `from`, played at context time `when`. */
-  schedule(ctx: BaseAudioContext, destination: AudioNode, from: number, when: number): ScheduledMix {
+  /**
+   * Schedules the montage from montage time `from` (up to `until`, default the end), played at
+   * context time `when`.
+   */
+  schedule(ctx: BaseAudioContext, destination: AudioNode, from: number, when: number, until = Infinity): ScheduledMix {
     const mix: ScheduledMix = { sources: [], gains: [] };
     for (const track of audibleTracks(this.montages.montage())) {
       const gain = ctx.createGain();
@@ -35,14 +38,15 @@ export class MixService {
       for (const clip of track.clips) {
         const buffer = this.bufferOf(clip);
         const length = this.timeline.clipLength(clip);
-        if (!buffer || clip.start + length <= from) continue;
+        if (!buffer || clip.start + length <= from || clip.start >= until) continue;
         const node = ctx.createBufferSource();
         node.buffer = buffer;
         node.connect(gain);
         const delay = Math.max(0, clip.start - from);
         const skip = Math.max(0, from - clip.start);
+        const play = Math.min(length, until - clip.start) - skip;
         // processed clips play their portion of the rendered source (rendered time = source time / rate)
-        node.start(when + delay, clip.offset / clipRate(clip) + skip, length - skip);
+        node.start(when + delay, clip.offset / clipRate(clip) + skip, play);
         mix.sources.push(node);
       }
     }

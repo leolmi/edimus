@@ -4,7 +4,7 @@ bin/
 .tmp/
 .storage/
 neutralinojs.log
-.tmp-dev.log
+.tmp-*
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
 # Compiled output
@@ -56,3 +56,4 @@ public/licenses.json
 build/
 release/
 imports/
+mcp/dist/

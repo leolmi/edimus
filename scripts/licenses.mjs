@@ -23,9 +23,10 @@ function repositoryUrl(pkg) {
 
 // --- npm packages: production dependencies, transitively -------------------------------
 const npm = new Map();
-function visit(name) {
+/** Adds a package of `base` (a folder with node_modules) and its dependencies. */
+function visit(name, base, usage) {
   if (npm.has(name)) return;
-  const dir = join(root, 'node_modules', name);
+  const dir = join(root, base, 'node_modules', name);
   if (!existsSync(join(dir, 'package.json'))) return;
   const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
   npm.set(name, {
@@ -33,12 +34,14 @@ function visit(name) {
     version: pkg.version,
     license: typeof pkg.license === 'string' ? pkg.license : (pkg.license?.type ?? 'UNKNOWN'),
     url: repositoryUrl(pkg),
-    usage: 'Frontend (npm)',
+    usage,
     text: licenseText(dir),
   });
-  for (const dep of Object.keys(pkg.dependencies ?? {})) visit(dep);
+  for (const dep of Object.keys(pkg.dependencies ?? {})) visit(dep, base, usage);
 }
-for (const dep of Object.keys(readJson('package.json').dependencies ?? {})) visit(dep);
+for (const dep of Object.keys(readJson('package.json').dependencies ?? {})) visit(dep, '.', 'Frontend (npm)');
+// bundled into edimus-mcp.exe
+for (const dep of Object.keys(readJson('mcp/package.json').dependencies ?? {})) visit(dep, 'mcp', 'MCP server (edimus-mcp.exe)');
 
 // --- native runtime and tools ----------------------------------------------------------
 const neutralinoVersion = readJson('neutralino.config.json').cli.binaryVersion;
@@ -62,6 +65,14 @@ const native = [
     url: 'https://ffmpeg.org — https://www.gyan.dev/ffmpeg/builds/',
     usage: 'Decoding, encoding and Rubber Band processing (ffmpeg.exe, ffprobe.exe)',
     text: gpl3,
+  },
+  {
+    name: 'Node.js',
+    version: process.versions.node,
+    license: 'MIT (and the licenses of its bundled dependencies)',
+    url: 'https://nodejs.org',
+    usage: 'Runtime embedded in the MCP server (edimus-mcp.exe, built with this Node version)',
+    text: existsSync(join(dirname(process.execPath), 'LICENSE')) ? readFileSync(join(dirname(process.execPath), 'LICENSE'), 'utf8').trim() : null,
   },
 ];
 

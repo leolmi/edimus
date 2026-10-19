@@ -1,4 +1,4 @@
-<div class="ruler-row">
+<div class="ruler-row" (wheel)="onWheel($event)">
   <div class="corner"></div>
   <app-ruler class="ruler" (pointerdown)="onScrubStart($event)" (pointermove)="onScrubMove($event)" (pointerup)="onScrubEnd($event)" (pointercancel)="onScrubEnd($event)" />
 </div>
@@ -80,6 +80,9 @@
 
 @if (rangeBox(); as box) {
   <div class="range" [style.left]="'calc(var(--header-width) + ' + box.left + 'px)'" [style.width.px]="box.width"></div>
+}
+@if (cueX() !== null && !montages.isEmpty()) {
+  <div class="cue" [style.left]="'calc(var(--header-width) + ' + cueX() + 'px)'"></div>
 }
 @if (playheadX() !== null && !montages.isEmpty()) {
   <div class="playhead" [style.left]="'calc(var(--header-width) + ' + playheadX() + 'px)'"></div>

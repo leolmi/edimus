@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { isSea } from 'node:sea';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
@@ -20,7 +21,11 @@ import { GUIDE } from './guide.mjs';
 
 const PORT = Number(process.env.EDIMUS_MCP_PORT ?? 47816);
 const CALL_TIMEOUT = 120_000;
-const here = dirname(fileURLToPath(import.meta.url));
+/** Built as a single executable (edimus-mcp.exe, see build-exe.mjs): it sits next to edimus.exe. */
+const packaged = isSea();
+const here = packaged ? dirname(process.execPath) : dirname(fileURLToPath(import.meta.url));
+const appExe = process.platform === 'win32' ? 'edimus.exe' : 'edimus';
+const defaultExe = packaged ? join(here, appExe) : join(here, '..', 'release', 'edimus', appExe);
 const configDir = process.env.APPDATA ? join(process.env.APPDATA, 'edimus') : join(homedir(), '.config', 'edimus');
 const configFile = join(configDir, 'mcp.json');
 const token = randomBytes(24).toString('hex');
@@ -126,7 +131,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '0.1.0' },
+  { name: 'edimus', version: '1.0.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -217,11 +222,11 @@ server.registerTool(
     title: 'Launch edimus',
     description:
       'Starts a new edimus window (optionally opening files) and waits until it connects. ' +
-      'Uses EDIMUS_EXE, or the portable build next to this server (../release/edimus/edimus.exe).',
+      'Uses EDIMUS_EXE, or edimus.exe next to this server (the portable build when run from the sources).',
     inputSchema: { files: z.array(z.string()).optional().describe('Audio files or a .edimus montage to open') },
   },
   async ({ files }) => {
-    const exe = process.env.EDIMUS_EXE ?? join(here, '..', 'release', 'edimus', process.platform === 'win32' ? 'edimus.exe' : 'edimus');
+    const exe = process.env.EDIMUS_EXE ?? defaultExe;
     if (!existsSync(exe)) return failure(new Error(`edimus executable not found: ${exe} (set EDIMUS_EXE)`));
     const before = new Set(instances.keys());
     const args = (files ?? []).map((f) => `--edimus-open=${f}`);
@@ -452,5 +457,5 @@ appTool(
 );
 appTool('snapshot', 'Timeline image', 'PNG image of the timeline as currently shown (tracks, waveforms, envelopes, playhead).', {}, { readOnlyHint: true });
 
-await server.connect(new StdioServerTransport());
-log('MCP server ready');
+// no top-level await: the executable build bundles this file as CommonJS
+server.connect(new StdioServerTransport()).then(() => log('MCP server ready'));

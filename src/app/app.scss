@@ -55,11 +55,6 @@
   }
 }
 
-.time {
-  font: var(--mat-sys-body-medium);
-  font-variant-numeric: tabular-nums;
-  min-width: 130px;
-}
 
 .toggled {
   color: var(--mat-sys-on-tertiary-container);
@@ -69,21 +64,6 @@
 .volume {
   width: 130px;
   min-width: 130px;
-}
-
-.ai {
-  color: var(--mat-sys-tertiary);
-  margin: 0 4px;
-
-  &.busy {
-    animation: ai-pulse 0.8s ease-in-out infinite alternate;
-  }
-}
-
-@keyframes ai-pulse {
-  to {
-    opacity: 0.35;
-  }
 }
 
 .divider {
@@ -104,10 +84,31 @@
   }
 
   flex: 0 0 auto;
-  padding: 3px 12px;
+  // fixed height: the transport buttons fit, the bar does not jump when they appear
+  min-height: 40px;
+  padding: 0 4px 0 12px;
   background: var(--mat-sys-surface-container);
   border-top: 1px solid var(--mat-sys-outline-variant);
   color: var(--mat-sys-on-surface-variant);
   font: var(--mat-sys-body-small);
+}
+
+// play/stop and time, at the right of the status bar
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  --mat-icon-button-state-layer-size: 34px;
+  --mat-icon-button-icon-size: 22px;
+  --mat-icon-button-icon-color: var(--mat-sys-on-surface);
+
+  .time {
+    font: var(--mat-sys-title-small);
+    font-variant-numeric: tabular-nums;
+    color: var(--mat-sys-on-surface);
+    min-width: 120px;
+    margin: 0 8px 0 6px;
+    text-align: right;
+  }
 }
 
