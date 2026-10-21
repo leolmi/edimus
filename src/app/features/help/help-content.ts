@@ -64,6 +64,19 @@ const IT: HelpContent = {
           ],
         },
         {
+          title: 'Pacchetto: montaggio con i file audio',
+          text: [
+            'In “Salva con nome” puoi scegliere il tipo Pacchetto edimus (.edimuspack): un unico file con il montaggio e una copia di tutti i file audio, comodo per spostarlo o condividerlo.',
+            'Aprendo un pacchetto, sul desktop i file audio vengono estratti nella cartella “<nome>.sources” accanto al pacchetto; nella versione web restano in memoria finché la pagina è aperta.',
+          ],
+        },
+        {
+          title: 'File audio mancanti',
+          text: [
+            'Se un file audio del montaggio non si trova più, la sua traccia mostra un errore. Apri o trascina il file giusto: edimus lo riconosce dal contenuto (anche con un altro nome o in un’altra cartella) e lo ricollega, senza aggiungere una nuova traccia.',
+          ],
+        },
+        {
           title: 'Esportare il mix',
           keys: ['Ctrl+E'],
           text: [
@@ -264,6 +277,21 @@ const IT: HelpContent = {
         },
       ],
     },
+    {
+      title: 'Versione web',
+      icon: 'language',
+      topics: [
+        {
+          title: 'edimus nel browser',
+          text: [
+            'La versione web lavora tutta sul tuo computer: i file audio non vengono mai caricati su un server.',
+            'Con Chrome o Edge apri e salvi i file con le finestre del sistema, e edimus li ritrova anche nelle sessioni successive (il browser chiede di nuovo il permesso). Con gli altri browser i file si aprono in sola lettura e ogni salvataggio diventa un download.',
+            'Esportazione in wav, mp3 e ogg. Velocità e intonazione usano lo stesso motore (Rubber Band) dell’app desktop; i render restano in una cache del browser.',
+            'Per collegare un assistente AI, avvia il server MCP sul PC e inserisci porta e token nella scheda Assistente AI di questo Aiuto.',
+          ],
+        },
+      ],
+    },
   ],
   howto: [
     {
@@ -333,6 +361,11 @@ const IT: HelpContent = {
       note: 'Si esportano solo le tracce udibili: controlla muto e solo prima di esportare.',
     },
     {
+      title: 'Condividere un montaggio con i suoi file audio',
+      steps: ['Premi Ctrl+Shift+S (salva con nome).', 'Come tipo di file scegli Pacchetto edimus (.edimuspack) e salva.', 'Invia il file .edimuspack: si apre con edimus, desktop o web.'],
+      note: 'Chi riceve solo il file .edimus può trascinare i propri file audio: quelli mancanti vengono ricollegati da soli.',
+    },
+    {
       title: 'Far lavorare un assistente AI sul montaggio',
       steps: [
         'Apri l’Aiuto (pulsante ? o F1) e la scheda Assistente AI.',
@@ -370,6 +403,19 @@ const EN: HelpContent = {
           text: [
             'The first save asks for the name of the montage. To rename it click the title in the top bar. The dot next to the title means unsaved changes.',
             'If you move the .edimus file together with the audio files (same folder structure), the paths are found again by themselves.',
+          ],
+        },
+        {
+          title: 'Bundle: montage with the audio files',
+          text: [
+            'In “Save as” you can choose the type edimus bundle (.edimuspack): one file with the montage and a copy of all its audio files, handy to move or share it.',
+            'When a bundle is opened, on the desktop the audio files are extracted into the folder “<name>.sources” next to it; in the web version they stay in memory while the page is open.',
+          ],
+        },
+        {
+          title: 'Missing audio files',
+          text: [
+            'When an audio file of the montage cannot be found any more, its track shows an error. Open or drop the right file: edimus recognizes it by its content (also with another name or in another folder) and relinks it, without adding a new track.',
           ],
         },
         {
@@ -567,6 +613,21 @@ const EN: HelpContent = {
         },
       ],
     },
+    {
+      title: 'Web version',
+      icon: 'language',
+      topics: [
+        {
+          title: 'edimus in the browser',
+          text: [
+            'The web version works entirely on your computer: the audio files are never uploaded to a server.',
+            'With Chrome or Edge you open and save files with the system dialogs, and edimus finds them again in later sessions (the browser asks the permission again). With other browsers files open read only and every save becomes a download.',
+            'Export to wav, mp3 and ogg. Speed and pitch use the same engine (Rubber Band) as the desktop app; the renders are kept in a browser cache.',
+            'To connect an AI assistant, start the MCP server on the PC and enter its port and token in the AI assistant tab of this Help.',
+          ],
+        },
+      ],
+    },
   ],
   howto: [
     {
@@ -631,6 +692,11 @@ const EN: HelpContent = {
       title: 'Export the result',
       steps: ['Press Ctrl+E (or the export button).', 'Choose format, quality and channels, then the destination file.'],
       note: 'Only the audible tracks are exported: check mute and solo before exporting.',
+    },
+    {
+      title: 'Share a montage with its audio files',
+      steps: ['Press Ctrl+Shift+S (save as).', 'As file type choose edimus bundle (.edimuspack) and save.', 'Send the .edimuspack file: it opens with edimus, desktop or web.'],
+      note: 'Whoever gets just the .edimus file can drop their own audio files: the missing ones are relinked by themselves.',
     },
     {
       title: 'Let an AI assistant work on the montage',

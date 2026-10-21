@@ -7,7 +7,12 @@ stereo mix, which is rendered by \`export\`.
 
 ## Data model
 - **montage** — what one edimus window holds (one montage per window, see list_instances).
-  Saved as a \`.edimus\` JSON file; \`dirty\` = unsaved changes.
+  Saved as a \`.edimus\` JSON file, or as a \`.edimuspack\` bundle (zip with copies of the audio
+  files, to move or share it); \`dirty\` = unsaved changes.
+- **web instances** — edimus also runs in the browser (instances with pid 0). There files have no
+  real paths (\`/<id>/<name>\`, from the user's own dialogs or drops): \`open\` works only with
+  paths returned by \`get_state\`, and \`save\`/\`export\` to a new path become a download in
+  the browser. Export formats there: wav, mp3, ogg.
 - **source** — an original audio file (id, path, format, length, detected or manual tempo).
 - **track** — a horizontal lane: name, muted, solo, \`volumeDb\` (volume of the whole track), and clips.
   Tracks are mixed together; when any track is soloed only soloed tracks are heard.

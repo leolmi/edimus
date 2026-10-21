@@ -1,12 +1,8 @@
-import { filesystem } from '@neutralinojs/lib';
+import { Zippable, strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import type { FileSystemPort } from '../platform/file-system.port';
 import type { EnvelopePoint } from './envelope';
-import { MONTAGE_VERSION, Montage, Track, dirName, toSource } from './montage.model';
-
-const exists = (path: string) =>
-  filesystem.getStats(path).then(
-    () => true,
-    () => false,
-  );
+import { fileFingerprint } from './fingerprint';
+import { MONTAGE_VERSION, Montage, Track, dirName, fileName, isBundleFile, toSource } from './montage.model';
 
 /** Track of a version 1 montage: one volume envelope over the timeline. */
 type TrackV1 = Track & { envelope?: EnvelopePoint[] };
@@ -30,30 +26,87 @@ function upgradeV1(montage: Montage): Montage {
   };
 }
 
-/** Reads a montage file, relocating the sources moved together with it. */
-export async function readMontage(path: string): Promise<Montage> {
-  let montage = JSON.parse(await filesystem.readFile(path)) as Montage;
+/** Name of the montage inside a bundle. */
+const BUNDLE_MONTAGE = 'montage.edimus';
+
+function parseMontage(text: string, path: string): Montage {
+  let montage = JSON.parse(text) as Montage;
   if (!Array.isArray(montage.tracks) || !Array.isArray(montage.sources)) throw new Error(`Unsupported montage format: ${path}`);
   if (montage.version === 1) montage = upgradeV1(montage);
   if (montage.version !== MONTAGE_VERSION) throw new Error(`Unsupported montage format: ${path}`);
+  return montage;
+}
+
+/** Reads a montage file (or bundle), relocating the sources moved together with it. */
+export async function readMontage(files: FileSystemPort, path: string): Promise<Montage> {
+  if (isBundleFile(path)) return readBundle(files, path);
+  const montage = parseMontage(await files.readText(path), path);
   const dir = dirName(path);
   for (const source of montage.sources) {
-    if (source.relativePath && !(await exists(source.path))) {
-      const relocated = await filesystem.getAbsolutePath(await filesystem.getJoinedPath(dir, source.relativePath));
-      if (await exists(relocated)) source.path = relocated;
+    if (source.relativePath && !(await files.exists(source.path))) {
+      const relocated = await files.resolvePath(dir, source.relativePath);
+      if (await files.exists(relocated)) source.path = relocated;
     }
   }
   return montage;
 }
 
-/** Writes the montage, storing each source path also relative to the montage file. */
-export async function writeMontage(path: string, montage: Montage): Promise<void> {
+/**
+ * Writes the montage (or bundle), storing each source path also relative to the montage file,
+ * and its fingerprint (kept from the montage when the file is missing).
+ */
+export async function writeMontage(files: FileSystemPort, path: string, montage: Montage): Promise<void> {
+  if (isBundleFile(path)) return writeBundle(files, path, montage);
   const dir = dirName(path);
   const sources = await Promise.all(
     montage.sources.map(async (source) => ({
       ...source,
-      relativePath: await filesystem.getRelativePath(source.path, dir).catch(() => undefined),
+      relativePath: await files.relativePath(source.path, dir),
+      fingerprint: (await fileFingerprint(files, source.path)) ?? source.fingerprint,
     })),
   );
-  await filesystem.writeFile(path, JSON.stringify({ ...montage, sources }, null, 2));
+  await files.writeText(path, JSON.stringify({ ...montage, sources }, null, 2));
+}
+
+/**
+ * Bundle: a zip with the montage and a copy of every source (`sources/<n>-<name>`, the path of
+ * the source in the bundled montage), to move or share a montage as one file.
+ */
+async function writeBundle(files: FileSystemPort, path: string, montage: Montage): Promise<void> {
+  const entries: Zippable = {};
+  const bundled = new Map<string, string>();
+  const sources = [];
+  for (const source of montage.sources) {
+    let entry = bundled.get(source.path);
+    if (!entry) {
+      entry = `sources/${bundled.size + 1}-${fileName(source.path)}`;
+      // stored as they are: audio files are already compressed
+      entries[entry] = [new Uint8Array(await files.readBinary(source.path)), { level: 0 }];
+      bundled.set(source.path, entry);
+    }
+    const fingerprint = (await fileFingerprint(files, source.path)) ?? source.fingerprint;
+    sources.push({ ...source, path: entry, relativePath: undefined, fingerprint });
+  }
+  entries[BUNDLE_MONTAGE] = strToU8(JSON.stringify({ ...montage, sources }, null, 2));
+  await files.writeBinary(path, zipSync(entries).buffer as ArrayBuffer);
+}
+
+/** Opens a bundle, making its sources available as files (see `FileSystemPort.importFile`). */
+async function readBundle(files: FileSystemPort, path: string): Promise<Montage> {
+  const entries = unzipSync(new Uint8Array(await files.readBinary(path)));
+  const text = entries[BUNDLE_MONTAGE];
+  if (!text) throw new Error(`Unsupported montage format: ${path}`);
+  const montage = parseMontage(strFromU8(text), path);
+  const imported = new Map<string, string>();
+  for (const source of montage.sources) {
+    const data = entries[source.path];
+    if (!data) continue;
+    let file = imported.get(source.path);
+    if (!file) {
+      file = await files.importFile(fileName(source.path), data.slice().buffer, path);
+      imported.set(source.path, file);
+    }
+    source.path = file;
+  }
+  return montage;
 }

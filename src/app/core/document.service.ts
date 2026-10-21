@@ -1,21 +1,32 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { app, events, filesystem, os, window as appWindow, type Icon, type MessageBoxChoice } from '@neutralinojs/lib';
 import { firstValueFrom } from 'rxjs';
 import { ExportDialogComponent, FORMATS } from '../features/export/export-dialog.component';
 import { RenameDialogComponent, RenameDialogData } from '../features/rename/rename-dialog.component';
+import { AudioLibraryService } from './audio/audio-library.service';
 import { ExportOptions, ExportService } from './audio/export.service';
-import { AudioDecoderService } from './audio/audio-decoder.service';
 import { MixService } from './audio/mix.service';
-import { DevToolsService } from './dev-tools.service';
 import { DropTarget, DropTargetService } from './drop-target.service';
-import { resolveDroppedFiles } from './dropped-files';
 import { TimelineService } from './timeline/timeline.service';
 import { I18nService } from './i18n/i18n.service';
 import type { TranslationKey } from './i18n/it';
-import { InstanceService } from './instance.service';
-import { AUDIO_EXTENSIONS, MONTAGE_EXTENSION, baseName, dirName, isMontageFile } from './montage/montage.model';
+import { fileFingerprint } from './montage/fingerprint';
+import {
+  AUDIO_EXTENSIONS,
+  BUNDLE_EXTENSION,
+  MONTAGE_EXTENSION,
+  baseName,
+  dirName,
+  fileExtension,
+  fileName,
+  isAudioFile,
+  isMontageFile,
+} from './montage/montage.model';
 import { MontageService } from './montage/montage.service';
+import { AudioEnginePort } from './platform/audio-engine.port';
+import { DevToolsPort } from './platform/dev-tools.port';
+import { FileSystemPort } from './platform/file-system.port';
+import { ShellPort } from './platform/shell.port';
 import { SettingsService } from './settings.service';
 
 interface StatusMessage {
@@ -29,16 +40,18 @@ const errorMessage = (err: unknown) => String((err as { message?: string })?.mes
 @Injectable({ providedIn: 'root' })
 export class DocumentService {
   private readonly montages = inject(MontageService);
-  private readonly instances = inject(InstanceService);
   private readonly i18n = inject(I18nService);
   private readonly dialogs = inject(MatDialog);
   private readonly exporter = inject(ExportService);
   private readonly mixer = inject(MixService);
   private readonly drops = inject(DropTargetService);
-  private readonly decoder = inject(AudioDecoderService);
+  private readonly engine = inject(AudioEnginePort);
   private readonly timeline = inject(TimelineService);
-  private readonly devTools = inject(DevToolsService);
+  private readonly devTools = inject(DevToolsPort);
   private readonly settings = inject(SettingsService);
+  private readonly files = inject(FileSystemPort);
+  private readonly library = inject(AudioLibraryService);
+  private readonly shell = inject(ShellPort);
   /** Options of the last export, proposed again by the next one. */
   private exportOptions?: ExportOptions;
 
@@ -49,19 +62,19 @@ export class DocumentService {
   readonly pendingDrop = signal<DropTarget | null>(null);
 
   constructor() {
-    effect(() => void appWindow.setTitle(`${this.title()}${this.montages.dirty() ? ' •' : ''} — edimus`));
-    events.on('windowClose', () => void this.close());
+    effect(() => void this.shell.setTitle(`${this.title()}${this.montages.dirty() ? ' •' : ''} — edimus`));
+    this.shell.onCloseRequest(() => void this.close());
     this.drops.drops.subscribe(async ({ files, target }) => {
       this.pendingDrop.set(target);
       try {
-        const { paths, imported } = await resolveDroppedFiles(files);
+        const { paths, imported } = await this.files.resolveDropped(files);
         await this.open(paths, target);
         if (imported) this.message.set({ key: 'drop.imported', params: { n: imported } });
       } finally {
         this.pendingDrop.set(null);
       }
     });
-    const startup = this.instances.startupFiles();
+    const startup = this.shell.startupFiles();
     if (startup.length) void this.open(startup);
   }
 
@@ -73,15 +86,12 @@ export class DocumentService {
   }
 
   async openDialog(): Promise<void> {
-    const paths = await os.showOpenDialog(this.i18n.t('dialog.open.title'), {
-      multiSelections: true,
-      filters: [
-        { name: this.i18n.t('filter.supported'), extensions: [...AUDIO_EXTENSIONS, MONTAGE_EXTENSION] },
-        { name: this.i18n.t('filter.audio'), extensions: AUDIO_EXTENSIONS },
-        { name: this.i18n.t('filter.montage'), extensions: [MONTAGE_EXTENSION] },
-        { name: this.i18n.t('filter.all'), extensions: ['*'] },
-      ],
-    });
+    const paths = await this.files.showOpenDialog(this.i18n.t('dialog.open.title'), [
+      { name: this.i18n.t('filter.supported'), extensions: [...AUDIO_EXTENSIONS, MONTAGE_EXTENSION, BUNDLE_EXTENSION] },
+      { name: this.i18n.t('filter.audio'), extensions: AUDIO_EXTENSIONS },
+      { name: this.i18n.t('filter.montage'), extensions: [MONTAGE_EXTENSION, BUNDLE_EXTENSION] },
+      { name: this.i18n.t('filter.all'), extensions: ['*'] },
+    ]);
     await this.open(paths);
   }
 
@@ -102,14 +112,41 @@ export class DocumentService {
         return this.message.set({ key: 'open.error', params: { message: errorMessage(err) } });
       }
     }
+    const relinked = await this.relink(paths);
+    if (relinked.length) {
+      paths = paths.filter((p) => !relinked.includes(p));
+      if (!paths.some(isAudioFile)) return this.message.set({ key: 'relink.done', params: { n: relinked.length } });
+    }
     if (target.kind === 'track') {
       const start = Math.max(0, this.timeline.xToTime(target.x));
-      const lengths = await Promise.all(paths.map((p) => this.decoder.probe(p).then((i) => i.duration, () => 0)));
+      const lengths = await Promise.all(paths.map((p) => this.engine.probe(p).then((i) => i.duration, () => 0)));
       const count = this.montages.addAudioToTrack(target.trackId, paths, start, lengths);
       if (count) return this.message.set({ key: 'add.toTrack', params: { n: count } });
     }
     const count = this.montages.addAudio(paths);
     this.message.set(count ? { key: 'add.done', params: { n: count } } : { key: 'open.unsupported' });
+  }
+
+  /**
+   * Audio files that are missing sources of the montage relink them, instead of being added:
+   * same fingerprint, or same name for sources saved without one. Returns the paths used.
+   */
+  private async relink(paths: string[]): Promise<string[]> {
+    const states = this.library.sources();
+    const missing = this.montages.montage().sources.filter((s) => states[s.id]?.status === 'error');
+    const used: string[] = [];
+    for (const path of paths.filter(isAudioFile)) {
+      if (!missing.length) break;
+      const fingerprint = await fileFingerprint(this.files, path);
+      const index = missing.findIndex((s) =>
+        s.fingerprint ? s.fingerprint === fingerprint : fileName(s.path).toLowerCase() === fileName(path).toLowerCase(),
+      );
+      if (index < 0) continue;
+      const [source] = missing.splice(index, 1);
+      this.montages.relinkSource(source.id, path, fingerprint);
+      used.push(path);
+    }
+    return used;
   }
 
   /** Saves over the montage file, or asks where when it was never saved. Returns false if not saved. */
@@ -129,14 +166,14 @@ export class DocumentService {
     }
     const pending = this.montages.pendingName();
     if (!pending) return this.write(path);
-    const renamed = `${dirName(path)}/${pending}.${MONTAGE_EXTENSION}`;
-    const taken = await filesystem.getStats(renamed).then(() => true, () => false);
+    const renamed = `${dirName(path)}/${pending}.${fileExtension(path)}`;
+    const taken = await this.files.exists(renamed);
     if (taken && renamed.toLowerCase() !== path.toLowerCase()) {
       this.message.set({ key: 'rename.exists', params: { path: renamed } });
       return false;
     }
     try {
-      await filesystem.move(path, renamed);
+      await this.files.move(path, renamed);
     } catch (err) {
       this.message.set({ key: 'save.error', params: { message: errorMessage(err) } });
       return false;
@@ -165,10 +202,14 @@ export class DocumentService {
     const name = this.montages.displayName() ?? (firstSource ? baseName(firstSource) : undefined);
     const folder = current ? dirName(current) : firstSource ? dirName(firstSource) : undefined;
     const defaultPath = folder && name ? `${folder}/${name}.${MONTAGE_EXTENSION}` : (current ?? undefined);
-    const path = await os.showSaveDialog(this.i18n.t('dialog.save.title'), {
+    const path = await this.files.showSaveDialog(
+      this.i18n.t('dialog.save.title'),
+      [
+        { name: this.i18n.t('filter.montage'), extensions: [MONTAGE_EXTENSION] },
+        { name: this.i18n.t('filter.bundle'), extensions: [BUNDLE_EXTENSION] },
+      ],
       defaultPath,
-      filters: [{ name: this.i18n.t('filter.montage'), extensions: [MONTAGE_EXTENSION] }],
-    });
+    );
     return path ? this.write(path) : false;
   }
 
@@ -176,8 +217,9 @@ export class DocumentService {
   async exportDialog(): Promise<void> {
     if (this.montages.isEmpty() || this.exporter.progress()) return;
     if (!this.mixer.isComplete()) return this.message.set({ key: 'export.notReady' });
+    const formats = this.engine.exportFormats;
     const initial: ExportOptions = this.exportOptions ?? {
-      format: 'mp3',
+      format: formats.includes('mp3') ? 'mp3' : formats[0],
       channels: this.montages.montage().channels,
       sampleRate: this.mixer.sampleRate(),
       bitDepth: 16,
@@ -193,10 +235,11 @@ export class DocumentService {
     const format = FORMATS.find((f) => f.id === options.format)!;
     const base = this.montages.path() ?? this.montages.montage().sources[0]?.path;
     const defaultPath = base ? `${dirName(base)}/${this.montages.fileName() ?? baseName(base)}.${format.extension}` : undefined;
-    let path = await os.showSaveDialog(this.i18n.t('export.title'), {
+    let path = await this.files.showSaveDialog(
+      this.i18n.t('export.title'),
+      [{ name: format.label, extensions: [format.extension] }],
       defaultPath,
-      filters: [{ name: format.label, extensions: [format.extension] }],
-    });
+    );
     if (!path) return;
     if (!path.toLowerCase().endsWith(`.${format.extension}`)) path = `${path}.${format.extension}`;
     try {
@@ -209,7 +252,7 @@ export class DocumentService {
 
   /** Closes the window, asking what to do with unsaved changes. */
   async close(): Promise<void> {
-    if (await this.confirmDiscard()) await app.exit();
+    if (await this.confirmDiscard()) await this.shell.exit();
   }
 
   /** Restarts the app (asking about unsaved changes) with the developer tools as set. */
@@ -220,14 +263,9 @@ export class DocumentService {
   /** With unsaved changes asks whether to save them; false when the user cancels (or saving fails). */
   private async confirmDiscard(): Promise<boolean> {
     if (!this.montages.dirty()) return true;
-    const choice = await os.showMessageBox(
-      this.title(),
-      this.i18n.t('montage.unsaved'),
-      'YES_NO_CANCEL' as MessageBoxChoice,
-      'QUESTION' as Icon,
-    );
-    if (choice === 'CANCEL') return false;
-    return choice === 'NO' || this.save();
+    const choice = await this.shell.ask(this.title(), this.i18n.t('montage.unsaved'), true);
+    if (choice === 'cancel') return false;
+    return choice === 'no' || this.save();
   }
 
   private async write(path: string): Promise<boolean> {

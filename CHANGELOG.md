@@ -4,6 +4,35 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.2.0 — 2026-10-21
+
+### Versione web
+- edimus gira anche nel browser (`npm run dev:web`, `npm run build:web`), tutto sul computer
+  dell'utente: i file audio non vanno su nessun server. Con Chrome ed Edge i file si aprono e
+  salvano con le finestre del sistema e vengono ritrovati nelle sessioni successive; con gli
+  altri browser si aprono in sola lettura e i salvataggi diventano download.
+- Velocità e intonazione con lo stesso motore del desktop (Rubber Band, in WebAssembly); i
+  render restano in una cache del browser. Export in wav, mp3 e ogg.
+- Assistente AI collegabile anche alla versione web, indicando porta e token del server MCP
+  nella scheda Assistente AI dell'Aiuto.
+
+### File
+- Pacchetto `.edimuspack` (in *Salva con nome*): il montaggio con una copia di tutti i file
+  audio in un unico file, da spostare o condividere; si apre sia sul desktop (i file vengono
+  estratti in `<nome>.sources`) sia nel web.
+- Al salvataggio ogni sorgente riceve un'impronta del contenuto: un file audio mancante si
+  ricollega da solo aprendo o trascinando il file giusto, anche con un altro nome o in un'altra
+  cartella. Il formato `.edimus` resta la versione 2 (l'impronta è un campo in più, ignorato
+  dalla 1.1.0).
+
+### Assistente AI
+- `open` e `save` accettano i pacchetti `.edimuspack`; la guida descrive le istanze web.
+
+### Interno
+- Il codice dell'app non usa più direttamente Neutralino: file, audio, impostazioni, finestra,
+  strumenti per sviluppatori e assistente AI passano da porte (`core/platform/`) con
+  un'implementazione desktop e una web (`src/platform/`).
+
 ## 1.1.0 — 2026-10-21
 
 ### Volume

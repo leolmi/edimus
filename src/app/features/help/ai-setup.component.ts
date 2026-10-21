@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AiBridgeService } from '../../core/ai/ai-bridge.service';
-import { AiClient, AiClientId, AiSetupService, ServerCommand, SetupResult } from '../../core/ai/ai-setup.service';
+import { AiClient, AiClientId, AiHostPort, ServerCommand, SetupResult } from '../../core/platform/ai-host.port';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 /**
@@ -160,7 +160,7 @@ import { TranslatePipe } from '../../core/i18n/translate.pipe';
 })
 export class AiSetupComponent {
   protected readonly ai = inject(AiBridgeService);
-  private readonly setup = inject(AiSetupService);
+  private readonly setup = inject(AiHostPort);
   private readonly clipboard = inject(Clipboard);
 
   protected readonly loading = signal(true);

@@ -7,10 +7,11 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AudioOutputsService } from '../../core/audio/audio-outputs.service';
-import { DevToolsService } from '../../core/dev-tools.service';
 import { DocumentService } from '../../core/document.service';
 import type { TranslationKey } from '../../core/i18n/it';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { DevToolsPort } from '../../core/platform/dev-tools.port';
+import { PlatformInfo } from '../../core/platform/platform-info';
 import { Language, SettingsService, SnapStep, ThemeMode } from '../../core/settings.service';
 
 const THEMES: { mode: ThemeMode; icon: string; label: TranslationKey }[] = [
@@ -91,18 +92,20 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       </div>
       <p class="hint">{{ 'settings.snapHint' | t }}</p>
 
-      <h3>{{ 'settings.advanced' | t }}</h3>
-      <mat-slide-toggle [checked]="settings.devTools()" (change)="settings.setDevTools($event.checked)">
-        {{ 'settings.devTools' | t }}
-      </mat-slide-toggle>
-      @if (settings.devTools() !== devTools.active) {
-        <div class="restart">
-          <span class="hint">{{ 'settings.restartNeeded' | t }}</span>
-          <button mat-stroked-button (click)="documents.restartForDevTools()">
-            <mat-icon>restart_alt</mat-icon>
-            {{ 'settings.restartNow' | t }}
-          </button>
-        </div>
+      @if (platform.hasDevTools) {
+        <h3>{{ 'settings.advanced' | t }}</h3>
+        <mat-slide-toggle [checked]="settings.devTools()" (change)="settings.setDevTools($event.checked)">
+          {{ 'settings.devTools' | t }}
+        </mat-slide-toggle>
+        @if (settings.devTools() !== devTools.active) {
+          <div class="restart">
+            <span class="hint">{{ 'settings.restartNeeded' | t }}</span>
+            <button mat-stroked-button (click)="documents.restartForDevTools()">
+              <mat-icon>restart_alt</mat-icon>
+              {{ 'settings.restartNow' | t }}
+            </button>
+          </div>
+        }
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -157,7 +160,8 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
 })
 export class SettingsDialogComponent {
   protected readonly settings = inject(SettingsService);
-  protected readonly devTools = inject(DevToolsService);
+  protected readonly platform = inject(PlatformInfo);
+  protected readonly devTools = inject(DevToolsPort);
   protected readonly documents = inject(DocumentService);
   private readonly outputs = inject(AudioOutputsService);
 

@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { events, filesystem, os } from '@neutralinojs/lib';
-import { appPath, nativePath } from '../app-paths';
+import { appPath, nativePath } from './app-paths';
 
 export interface ProcessResult {
   exitCode: number;

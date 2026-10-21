@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import type { AudioSource } from '../montage/montage.model';
-import { AudioDecoderService, AudioInfo } from './audio-decoder.service';
+import { AudioEnginePort, AudioInfo } from '../platform/audio-engine.port';
 import { ChannelPeaks, computePeaks } from './peaks';
 
 export type SourceState =
@@ -12,7 +12,7 @@ export type SourceState =
 /** Decoded audio of the montage sources, by source id. */
 @Injectable({ providedIn: 'root' })
 export class AudioLibraryService {
-  private readonly decoder = inject(AudioDecoderService);
+  private readonly decoder = inject(AudioEnginePort);
 
   readonly sources = signal<Record<string, SourceState>>({});
 
@@ -28,6 +28,12 @@ export class AudioLibraryService {
     if (!added.length) return;
     this.sources.update((all) => ({ ...all, ...Object.fromEntries(added.map((s) => [s.id, { status: 'probing' }])) }));
     for (const source of added) await this.loadOne(source);
+  }
+
+  /** Decodes a source again (its file changed, e.g. a relinked source). */
+  async reload(source: AudioSource): Promise<void> {
+    this.sources.update((all) => ({ ...all, [source.id]: { status: 'probing' } }));
+    await this.loadOne(source);
   }
 
   private async loadOne(source: AudioSource): Promise<void> {

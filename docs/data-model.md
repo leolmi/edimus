@@ -19,6 +19,7 @@ Montage { version: 2; channels: 1 | 2; sources: AudioSource[]; tracks: Track[] }
 | `id` | identificativo (UUID) usato dalle clip |
 | `path` | percorso assoluto del file originale |
 | `relativePath?` | percorso relativo al file `.edimus`, scritto al salvataggio; all'apertura, se `path` non esiste più, la sorgente viene ricollocata con questo |
+| `fingerprint?` | impronta del file (SHA-256 di dimensione, primi e ultimi 256 KiB, `fingerprint.ts`), scritta al salvataggio; un file aperto o trascinato con la stessa impronta ricollega la sorgente mancante (`DocumentService.relink`; senza impronta vale lo stesso nome) |
 | `tempo?` | tempo impostato a mano; senza, il tempo è quello rilevato (non salvato) |
 
 Formato, durata, canali e tempo rilevato **non** sono nel file: vengono ricavati a ogni apertura.
@@ -105,9 +106,15 @@ Tempo { bpm: number; offset: number /* s sorgente */; confidence: number /* 0..1
 
 ## File `.edimus`
 
-JSON indentato del `Montage`, con `relativePath` aggiunto a ogni sorgente al salvataggio
-(`montage-file.ts`). Una versione diversa da `MONTAGE_VERSION` viene rifiutata: un cambio
+JSON indentato del `Montage`, con `relativePath` e `fingerprint` aggiunti a ogni sorgente al
+salvataggio (`montage-file.ts`). Una versione diversa da `MONTAGE_VERSION` viene rifiutata: un cambio
 incompatibile del formato richiede di incrementarla e prevedere la migrazione in `readMontage`.
+
+**Pacchetto `.edimuspack`**: zip con `montage.edimus` e una copia di ogni sorgente in
+`sources/<n>-<nome>` (senza ricompressione); nel montaggio del pacchetto `path` è il nome della
+voce nello zip. All'apertura le sorgenti vengono rese disponibili da `FileSystemPort.importFile`
+(desktop: cartella `<nome>.sources` accanto al pacchetto, riusata se il file c'è già; web: in
+memoria). Si sceglie dal tipo di file di *Salva con nome* (o con l'estensione nel `save` MCP).
 
 Migrazioni:
 

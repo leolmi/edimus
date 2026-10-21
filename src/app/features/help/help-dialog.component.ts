@@ -4,10 +4,12 @@ import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
-import { os } from '@neutralinojs/lib';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { PlatformInfo } from '../../core/platform/platform-info';
+import { ShellPort } from '../../core/platform/shell.port';
 import { SettingsService } from '../../core/settings.service';
 import { AiSetupComponent } from './ai-setup.component';
+import { AiWebSetupComponent } from './ai-web-setup.component';
 import { APP_INFO, HELP_CONTENT } from './help-content';
 import { LicensesComponent } from './licenses.component';
 
@@ -18,7 +20,7 @@ const TABS: HelpTab[] = ['guide', 'howto', 'ai', 'info'];
 /** Help of the app: guide to every function, how-to of the common tasks, AI assistant setup, info and licenses. */
 @Component({
   selector: 'app-help-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatExpansionModule, MatIconModule, MatTabsModule, AiSetupComponent, LicensesComponent, TranslatePipe],
+  imports: [MatButtonModule, MatDialogModule, MatExpansionModule, MatIconModule, MatTabsModule, AiSetupComponent, AiWebSetupComponent, LicensesComponent, TranslatePipe],
   template: `
     <mat-dialog-content class="content">
       <mat-tab-group [selectedIndex]="initialTab" mat-stretch-tabs="false" animationDuration="0ms">
@@ -73,7 +75,11 @@ const TABS: HelpTab[] = ['guide', 'howto', 'ai', 'info'];
         <mat-tab [label]="'help.ai' | t">
           <ng-template matTabContent>
             <div class="tab">
-              <app-ai-setup />
+              @if (platform.canSetupAi) {
+                <app-ai-setup />
+              } @else {
+                <app-ai-web-setup />
+              }
             </div>
           </ng-template>
         </mat-tab>
@@ -93,8 +99,10 @@ const TABS: HelpTab[] = ['guide', 'howto', 'ai', 'info'];
               <dd>
                 <a href="#" (click)="$event.preventDefault(); openRepository()">{{ info.repository }}</a>
               </dd>
-              <dt>{{ 'help.runtime' | t }}</dt>
-              <dd>Neutralinojs {{ neutralino }}</dd>
+              @if (platform.runtime) {
+                <dt>{{ 'help.runtime' | t }}</dt>
+                <dd>{{ platform.runtime }}</dd>
+              }
             </dl>
             <h3>
               <mat-icon>license</mat-icon>
@@ -195,15 +203,16 @@ const TABS: HelpTab[] = ['guide', 'howto', 'ai', 'info'];
 })
 export class HelpDialogComponent {
   private readonly settings = inject(SettingsService);
+  private readonly shell = inject(ShellPort);
+  protected readonly platform = inject(PlatformInfo);
 
   protected readonly initialTab = Math.max(0, TABS.indexOf(inject<HelpTab | null>(MAT_DIALOG_DATA, { optional: true }) ?? 'guide'));
   protected readonly content = computed(() => HELP_CONTENT[this.settings.language()]);
   protected readonly info = APP_INFO;
-  protected readonly version = window.NL_APPVERSION ?? '';
-  protected readonly neutralino = window.NL_VERSION ?? '';
+  protected readonly version = this.platform.version;
 
   /** The repository opens in the system browser (not inside the app window). */
   protected openRepository(): void {
-    void os.open(this.info.repository);
+    void this.shell.openUrl(this.info.repository);
   }
 }

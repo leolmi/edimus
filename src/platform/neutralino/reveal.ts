@@ -1,6 +1,6 @@
 import { os } from '@neutralinojs/lib';
 import { nativePath } from './app-paths';
-import { dirName } from './montage/montage.model';
+import { dirName } from '../../app/core/montage/montage.model';
 
 /** Shows a file in the file manager of the OS (selected where the OS allows it). */
 export async function revealFile(path: string): Promise<void> {

@@ -1,7 +1,7 @@
 import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { Clip, clipRate, isProcessed } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
-import { AudioDecoderService } from './audio-decoder.service';
+import { AudioEnginePort } from '../platform/audio-engine.port';
 import { AudioLibraryService } from './audio-library.service';
 import { ChannelPeaks, computePeaks } from './peaks';
 
@@ -11,7 +11,7 @@ export type ProcessedState =
   | { status: 'error'; error: string };
 
 /**
- * Renders the clips with a speed or pitch change (Rubber Band, through ffmpeg) into buffers
+ * Renders the clips with a speed or pitch change (through the audio engine) into buffers
  * used by both playback and waveform. A render covers the whole source for a speed/pitch pair,
  * so trimming, splitting, undo/redo and clips sharing the settings reuse it.
  */
@@ -19,7 +19,7 @@ export type ProcessedState =
 export class ProcessedAudioService {
   private readonly montages = inject(MontageService);
   private readonly library = inject(AudioLibraryService);
-  private readonly decoder = inject(AudioDecoderService);
+  private readonly engine = inject(AudioEnginePort);
 
   readonly renders = signal<Record<string, ProcessedState>>({});
   private queue: Promise<void> = Promise.resolve();
@@ -57,7 +57,7 @@ export class ProcessedAudioService {
 
   private enqueue(key: string, clip: Clip): void {
     this.update(key, { status: 'rendering', progress: 0 });
-    // one render at a time: ffmpeg already uses several cores
+    // one render at a time: the engine already uses several cores
     this.queue = this.queue.then(() => this.render(key, clip));
   }
 
@@ -68,8 +68,8 @@ export class ProcessedAudioService {
     const rate = clipRate(clip);
     try {
       const onProgress = (progress: number) => this.update(key, { status: 'rendering', progress });
-      const buffer = await this.decoder.decode(path, source.info, onProgress, {
-        filter: renderFilter(clip, source.info.sampleRate),
+      const buffer = await this.engine.decode(path, source.info, onProgress, {
+        processing: { rate, pitch: clip.pitch ?? 0, varispeed: !!clip.varispeed },
         outputDuration: source.buffer.duration / rate,
       });
       this.update(key, { status: 'ready', buffer, peaks: await computePeaks(buffer) });
@@ -86,16 +86,4 @@ export class ProcessedAudioService {
 /** Cache key of the render used by a clip: source, speed, pitch and speed mode. */
 function renderKey(clip: Clip): string {
   return [clip.sourceId, clipRate(clip), clip.pitch ?? 0, clip.varispeed ? 'v' : 's'].join('|');
-}
-
-/**
- * ffmpeg filter of a processed clip: Rubber Band time-stretch (speed and pitch independent), or
- * varispeed by resampling (pitch follows the speed) plus an optional extra pitch shift.
- */
-function renderFilter(clip: Clip, sampleRate: number): string {
-  const rate = clipRate(clip);
-  const pitch = Math.pow(2, (clip.pitch ?? 0) / 12);
-  if (!clip.varispeed) return `rubberband=tempo=${rate}:pitch=${pitch}:pitchq=quality:channels=together`;
-  const resample = `asetrate=${Math.round(sampleRate * rate)},aresample=${sampleRate}`;
-  return pitch === 1 ? resample : `${resample},rubberband=pitch=${pitch}:pitchq=quality:channels=together`;
 }

@@ -18,7 +18,8 @@ e vanno lette prima di toccare l'area corrispondente:
 ## Stack
 
 - Angular 22 (standalone, signals, `OnPush`, zoneless), Angular Material M3, Material Symbols.
-- Neutralino 6 (`@neutralinojs/lib`): filesystem, processi, finestra, storage.
+- Neutralino 6 (`@neutralinojs/lib`): filesystem, processi, finestra, storage. Usato solo
+  dietro le porte di `core/platform/` (implementazioni in `src/platform/neutralino/`).
 - Web Audio API per riproduzione e render offline; **ffmpeg/ffprobe** esterni (build GPL con
   Rubber Band e libmp3lame) per decodifica, stretch/pitch ed encoding.
 - TypeScript 6, Prettier. Nessun framework di test: la verifica è `tsc` + prova nell'app.
@@ -28,6 +29,8 @@ e vanno lette prima di toccare l'area corrispondente:
 | Comando | Uso |
 |---|---|
 | `npm run dev` | finestra Neutralino collegata a `ng serve` sulla porta 47815 |
+| `npm run dev:web` | versione web nel browser (`ng serve`, porta 47817, header COOP/COEP; la 47816 è del bridge MCP) |
+| `npm run build:web` | build web in `dist/web/` |
 | `npm run typecheck` | `tsc --noEmit` dell'app: il controllo da lanciare dopo ogni insieme di modifiche |
 | `npm run package` | build release + `mcp:build` + cartella portabile `release/edimus/` |
 | `npm run mcp:build` | `mcp/dist/edimus-mcp.exe`: server MCP come eseguibile autonomo (Node SEA) |
@@ -50,7 +53,8 @@ src/app/
       crossfade.ts        dissolvenza incrociata tra due clip
       tempo-align.ts      allineamento del tempo tra clip
       montage-file.ts     lettura/scrittura .edimus (percorsi relativi)
-    audio/              decodifica, libreria buffer, picchi, tempo, render processato, mix, playback, export, ffmpeg
+    audio/              libreria buffer, picchi, tempo, render processato, mix, playback, export
+    platform/           porte verso la piattaforma: file system, motore audio, impostazioni, shell, capacità
     timeline/           TimelineService: zoom, scroll, selezione, modalità (inviluppo, griglia, marcatura)
     edit.service.ts     comandi di editing per UI e AI (selezione, playhead, dialoghi tempo/velocità)
     document.service.ts nuovo/apri/salva/esporta/chiudi con controllo modifiche non salvate
@@ -60,12 +64,18 @@ src/app/
   features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi), export, rename, settings,
                         help (Aiuto: guida, come fare, assistente AI, info e licenze)
   shared/               componenti riusabili (scale-slider)
+src/platform/           implementazioni delle porte: neutralino/ (ffmpeg, dialoghi, drop, reveal);
+                        web/ (File System Access API, Rubber Band e encoder wasm); platform.providers.ts sceglie la piattaforma della build,
+                        sostituito da platform.providers.web.ts nella configurazione `web`
 mcp/                    server MCP (Node, stdio), guida per l'AI (guide.mjs), build dell'exe (build-exe.mjs)
 scripts/                licenses.mjs, package.mjs
 ```
 
 ## Regole del progetto
 
+- **Piattaforma**: in `src/app` niente `@neutralinojs/lib` né API del browser legate a una
+  sola piattaforma: le capacità native passano dalle porte di `core/platform/`, implementate in
+  `src/platform/neutralino/` e `src/platform/web/` (una capacità nuova va in entrambe).
 - **Non distruttivo**: mai scrivere sui file sorgente; tutto passa dal montaggio.
 - **Montaggio immutabile**: ogni modifica produce un nuovo `Montage` tramite
   `MontageService.update()` (un passo di annulla) o `preview()` + `commit(from)` per i gesti

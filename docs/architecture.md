@@ -2,6 +2,44 @@
 
 ## Runtime
 
+- **Piattaforma**: il codice dell'app (`src/app`) non usa direttamente le API native ma delle
+  porte astratte in `core/platform/`, registrate come provider Angular:
+
+  | Porta | Ruolo |
+  |---|---|
+  | `FileSystemPort` | lettura/scrittura file, percorsi relativi, dialoghi apri/salva, file trascinati |
+  | `AudioEnginePort` | probe, decodifica (con velocità/pitch, `AudioProcessing`), encoding dell'export |
+  | `SettingsPort` | archivio delle impostazioni |
+  | `ShellPort` | titolo e chiusura della finestra, domande sì/no, link esterni, mostra file |
+  | `PlatformInfo` | capacità della piattaforma (mostra file, configurazione AI, strumenti sviluppatori): la UI nasconde ciò che manca |
+
+  | `DevToolsPort` | strumenti per sviluppatori della finestra (solo desktop) |
+  | `AiHostPort` | indirizzo del server MCP e configurazione dei client AI installati |
+
+  Le implementazioni stanno in `src/platform/<piattaforma>/`; `src/platform/platform.providers.ts`
+  sceglie quella della build (`neutralino`) e fornisce `initPlatform()`, chiamata da `main.ts`
+  prima dell'avvio. La configurazione `web` di `angular.json` (`npm run dev:web`,
+  `npm run build:web` → `dist/web/`) lo sostituisce con `platform.providers.web.ts`
+  (`fileReplacements`); il dev server web invia gli header COOP/COEP, necessari a
+  `SharedArrayBuffer` per i worker wasm. In `src/app` non c'è nessun import di
+  `@neutralinojs/lib`, quindi la build web non contiene Neutralino.
+- **File nel browser** (`WebFileSystem`): niente percorsi reali. Ogni file aperto, salvato o
+  trascinato riceve un percorso `/<id>/<nome>` nel `WebFileRegistry`. Con la File System
+  Access API (Chromium) i file sono handle in lettura/scrittura, salvati in IndexedDB per
+  ritrovare le sorgenti nelle sessioni successive (il permesso viene richiesto di nuovo), e la
+  rinomina usa `move`. Senza l'API si apre con il selettore della pagina (solo lettura); ogni
+  scrittura su un file senza handle (o su un percorso dato dall'AI) diventa un download.
+  Niente cartelle: `relativePath` è sempre assente.
+- **Motore audio web** (`WebAudioEngine`): il probe legge rate e canali dall'header
+  (`audio-header.ts`: wav, flac, mp3, ogg vorbis/opus, mp4) e decodifica con `decodeAudioData`
+  a quel rate (il buffer è tenuto per la decodifica che segue). Varispeed e downmix con un
+  `OfflineAudioContext` (`playbackRate`); stretch e pitch con Rubber Band in wasm
+  (`rubberband-wasm`, modalità offline, stesse opzioni del filtro ffmpeg) in un Web Worker
+  (`rubberband.worker.ts`). I render processati restano nell'OPFS (`render-cache.ts`, chiave:
+  impronta della sorgente e parametri, al massimo 24). Export: WAV in JS (`wav-encoder.ts`),
+  MP3 (LAME) e Ogg Vorbis con `wasm-media-encoders`; flac, opus e m4a non ci sono
+  (`AudioEnginePort.exportFormats`: il dialogo mostra solo i formati disponibili). I `.wasm`
+  sono copiati in `wasm/` dagli asset della configurazione `web`.
 - **Neutralino 6** ospita il frontend in una web view e fornisce le API native
   (`filesystem`, `os.execCommand`/processi, `window`, `storage`, `events`).
   `tokenSecurity: none`, server locale su porta casuale; in sviluppo la finestra carica
@@ -10,16 +48,16 @@
   `openInspectorOnStartup` false); `npm run dev` li abilita da riga di comando
   (`--window-enable-inspector=true`). L'impostazione "Apri gli strumenti per sviluppatori
   all'avvio" fa riavviare il processo una volta con `--window-enable-inspector=true
-  --window-open-inspector-on-startup=true` (`DevToolsService`): la finestra li prende solo
+  --window-open-inspector-on-startup=true` (`NeutralinoDevTools`): la finestra li prende solo
   dalla riga di comando, quindi cambiarli richiede un riavvio ("Riavvia ora").
 - **Una istanza = un montaggio.** Il file da aprire all'avvio arriva da riga di comando
-  (`InstanceService`, `NL_ARGS`). Più montaggi = più finestre/processi.
-- **Cartella dell'app** (`appPath()`, da `NL_PATH`): contiene `.cache/` per i file PCM
+  (`ShellPort.startupFiles`, su desktop da `NL_ARGS`). Più montaggi = più finestre/processi.
+- **Cartella dell'app** (`appPath()` in `platform/neutralino/app-paths.ts`, da `NL_PATH`): contiene `.cache/` per i file PCM
   temporanei; le impostazioni (tema, lingua, volume d'ascolto, uscita audio, passo di aggancio)
   si cambiano dal dialog Impostazioni (`features/settings`, Ctrl+,; il volume dalla toolbar) e stanno nello storage di
-  Neutralino (`SettingsService`).
+  Neutralino (`SettingsService` tramite `SettingsPort`).
 - **ffmpeg/ffprobe** sono cercati accanto all'exe, in `ffmpeg/` o in `tools/ffmpeg/bin/`
-  (`FfmpegService`) e lanciati come processi figli; lo scambio di audio avviene tramite file
+  (`platform/neutralino/ffmpeg.service.ts`) e lanciati come processi figli; lo scambio di audio avviene tramite file
   PCM `f32le` in `.cache/`.
 
 ## Flusso audio
@@ -34,7 +72,7 @@ MixService.schedule(ctx) ──▶ AudioContext (PlaybackService)  |  OfflineAud
 ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/ogg/opus/m4a)
 ```
 
-- **Decodifica** (`AudioDecoderService`): ffprobe per formato/canali/durata, ffmpeg decodifica
+- **Decodifica** (`AudioEnginePort`, su desktop `NeutralinoAudioEngine`): ffprobe per formato/canali/durata, ffmpeg decodifica
   in float al sample rate nativo, mono o stereo (oltre 2 canali → downmix a 2).
 - **Libreria** (`AudioLibraryService`): stato per sorgente (`loading`/`ready`/`error`), buffer
   e picchi; segue le sorgenti del montaggio corrente.
@@ -43,7 +81,8 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   memoria e ricalcolati a ogni apertura. Un tempo impostato a mano viene salvato sulla
   sorgente nel montaggio e ha la precedenza (`sourceTempo()`).
 - **Audio processato** (`ProcessedAudioService`): una clip con velocità o pitch diversi da
-  1/0 suona un render dell'**intera sorgente** per quella coppia rate/pitch (stretch:
+  1/0 suona un render dell'**intera sorgente** per quella coppia rate/pitch, chiesto al motore
+  audio come `AudioProcessing` (su desktop, filtri ffmpeg: stretch:
   `rubberband=tempo:pitch`; varispeed: `asetrate`+`aresample`, più rubberband per il pitch
   aggiuntivo). Il render è riusato da trim, split, undo/redo e clip con le stesse impostazioni.
   Il buffer renderizzato è in tempo *timeline*: offset nel buffer = `clip.offset / rate`.
@@ -51,8 +90,8 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   `AudioBufferSourceNode` per clip; una clip con inviluppo passa da un suo `GainNode`
   automatizzato (`automate` con i punti convertiti in tempo di timeline,
   `clipEnvelopeOnTimeline`). Lo stesso grafo serve riproduzione ed export, quindi suonano uguali.
-- **Export** (`ExportService`): render offline, normalizzazione opzionale, scrittura PCM
-  a blocchi, encoding con ffmpeg con progresso letto da `-progress pipe:1`.
+- **Export** (`ExportService`): render offline e normalizzazione opzionale; l'encoding è del
+  motore audio (su desktop: scrittura PCM a blocchi, ffmpeg con progresso letto da `-progress pipe:1`).
 
 ## Stato e servizi
 
@@ -64,7 +103,7 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
 | `DocumentService` | nuovo/apri/salva/salva con nome/rinomina/esporta/chiudi, con conferma per le modifiche non salvate; titolo della finestra |
 | `PlaybackService` | play/stop/seek, loop, punto iniziale, posizione del playhead, `AudioContext` condiviso inviato all'uscita scelta (`setSinkId`; se il dispositivo manca, la predefinita) |
 | `AudioOutputsService` | elenco delle uscite audio (`enumerateDevices`). WebView2 dà i nomi solo a una pagina con permesso microfono: all'apertura delle Impostazioni, la prima volta, si apre e chiude subito un flusso dal microfono. La scelta (id e nome) è nelle impostazioni |
-| `DropTargetService` + `dropped-files.ts` | drop di file sulla finestra o su una traccia; la web view non dà i percorsi: si ricavano dalla selezione di Esplora risorse (PowerShell) o, in mancanza, il contenuto viene copiato |
+| `DropTargetService` + `FileSystemPort.resolveDropped` (desktop: `platform/neutralino/dropped-files.ts`) | drop di file sulla finestra o su una traccia; la web view non dà i percorsi: si ricavano dalla selezione di Esplora risorse (PowerShell) o, in mancanza, il contenuto viene copiato |
 | `ThemeColorsService` | token Material risolti in colori concreti per il canvas |
 | `I18nService` + pipe `t` | traduzioni it/en a runtime |
 
@@ -81,10 +120,14 @@ AI ──stdio──▶ edimus-mcp.exe | node mcp/server.mjs ──WebSocket 127
   `mcp/build-exe.mjs`, `npm run mcp:build`), quindi chi lo usa non deve installare Node.
   Niente top-level await nel server: viene impacchettato come CommonJS.
 
-- Il server scrive porta e token in `%APPDATA%/edimus/mcp.json`; l'app lo legge e si collega,
-  riprovando finché il server non c'è.
+- Il server scrive porta e token in `%APPDATA%/edimus/mcp.json`; l'app li ottiene da
+  `AiHostPort.bridgeConfig()` e si collega, riprovando finché il server non c'è. Sul desktop
+  `NeutralinoAiHost` legge il file; nel web la pagina non può leggerlo: porta e token si
+  inseriscono nella scheda *Assistente AI* (`AiWebSetupComponent`) e restano nelle impostazioni
+  (`aiBridge`). Una pagina https può aprire `ws://127.0.0.1` (localhost è un'origine sicura), ma
+  il browser può chiedere il permesso di accesso alla rete locale.
 - La scheda *Assistente AI* dell'Aiuto (`AiSetupComponent`) mostra lo stato del collegamento.
-  `AiSetupService` individua il comando del server (`edimus-mcp.exe` accanto all'app, quello
+  `NeutralinoAiHost` individua il comando del server (`edimus-mcp.exe` accanto all'app, quello
   in `mcp/dist`, oppure `node mcp/server.mjs` in sviluppo) e i client AI installati, e
   registra il server in quelli scelti dall'utente: Claude Code tramite la sua CLI, gli altri
   aggiungendo una voce al loro file di configurazione, dopo averne fatto un backup

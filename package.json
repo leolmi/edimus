@@ -1,12 +1,14 @@
 {
   "name": "edimus",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "scripts": {
     "ng": "ng",
     "setup": "neu update --latest && npm run licenses",
     "licenses": "node scripts/licenses.mjs",
     "dev": "neu run -- --window-enable-inspector=true",
     "build": "neu build --release --embed-resources",
+    "dev:web": "ng serve --configuration web",
+    "build:web": "ng build --configuration production,web",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "package": "npm run build && npm run mcp:build && node scripts/package.mjs",
     "mcp:install": "npm --prefix mcp install",
@@ -25,9 +27,12 @@
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
     "@neutralinojs/lib": "^6.10.0",
+    "fflate": "^0.8.2",
     "material-symbols": "^0.48.0",
+    "rubberband-wasm": "^3.3.0",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "wasm-media-encoders": "^0.7.0"
   },
   "devDependencies": {
     "@angular/build": "^22.2.0",

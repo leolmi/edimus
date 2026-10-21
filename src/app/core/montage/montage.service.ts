@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AudioLibraryService } from '../audio/audio-library.service';
 import type { Tempo } from '../audio/tempo';
+import { FileSystemPort } from '../platform/file-system.port';
 import { readMontage, writeMontage } from './montage-file';
 import {
   AudioSource,
@@ -9,8 +10,8 @@ import {
   Montage,
   Track,
   baseName,
-  fileExtension,
   isAudioFile,
+  isMontageFile,
 } from './montage.model';
 
 const HISTORY_LIMIT = 200;
@@ -31,6 +32,7 @@ const emptyMontage = (): Montage => ({ version: MONTAGE_VERSION, channels: 2, so
 @Injectable({ providedIn: 'root' })
 export class MontageService {
   private readonly library = inject(AudioLibraryService);
+  private readonly files = inject(FileSystemPort);
 
   readonly montage = signal<Montage>(emptyMontage());
   /** Path of the montage file; null while the montage has never been saved. */
@@ -64,7 +66,7 @@ export class MontageService {
 
   /** Replaces the current montage with the one in the file. */
   async openMontage(path: string): Promise<void> {
-    this.reset(await readMontage(path), path);
+    this.reset(await readMontage(this.files, path), path);
   }
 
   /** Starts over with a new, empty montage. */
@@ -142,6 +144,16 @@ export class MontageService {
     return audio.length;
   }
 
+  /** Points a source to another file (a missing source found again), decoding it. */
+  relinkSource(sourceId: string, path: string, fingerprint?: string): void {
+    this.update((m) => ({
+      ...m,
+      sources: m.sources.map((s) => (s.id === sourceId ? { ...s, path, relativePath: undefined, fingerprint: fingerprint ?? s.fingerprint } : s)),
+    }));
+    const source = this.montage().sources.find((s) => s.id === sourceId);
+    if (source) void this.library.reload(source);
+  }
+
   /** Sets (or, with null, removes) the tempo given by hand to a source. */
   setSourceTempo(sourceId: string, tempo: Tempo | null): void {
     this.update((m) => ({
@@ -201,9 +213,9 @@ export class MontageService {
 
   /** Saves to the given path (adding the montage extension when missing). */
   async saveAs(path: string): Promise<string> {
-    if (fileExtension(path) !== MONTAGE_EXTENSION) path = `${path}.${MONTAGE_EXTENSION}`;
+    if (!isMontageFile(path)) path = `${path}.${MONTAGE_EXTENSION}`;
     const montage = this.montage();
-    await writeMontage(path, montage);
+    await writeMontage(this.files, path, montage);
     this.path.set(path);
     this.saved.set(montage);
     this.pendingName.set(null);

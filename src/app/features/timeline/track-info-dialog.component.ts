@@ -4,11 +4,12 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
-import { filesystem } from '@neutralinojs/lib';
 import { formatDuration } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { dirName, fileName } from '../../core/montage/montage.model';
-import { revealFile } from '../../core/reveal';
+import { FileSystemPort } from '../../core/platform/file-system.port';
+import { PlatformInfo } from '../../core/platform/platform-info';
+import { ShellPort } from '../../core/platform/shell.port';
 
 /** A source used by the track, with what is known about it. */
 export interface TrackInfoSource {
@@ -70,10 +71,12 @@ const formatSize = (bytes: number) =>
               <span class="file-name">{{ fileNameOf(source.path) }}</span>
               <span class="folder">{{ folder(source.path) }}</span>
             </div>
-            <button mat-stroked-button (click)="reveal(source.path)">
-              <mat-icon>folder_open</mat-icon>
-              {{ 'trackInfo.reveal' | t }}
-            </button>
+            @if (platform.canRevealFiles) {
+              <button mat-stroked-button (click)="reveal(source.path)">
+                <mat-icon>folder_open</mat-icon>
+                {{ 'trackInfo.reveal' | t }}
+              </button>
+            }
           </div>
           <table class="facts">
             <tr><td>{{ 'trackInfo.format' | t }}</td><td>{{ source.format ?? '—' }} · {{ source.codec ?? '—' }}</td></tr>
@@ -166,6 +169,9 @@ const formatSize = (bytes: number) =>
 export class TrackInfoDialogComponent {
   protected readonly data = inject<TrackInfoData>(MAT_DIALOG_DATA);
   private readonly dialog = inject(MatDialogRef<TrackInfoDialogComponent, TrackInfoResult>);
+  private readonly files = inject(FileSystemPort);
+  private readonly shell = inject(ShellPort);
+  protected readonly platform = inject(PlatformInfo);
   protected readonly name = signal(this.data.name);
 
   protected readonly fileNameOf = fileName;
@@ -177,10 +183,7 @@ export class TrackInfoDialogComponent {
     loader: () =>
       Promise.all(
         this.data.sources.map((s) =>
-          filesystem.getStats(s.path).then(
-            (stats) => formatSize(stats.size),
-            () => '—',
-          ),
+          this.files.size(s.path).then((size) => (size === undefined ? '—' : formatSize(size))),
         ),
       ),
   });
@@ -198,6 +201,6 @@ export class TrackInfoDialogComponent {
   }
 
   protected reveal(path: string): void {
-    void revealFile(path);
+    void this.shell.revealFile(path);
   }
 }

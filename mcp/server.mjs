@@ -131,7 +131,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.1.0' },
+  { name: 'edimus', version: '1.2.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -264,7 +264,7 @@ appTool(
 appTool(
   'open',
   'Open files',
-  'Opens files: a .edimus montage replaces the current one (fails with unsaved changes unless discard is true); ' +
+  'Opens files: a .edimus montage or .edimuspack bundle replaces the current one (fails with unsaved changes unless discard is true); ' +
     'audio files are added as new tracks (or to trackId from start).',
   {
     paths: z.array(z.string()).min(1).describe('Absolute paths'),
@@ -276,14 +276,14 @@ appTool(
 appTool(
   'save',
   'Save montage',
-  'Saves the montage (.edimus). Without path saves over its file (fails for a never saved montage). ' +
+  'Saves the montage (.edimus, or .edimuspack for a bundle with copies of the audio files). Without path saves over its file (fails for a never saved montage). ' +
     'A different existing file is overwritten only with overwrite true.',
   { path: z.string().optional(), overwrite: z.boolean().optional() },
 );
 appTool(
   'export',
   'Export mixdown',
-  'Renders the mix of the audible tracks to one audio file. Formats: wav, flac, mp3, ogg, opus, m4a. ' +
+  'Renders the mix of the audible tracks to one audio file. Formats: wav, flac, mp3, ogg, opus, m4a (web version: wav, mp3, ogg). ' +
     'Existing files are overwritten only with overwrite true.',
   {
     path: z.string().describe('Output file; the extension is added if missing'),

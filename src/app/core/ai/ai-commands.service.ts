@@ -1,5 +1,4 @@
 import { Injectable, inject } from '@angular/core';
-import { filesystem } from '@neutralinojs/lib';
 import { AudioLibraryService } from '../audio/audio-library.service';
 import { ExportOptions, ExportService } from '../audio/export.service';
 import { MixService } from '../audio/mix.service';
@@ -25,6 +24,7 @@ import {
   type Clip,
 } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
+import { FileSystemPort } from '../platform/file-system.port';
 import { AlignOptions, alignTempo } from '../montage/tempo-align';
 import { TimelineService } from '../timeline/timeline.service';
 
@@ -39,11 +39,6 @@ const round = (value: number, decimals = 3) => Math.round(value * 10 ** decimals
 const toDb = (gain: number) => (gain <= 1e-5 ? SILENCE_DB : round(20 * Math.log10(gain), 2));
 const fromDb = (db: number) => (db <= SILENCE_DB ? 0 : Math.min(2, Math.pow(10, db / 20)));
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const exists = (path: string) =>
-  filesystem.getStats(path).then(
-    () => true,
-    () => false,
-  );
 
 /** Bends of the fade shapes (see envelope curve). */
 const FADE_CURVES = { linear: 0, exponential: 4, logarithmic: -4, smooth: 2 } as const;
@@ -55,6 +50,7 @@ const FADE_CURVES = { linear: 0, exponential: 4, logarithmic: -4, smooth: 2 } as
 @Injectable({ providedIn: 'root' })
 export class AiCommandsService {
   private readonly montages = inject(MontageService);
+  private readonly files = inject(FileSystemPort);
   private readonly timeline = inject(TimelineService);
   private readonly library = inject(AudioLibraryService);
   private readonly processed = inject(ProcessedAudioService);
@@ -96,8 +92,8 @@ export class AiCommandsService {
     save: async (p) => {
       let path = (p['path'] as string | undefined) ?? this.montages.path();
       if (!path) throw new Error('The montage was never saved: give a path');
-      if (!path.toLowerCase().endsWith(`.${MONTAGE_EXTENSION}`)) path = `${path}.${MONTAGE_EXTENSION}`;
-      if (path !== this.montages.path() && !p['overwrite'] && (await exists(path))) {
+      if (!isMontageFile(path)) path = `${path}.${MONTAGE_EXTENSION}`;
+      if (path !== this.montages.path() && !p['overwrite'] && (await this.files.exists(path))) {
         throw new Error(`${path} exists: pass overwrite true to replace it`);
       }
       return { saved: await this.montages.saveAs(path) };
@@ -107,7 +103,7 @@ export class AiCommandsService {
       let path = String(p['path']);
       const extension = format === 'ogg' ? 'ogg' : format;
       if (!path.toLowerCase().endsWith(`.${extension}`)) path = `${path}.${extension}`;
-      if (!p['overwrite'] && (await exists(path))) throw new Error(`${path} exists: pass overwrite true to replace it`);
+      if (!p['overwrite'] && (await this.files.exists(path))) throw new Error(`${path} exists: pass overwrite true to replace it`);
       await this.waitReady();
       const options: ExportOptions = {
         format,

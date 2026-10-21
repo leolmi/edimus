@@ -1,6 +1,6 @@
 import { filesystem, os } from '@neutralinojs/lib';
 import { appPath } from './app-paths';
-import { fileName } from './montage/montage.model';
+import { fileName } from '../../app/core/montage/montage.model';
 
 /** Bytes written per call when copying a dropped file (Neutralino transfers files through its socket). */
 const WRITE_CHUNK = 8 * 1024 * 1024;

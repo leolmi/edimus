@@ -1,35 +1,17 @@
 import { Injectable } from '@angular/core';
 import { filesystem, os } from '@neutralinojs/lib';
-import { appPath } from '../app-paths';
+import {
+  AiClient,
+  AiClientId,
+  AiHostPort,
+  BridgeConfig,
+  ServerCommand,
+  SetupResult,
+} from '../../app/core/platform/ai-host.port';
+import { appPath } from './app-paths';
 
 /** Name of the server in the configuration of the AI clients. */
 const SERVER_NAME = 'edimus';
-
-/** How an AI client starts the edimus MCP server (forward slashes: valid everywhere on Windows). */
-export interface ServerCommand {
-  command: string;
-  args: string[];
-}
-
-/** An AI client that can use MCP servers. */
-export interface AiClient {
-  id: AiClientId;
-  name: string;
-  /** Found on this PC. */
-  detected: boolean;
-  /** Already starts this server (same command). */
-  configured: boolean;
-  /** Configuration file (or command) changed by the setup, shown to the user. */
-  target: string;
-}
-
-export type AiClientId = 'claude-code' | 'claude-desktop' | 'cursor' | 'vscode' | 'windsurf' | 'gemini' | 'codex';
-
-export interface SetupResult {
-  id: AiClientId;
-  ok: boolean;
-  error?: string;
-}
 
 /** A client configured through a JSON file: where it lives and how the server entry looks. */
 interface JsonClient {
@@ -64,11 +46,19 @@ const sameServer = (entry: ServerEntry | undefined, server: ServerCommand) =>
   JSON.stringify((entry.args ?? []).map(slashes)) === JSON.stringify(server.args);
 
 /**
- * Registers the edimus MCP server in the AI clients found on this PC: Claude Code through its
- * command line, the others by adding an entry to their configuration file (backed up first).
+ * The MCP server on this PC: its address, written by the server to <app data>/edimus/mcp.json,
+ * and its registration in the AI clients found here (Claude Code through its command line, the
+ * others by adding an entry to their configuration file, backed up first).
  */
-@Injectable({ providedIn: 'root' })
-export class AiSetupService {
+@Injectable()
+export class NeutralinoAiHost extends AiHostPort {
+  readonly pid = window.NL_PID;
+
+  async bridgeConfig(): Promise<BridgeConfig | null> {
+    const dataDir = await os.getPath('data');
+    return JSON.parse(await filesystem.readFile(`${dataDir}/edimus/mcp.json`)) as BridgeConfig;
+  }
+
   /**
    * Command that starts the server: the executable next to edimus.exe (portable folder); in the
    * sources node with the script (edits take effect at once), or the executable built there.

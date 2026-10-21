@@ -1,6 +1,7 @@
 import { DOCUMENT, Injectable, effect, inject, signal } from '@angular/core';
-import { storage } from '@neutralinojs/lib';
 import type { AudioOutput } from './audio/audio-outputs.service';
+import type { BridgeConfig } from './platform/ai-host.port';
+import { SettingsPort } from './platform/settings.port';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type Language = 'it' | 'en';
@@ -18,15 +19,18 @@ interface Settings {
   snapStep: SnapStep;
   /** Opens the developer tools of the window at startup. */
   devTools: boolean;
+  /** Address of the MCP server set by hand (web app: the page cannot read it from the PC). */
+  aiBridge: BridgeConfig | null;
 }
 
 const STORAGE_KEY = 'settings';
-const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat', devTools: false };
+const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat', devTools: false, aiBridge: null };
 
-/** User preferences (theme, language, listening volume and output), persisted with the Neutralino storage API. */
+/** User preferences (theme, language, listening volume and output), persisted by the platform (`SettingsPort`). */
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
   private readonly document = inject(DOCUMENT);
+  private readonly store = inject(SettingsPort);
 
   readonly theme = signal<ThemeMode>(DEFAULTS.theme);
   readonly language = signal<Language>(DEFAULTS.language);
@@ -35,6 +39,7 @@ export class SettingsService {
   readonly audioOutput = signal<AudioOutput | null>(DEFAULTS.audioOutput);
   readonly snapStep = signal<SnapStep>(DEFAULTS.snapStep);
   readonly devTools = signal(DEFAULTS.devTools);
+  readonly aiBridge = signal<BridgeConfig | null>(DEFAULTS.aiBridge);
 
   constructor() {
     effect(() => {
@@ -49,7 +54,7 @@ export class SettingsService {
 
   async load(): Promise<void> {
     try {
-      const saved = JSON.parse(await storage.getData(STORAGE_KEY)) as Partial<Settings>;
+      const saved = JSON.parse((await this.store.read(STORAGE_KEY)) ?? '{}') as Partial<Settings>;
       if (saved.theme) this.theme.set(saved.theme);
       if (saved.language) this.language.set(saved.language);
       if (typeof saved.volume === 'number') this.volume.set(saved.volume);
@@ -57,6 +62,7 @@ export class SettingsService {
       if (saved.audioOutput?.id) this.audioOutput.set(saved.audioOutput);
       if (saved.snapStep === 'bar' || saved.snapStep === 'beat' || saved.snapStep === 'half') this.snapStep.set(saved.snapStep);
       if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
+      if (saved.aiBridge?.port && saved.aiBridge.token) this.aiBridge.set(saved.aiBridge);
     } catch {
       // no saved settings yet (or storage unavailable): keep defaults
     }
@@ -99,6 +105,11 @@ export class SettingsService {
     void this.save();
   }
 
+  setAiBridge(config: BridgeConfig | null): void {
+    this.aiBridge.set(config);
+    void this.save();
+  }
+
   private async save(): Promise<void> {
     const data: Settings = {
       theme: this.theme(),
@@ -108,9 +119,10 @@ export class SettingsService {
       audioOutput: this.audioOutput(),
       snapStep: this.snapStep(),
       devTools: this.devTools(),
+      aiBridge: this.aiBridge(),
     };
     try {
-      await storage.setData(STORAGE_KEY, JSON.stringify(data));
+      await this.store.write(STORAGE_KEY, JSON.stringify(data));
     } catch (err) {
       console.error('Unable to save settings', err);
     }

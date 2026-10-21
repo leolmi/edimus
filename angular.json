@@ -80,6 +80,31 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "web": {
+              "fileReplacements": [
+                {
+                  "replace": "src/platform/platform.providers.ts",
+                  "with": "src/platform/platform.providers.web.ts"
+                }
+              ],
+              "assets": [
+                {
+                  "glob": "**/*",
+                  "input": "public"
+                },
+                {
+                  "glob": "rubberband.wasm",
+                  "input": "node_modules/rubberband-wasm/dist",
+                  "output": "wasm"
+                },
+                {
+                  "glob": "*.wasm",
+                  "input": "node_modules/wasm-media-encoders/wasm",
+                  "output": "wasm"
+                }
+              ],
+              "outputPath": "dist/web"
             }
           },
           "defaultConfiguration": "production"
@@ -92,6 +117,14 @@
             },
             "development": {
               "buildTarget": "edimus:build:development"
+            },
+            "web": {
+              "buildTarget": "edimus:build:development,web",
+              "port": 47817,
+              "headers": {
+                "Cross-Origin-Opener-Policy": "same-origin",
+                "Cross-Origin-Embedder-Policy": "require-corp"
+              }
             }
           },
           "defaultConfiguration": "development",

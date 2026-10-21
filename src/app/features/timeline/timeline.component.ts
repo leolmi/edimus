@@ -13,12 +13,11 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { os, type Icon, type MessageBoxChoice } from '@neutralinojs/lib';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import type { AudioInfo } from '../../core/audio/audio-decoder.service';
+import type { AudioInfo } from '../../core/platform/audio-engine.port';
 import { AudioLibraryService, SourceState } from '../../core/audio/audio-library.service';
 import { PlaybackService } from '../../core/audio/playback.service';
 import { TempoService } from '../../core/audio/tempo.service';
@@ -28,6 +27,7 @@ import { formatDuration } from '../../core/format';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { moveClips, trimClip } from '../../core/montage/edits';
+import { ShellPort } from '../../core/platform/shell.port';
 import { EnvelopePoint, MAX_GAIN, curveThroughMidpoint, insertPoint, movePoint, setCurve } from '../../core/montage/envelope';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
 import { Clip, Montage, Track, audibleTracks, copyName, fileName, toSource, trackVolume } from '../../core/montage/montage.model';
@@ -108,6 +108,7 @@ export class TimelineComponent {
   private readonly theme = inject(ThemeColorsService);
   private readonly settings = inject(SettingsService);
   private readonly i18n = inject(I18nService);
+  private readonly shell = inject(ShellPort);
 
   private readonly lanes = viewChild.required<ElementRef<HTMLElement>>('lanes');
   private readonly scroller = viewChild.required<ElementRef<HTMLElement>>('scroller');
@@ -520,13 +521,11 @@ export class TimelineComponent {
 
   /** Removes a track after a confirmation. */
   protected async removeTrack(track: Track): Promise<void> {
-    const choice = await os.showMessageBox(
+    const choice = await this.shell.ask(
       this.i18n.t('track.remove'),
       this.i18n.t('track.removeConfirm', { name: track.name, n: track.clips.length }),
-      'YES_NO' as MessageBoxChoice,
-      'QUESTION' as Icon,
     );
-    if (choice === 'YES') this.montages.removeTrack(track.id);
+    if (choice === 'yes') this.montages.removeTrack(track.id);
   }
 
   protected toggleMute(track: Track): void {

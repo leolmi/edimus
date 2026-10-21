@@ -3,6 +3,8 @@ import type { EnvelopePoint } from './envelope';
 
 /** Extension of the montage project files. */
 export const MONTAGE_EXTENSION = 'edimus';
+/** Montage and copies of its sources in one zip file. */
+export const BUNDLE_EXTENSION = 'edimuspack';
 /** 2: volume envelopes on the clips (in source time) and a single volume per track. */
 export const MONTAGE_VERSION = 2;
 
@@ -15,6 +17,11 @@ export interface AudioSource {
   path: string;
   /** Path relative to the montage file, used when the absolute one no longer exists. */
   relativePath?: string;
+  /**
+   * Fingerprint of the file (see `fileFingerprint`), written on save: a missing source is
+   * relinked to a file opened or dropped later with the same fingerprint.
+   */
+  fingerprint?: string;
   /** Tempo set by hand (otherwise detected at every opening). */
   tempo?: Tempo;
 }
@@ -116,5 +123,6 @@ export function copyName(name: string, existing: readonly string[]): string {
   return `${stem} (${n})`;
 }
 
-export const isMontageFile = (path: string) => fileExtension(path) === MONTAGE_EXTENSION;
+export const isBundleFile = (path: string) => fileExtension(path) === BUNDLE_EXTENSION;
+export const isMontageFile = (path: string) => fileExtension(path) === MONTAGE_EXTENSION || isBundleFile(path);
 export const isAudioFile = (path: string) => AUDIO_EXTENSIONS.includes(fileExtension(path));

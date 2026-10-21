@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import type { ExportFormat, ExportOptions } from '../../core/audio/export.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { AudioEnginePort } from '../../core/platform/audio-engine.port';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
 
 export const FORMATS: { id: ExportFormat; label: string; extension: string }[] = [
@@ -146,7 +147,8 @@ export class ExportDialogComponent {
   private readonly dialog = inject(MatDialogRef<ExportDialogComponent, ExportOptions>);
   private readonly initial = inject<ExportOptions>(MAT_DIALOG_DATA);
 
-  protected readonly formats = FORMATS;
+  /** The formats the audio engine of this platform can write. */
+  protected readonly formats = FORMATS.filter((f) => inject(AudioEnginePort).exportFormats.includes(f.id));
   protected readonly sampleRates = SAMPLE_RATES;
 
   protected readonly format = signal(this.initial.format);

@@ -1,15 +1,10 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { filesystem, os } from '@neutralinojs/lib';
 import { DocumentService } from '../document.service';
+import { AiHostPort } from '../platform/ai-host.port';
 import { AiCommandsService } from './ai-commands.service';
 
 /** Seconds between two attempts to reach the MCP server. */
 const RETRY_MS = 3000;
-
-interface BridgeConfig {
-  port: number;
-  token: string;
-}
 
 interface Request {
   type: 'request';
@@ -20,13 +15,14 @@ interface Request {
 
 /**
  * Connection to the edimus MCP server (mcp/server.mjs), so that an AI can drive this window.
- * The server, when running, writes its port and token to <app data>/edimus/mcp.json: the app
- * reads it and connects, retrying while the server is not there.
+ * The platform tells where the server is (on the desktop: <app data>/edimus/mcp.json, written by
+ * the server): the app connects, retrying while the server is not there.
  */
 @Injectable({ providedIn: 'root' })
 export class AiBridgeService {
   private readonly commands = inject(AiCommandsService);
   private readonly documents = inject(DocumentService);
+  private readonly host = inject(AiHostPort);
 
   /** Connected to an MCP server. */
   readonly connected = signal(false);
@@ -34,7 +30,7 @@ export class AiBridgeService {
   readonly busy = signal(false);
 
   private socket?: WebSocket;
-  private readonly instanceId = `${window.NL_PID ?? 'dev'}-${Math.random().toString(36).slice(2, 6)}`;
+  private readonly instanceId = `${this.host.pid ?? 'dev'}-${Math.random().toString(36).slice(2, 6)}`;
 
   constructor() {
     void this.loop();
@@ -50,14 +46,14 @@ export class AiBridgeService {
   }
 
   private async connect(): Promise<void> {
-    const dataDir = await os.getPath('data');
-    const config = JSON.parse(await filesystem.readFile(`${dataDir}/edimus/mcp.json`)) as BridgeConfig;
+    const config = await this.host.bridgeConfig();
+    if (!config) return;
     await new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(`ws://127.0.0.1:${config.port}/?token=${config.token}`);
       socket.onopen = () => {
         this.socket = socket;
         this.connected.set(true);
-        this.send({ type: 'hello', instanceId: this.instanceId, title: this.documents.title(), pid: window.NL_PID });
+        this.send({ type: 'hello', instanceId: this.instanceId, title: this.documents.title(), pid: this.host.pid });
         resolve();
       };
       socket.onerror = () => reject(new Error('MCP server not reachable'));

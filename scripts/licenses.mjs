@@ -116,6 +116,22 @@ const notes = [
     text: null,
   },
   {
+    name: 'LAME (in wasm-media-encoders)',
+    version: '',
+    license: 'LGPL-2.0-or-later',
+    url: 'https://lame.sourceforge.io',
+    usage: 'MP3 encoding of the web version (WebAssembly)',
+    text: null,
+  },
+  {
+    name: 'libvorbis / libogg (in wasm-media-encoders)',
+    version: '',
+    license: 'BSD-3-Clause',
+    url: 'https://xiph.org/vorbis/',
+    usage: 'Ogg Vorbis encoding of the web version (WebAssembly)',
+    text: null,
+  },
+  {
     name: 'Microsoft Edge WebView2 Runtime',
     version: '',
     license: 'Microsoft Software License Terms',
