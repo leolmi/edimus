@@ -1,10 +1,21 @@
-import { Injectable, inject } from '@angular/core';
-import { automate, clipEnvelopeOnTimeline } from '../montage/envelope';
+import { Injectable, computed, inject } from '@angular/core';
+import { automate, clipEnvelopeOnTimeline, clipGainAt } from '../montage/envelope';
 import { Clip, audibleTracks, clipRate, isProcessed, trackVolume } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { AudioLibraryService } from './audio-library.service';
 import { ProcessedAudioService } from './processed-audio.service';
+
+/** Level under which the mix counts as silence (-60 dBFS). */
+const SILENCE = 0.001;
+/** Length of the blocks scanned for the audible span (10 ms). */
+const BLOCK = 0.01;
+
+/** Span of the mix that is heard, in timeline seconds. */
+export interface AudibleRange {
+  start: number;
+  end: number;
+}
 
 /** Nodes of a scheduled mix, to stop and release them. */
 export interface ScheduledMix {
@@ -61,6 +72,55 @@ export class MixService {
       }
     }
     return mix;
+  }
+
+  /**
+   * Span of the mix that is heard: from the first to the last 10 ms block above -60 dBFS of the
+   * audible clips, envelopes and track volumes included (the leading and trailing silences
+   * left out, as a trim would). Null when nothing is heard or some audio is not ready yet.
+   */
+  readonly audibleRange = computed<AudibleRange | null>(() => {
+    const tracks = audibleTracks(this.montages.montage());
+    let start = Infinity;
+    let end = -Infinity;
+    for (const track of tracks) {
+      for (const clip of track.clips) {
+        const buffer = this.bufferOf(clip);
+        if (!buffer) return null;
+        const length = this.timeline.clipLength(clip);
+        const level = (t: number) => this.blockPeak(buffer, clip, t) * trackVolume(track) * clipGainAt(clip, t + BLOCK / 2);
+        // from each end towards the middle, stopping where another clip already did better
+        for (let t = clip.start; t < Math.min(clip.start + length, start); t += BLOCK) {
+          if (level(t) >= SILENCE) {
+            start = t;
+            break;
+          }
+        }
+        for (let t = clip.start + length - BLOCK; t >= clip.start && t + BLOCK > end; t -= BLOCK) {
+          if (level(t) >= SILENCE) {
+            end = Math.min(clip.start + length, t + BLOCK);
+            break;
+          }
+        }
+      }
+    }
+    return end > start ? { start, end } : null;
+  });
+
+  /** Peak of the samples of a clip in the block starting at timeline time `t`. */
+  private blockPeak(buffer: AudioBuffer, clip: Clip, t: number): number {
+    // position in the buffer as played (see schedule): rendered time for processed clips
+    const from = Math.max(0, Math.floor((clip.offset / clipRate(clip) + t - clip.start) * buffer.sampleRate));
+    const to = Math.min(buffer.length, from + Math.ceil(BLOCK * buffer.sampleRate));
+    let peak = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const data = buffer.getChannelData(c);
+      for (let i = from; i < to; i++) {
+        const v = Math.abs(data[i]);
+        if (v > peak) peak = v;
+      }
+    }
+    return peak;
   }
 
   /** True when every clip has its audio ready (decoded, and rendered when processed). */

@@ -6,8 +6,12 @@ export type DropTarget = { kind: 'track'; trackId: string; x: number } | { kind:
 
 export interface FileDrop {
   files: File[];
+  /** Handles of the dropped files, where the browser gives them (see `FileSystemPort.resolveDropped`). */
+  handles: Promise<FileSystemHandle | null>[];
   target: DropTarget;
 }
+
+type HandleItem = DataTransferItem & { getAsFileSystemHandle?: () => Promise<FileSystemHandle | null> };
 
 /** Class set on the drop zone under the pointer while dragging files over the window. */
 const OVER_CLASS = 'drop-over';
@@ -38,7 +42,11 @@ export class DropTargetService {
       e.preventDefault();
       this.highlight(undefined);
       const files = [...(e.dataTransfer?.files ?? [])];
-      if (files.length) this.drops.next({ files, target: this.targetAt(e.clientX, e.clientY) });
+      // asked now: the items are valid only during the event
+      const handles = [...(e.dataTransfer?.items ?? [])]
+        .filter((item) => item.kind === 'file')
+        .map((item) => (item as HandleItem).getAsFileSystemHandle?.().catch(() => null) ?? Promise.resolve(null));
+      if (files.length) this.drops.next({ files, handles, target: this.targetAt(e.clientX, e.clientY) });
     });
   }
 

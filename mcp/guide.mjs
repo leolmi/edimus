@@ -29,6 +29,11 @@ stereo mix, which is rendered by \`export\`.
   and after the last one the level stays constant. A segment can be bent (\`curve\`: 0 straight,
   >0 slow start, <0 fast start).
 
+## Audible length
+\`get_state\` reports \`audible\`: the span of the mix that is heard (from the first to the last
+sound above -60 dBFS of the audible tracks, envelopes and volumes included), i.e. the length
+without leading and trailing silences; null while some audio is not ready.
+
 ## Units
 - All times are **seconds**: timeline seconds unless the parameter says "source".
 - Volumes are **dB**; speed is a factor; pitch is semitones; tempo is BPM.

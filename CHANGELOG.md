@@ -4,6 +4,36 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.3.0 — 2026-10-21
+
+### File
+- Finestra *File del montaggio*: se all'apertura qualche file audio non è raggiungibile, mostra
+  lo stato di ogni file e permette di consentire di nuovo l'accesso (web), selezionare più file
+  o una cartella (abbinati per contenuto o nome) o indicare il file di una traccia. Si riapre con
+  *Trova i file…* sotto una traccia in errore.
+- Le clip dei file mancanti sono disegnate come riquadri tratteggiati; al salvataggio le clip
+  che arrivano a fine sorgente hanno la durata scritta, così restano al loro posto anche senza
+  il file.
+- Web: anche i file trascinati vengono ritrovati nelle sessioni successive (Chrome, Edge).
+
+### Ascolto
+- Durata udibile nella barra di stato: il mix senza i silenzi iniziale e finale (dal primo
+  all'ultimo suono sopra −60 dB, con volumi e inviluppi); un clic seleziona l'intervallo. Anche
+  in `get_state` (`audible`) per l'assistente AI.
+
+### Interfaccia
+- App desktop: disattivato lo zoom della pagina (pizzico sul touchpad, Ctrl +/−/0); lo zoom della
+  timeline resta.
+
+### Editing
+- Le frecce ← → spostano le clip selezionate di un pixel allo zoom corrente; con Shift saltano al
+  punto di aggancio successivo (bordi e inviluppi delle altre clip, cursore). Un tasto tenuto
+  premuto, o premuto più volte di seguito, è un solo passo di annulla.
+- Accorciando o spostando l'ultima clip la vista non scorre più sotto il puntatore: la lunghezza
+  della timeline si adegua al rilascio.
+- Canc chiede conferma quando le clip selezionate sono tutte quelle di una traccia (che verrebbe
+  eliminata), come il pulsante di eliminazione della traccia.
+
 ## 1.2.0 — 2026-10-21
 
 ### Versione web

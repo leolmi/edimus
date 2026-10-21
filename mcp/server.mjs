@@ -131,7 +131,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.2.0' },
+  { name: 'edimus', version: '1.3.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -247,7 +247,7 @@ server.registerTool(
 appTool(
   'get_state',
   'Montage state',
-  'The montage: file, tracks (mute/solo, volume envelope), clips (timeline start/end, source offset, speed, pitch, BPM), ' +
+  'The montage: file, audible span (mix without leading/trailing silence), tracks (mute/solo, volume envelope), clips (timeline start/end, source offset, speed, pitch, BPM), ' +
     'sources (file, format, length, tempo), playhead, selection. Ids returned here are used by all the other tools.',
   {},
   { readOnlyHint: true },
@@ -265,7 +265,7 @@ appTool(
   'open',
   'Open files',
   'Opens files: a .edimus montage or .edimuspack bundle replaces the current one (fails with unsaved changes unless discard is true); ' +
-    'audio files are added as new tracks (or to trackId from start).',
+    'audio files are added as new tracks (or to trackId from start); an audio file of a missing source (same content, or same name) relinks it instead.',
   {
     paths: z.array(z.string()).min(1).describe('Absolute paths'),
     trackId: z.string().optional().describe('Add the audio files to this track, one after the other'),

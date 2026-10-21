@@ -27,9 +27,20 @@
   trascinato riceve un percorso `/<id>/<nome>` nel `WebFileRegistry`. Con la File System
   Access API (Chromium) i file sono handle in lettura/scrittura, salvati in IndexedDB per
   ritrovare le sorgenti nelle sessioni successive (il permesso viene richiesto di nuovo), e la
-  rinomina usa `move`. Senza l'API si apre con il selettore della pagina (solo lettura); ogni
-  scrittura su un file senza handle (o su un percorso dato dall'AI) diventa un download.
-  Niente cartelle: `relativePath` è sempre assente.
+  rinomina usa `move`. Anche i file trascinati hanno l'handle, chiesto durante l'evento di drop
+  (`DataTransferItem.getAsFileSystemHandle`, `DropTargetService`). La ricerca in una cartella
+  (`showDirectoryPicker`) registra gli handle trovati senza salvarli: un handle va in IndexedDB
+  quando il file viene letto. Senza l'API si apre con il selettore della pagina (solo lettura,
+  file validi per la sessione); ogni scrittura su un file senza handle (o su un percorso dato
+  dall'AI) diventa un download. Niente cartelle: `relativePath` è sempre assente.
+- **File del montaggio** (`SourceFilesService`, `SourceFilesDialogComponent`): dopo l'apertura
+  di un montaggio `FileSystemPort.access` dice per ogni sorgente se è `ready`, `permission`
+  (handle noto, il browser rivuole il permesso: va chiesto da un clic, `requestAccess`) o
+  `missing`. Se qualcosa non è pronto si apre il dialog: consenti l'accesso, seleziona più file,
+  cerca in una cartella (`showFolderDialog`, ricorsivo; desktop con Neutralino), trova il file di
+  una sorgente. L'abbinamento è per nome (verificando l'impronta, se c'è) e poi per impronta
+  (file rinominati, al massimo 400 file esaminati). Le clip delle sorgenti mancanti sono
+  disegnate come segnaposto tratteggiati; *Trova i file…* sotto la traccia riapre il dialog.
 - **Motore audio web** (`WebAudioEngine`): il probe legge rate e canali dall'header
   (`audio-header.ts`: wav, flac, mp3, ogg vorbis/opus, mp4) e decodifica con `decodeAudioData`
   a quel rate (il buffer è tenuto per la decodifica che segue). Varispeed e downmix con un
@@ -40,6 +51,9 @@
   MP3 (LAME) e Ogg Vorbis con `wasm-media-encoders`; flac, opus e m4a non ci sono
   (`AudioEnginePort.exportFormats`: il dialogo mostra solo i formati disponibili). I `.wasm`
   sono copiati in `wasm/` dagli asset della configurazione `web`.
+- **Zoom della web view** disattivato sul desktop (`initNeutralino`): il pizzico del touchpad
+  (Ctrl+rotella) e Ctrl +/−/0 non ingrandiscono la pagina; gli eventi arrivano comunque alla
+  timeline. Nel web lo zoom del browser resta (accessibilità).
 - **Neutralino 6** ospita il frontend in una web view e fornisce le API native
   (`filesystem`, `os.execCommand`/processi, `window`, `storage`, `events`).
   `tokenSecurity: none`, server locale su porta casuale; in sviluppo la finestra carica
@@ -90,6 +104,8 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   `AudioBufferSourceNode` per clip; una clip con inviluppo passa da un suo `GainNode`
   automatizzato (`automate` con i punti convertiti in tempo di timeline,
   `clipEnvelopeOnTimeline`). Lo stesso grafo serve riproduzione ed export, quindi suonano uguali.
+  `audibleRange` dà il tratto udibile del mix (dal primo all'ultimo blocco di 10 ms sopra −60 dBFS
+  delle tracce udibili, inviluppi e volumi compresi): barra di stato e `get_state`.
 - **Export** (`ExportService`): render offline e normalizzazione opzionale; l'encoding è del
   motore audio (su desktop: scrittura PCM a blocchi, ffmpeg con progresso letto da `-progress pipe:1`).
 

@@ -215,11 +215,29 @@ export class MontageService {
   async saveAs(path: string): Promise<string> {
     if (!isMontageFile(path)) path = `${path}.${MONTAGE_EXTENSION}`;
     const montage = this.montage();
-    await writeMontage(this.files, path, montage);
+    await writeMontage(this.files, path, this.withLengths(montage));
     this.path.set(path);
     this.saved.set(montage);
     this.pendingName.set(null);
     return path;
+  }
+
+  /**
+   * The montage with the length of the clips that run to the end of their source written
+   * out: a montage opened without its files still knows where its clips end.
+   */
+  private withLengths(montage: Montage): Montage {
+    const length = (sourceId: string) => this.library.ready(sourceId)?.buffer.duration;
+    return {
+      ...montage,
+      tracks: montage.tracks.map((track) => ({
+        ...track,
+        clips: track.clips.map((clip) => {
+          const total = clip.duration > 0 ? undefined : length(clip.sourceId);
+          return total ? { ...clip, duration: Math.max(0, total - clip.offset) } : clip;
+        }),
+      })),
+    };
   }
 
   /** Replaces the montage, decoding the sources it adds. */

@@ -11,6 +11,7 @@ export interface CanvasColors {
   text: string;
   envelope: string;
   beat: string;
+  error: string;
   font: string;
   /** The theme in use is dark. */
   dark: boolean;
@@ -25,6 +26,7 @@ const TOKENS: Record<Exclude<keyof CanvasColors, 'font' | 'dark'>, string> = {
   text: '--mat-sys-on-surface-variant',
   envelope: '--mat-sys-tertiary',
   beat: '--mat-sys-on-surface',
+  error: '--mat-sys-error',
 };
 
 /**

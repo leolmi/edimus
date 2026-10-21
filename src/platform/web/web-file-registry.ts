@@ -40,11 +40,23 @@ async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
  */
 export class WebFileRegistry {
   private readonly files = new Map<string, WebFile>();
+  /** Paths whose handle is in IndexedDB. */
+  private readonly stored = new Set<string>();
 
-  add(name: string, file: WebFile): string {
+  /** Registers a file; `store` false for the many files of a folder search (stored when read, see `remember`). */
+  add(name: string, file: WebFile, store = true): string {
     const path = `/${crypto.randomUUID().slice(0, 8)}/${name}`;
-    this.set(path, file);
+    this.files.set(path, file);
+    if (store) this.remember(path);
     return path;
+  }
+
+  /** Stores the handle of a file (once), so that it is found again in later sessions. */
+  remember(path: string): void {
+    const file = this.files.get(path);
+    if (file?.kind !== 'handle' || this.stored.has(path)) return;
+    this.stored.add(path);
+    void withStore('readwrite', (s) => s.put(file.handle, path)).catch(() => undefined);
   }
 
   async get(path: string): Promise<WebFile | undefined> {
@@ -54,21 +66,19 @@ export class WebFileRegistry {
     if (!handle) return undefined;
     const file: WebFile = { kind: 'handle', handle };
     this.files.set(path, file);
+    this.stored.add(path);
     return file;
   }
 
   rename(from: string, to: string, file: WebFile): void {
     this.delete(from);
-    this.set(to, file);
+    this.files.set(to, file);
+    this.remember(to);
   }
 
   delete(path: string): void {
     this.files.delete(path);
+    this.stored.delete(path);
     void withStore('readwrite', (s) => s.delete(path)).catch(() => undefined);
-  }
-
-  private set(path: string, file: WebFile): void {
-    this.files.set(path, file);
-    if (file.kind === 'handle') void withStore('readwrite', (s) => s.put(file.handle, path)).catch(() => undefined);
   }
 }

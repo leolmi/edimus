@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, 
 import { AudioLibraryService } from '../../core/audio/audio-library.service';
 import { rangePeak } from '../../core/audio/peaks';
 import { MAX_GAIN, clipGainAt, gainAt, gainToDb } from '../../core/montage/envelope';
-import { Clip, Track, clipRate, isProcessed, toTimeline, trackVolume } from '../../core/montage/montage.model';
+import { Clip, Track, clipRate, fileName, isProcessed, toTimeline, trackVolume } from '../../core/montage/montage.model';
 import { ProcessedAudioService } from '../../core/audio/processed-audio.service';
 import { beatsPerBar } from '../../core/audio/tempo';
 import { TempoService } from '../../core/audio/tempo.service';
@@ -220,7 +220,10 @@ export class TrackLaneComponent {
     for (const clip of this.stacked()) {
       const selected = selection.has(clip.id);
       const source = this.library.ready(clip.sourceId);
-      if (!source) continue;
+      if (!source) {
+        this.drawPlaceholder(ctx, colors, clip, size);
+        continue;
+      }
       // each source has its own color (index of the source in the montage)
       const palette = sourceColors(this.montages.montage().sources.findIndex((s) => s.id === clip.sourceId), colors.dark);
       const processed = isProcessed(clip);
@@ -286,6 +289,34 @@ export class TrackLaneComponent {
     }
     this.drawMarkedBar(ctx, colors, size.width, size.height);
     this.drawEnvelope(ctx, colors, size.width);
+  }
+
+  /**
+   * Clip whose audio is not there (file missing, or still loading): an outline with the file
+   * name, so that the space it takes on the timeline is visible. Its length is known only
+   * when saved in the clip.
+   */
+  private drawPlaceholder(ctx: CanvasRenderingContext2D, colors: CanvasColors, clip: Clip, size: { width: number; height: number }): void {
+    const length = this.timeline.clipLength(clip);
+    const x0 = this.timeline.timeToX(clip.start);
+    const x1 = this.timeline.timeToX(clip.start + length);
+    if (length <= 0 || x1 < 0 || x0 > size.width) return;
+    const failed = this.library.sources()[clip.sourceId]?.status === 'error';
+    const color = failed ? colors.error : colors.axis;
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(Math.round(x0) + 0.5, 1.5, Math.round(x1 - x0) - 1, size.height - 3);
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.rect(Math.max(0, x0), 0, Math.min(size.width, x1) - Math.max(0, x0), size.height);
+    ctx.clip();
+    const path = this.montages.montage().sources.find((s) => s.id === clip.sourceId)?.path ?? '';
+    ctx.fillStyle = color;
+    ctx.font = colors.font;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${failed ? '⚠' : '…'} ${fileName(path)}`, Math.max(0, x0) + 8, size.height / 2);
+    ctx.restore();
   }
 
   /**

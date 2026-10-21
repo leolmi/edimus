@@ -3,14 +3,13 @@ import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ExportDialogComponent, FORMATS } from '../features/export/export-dialog.component';
 import { RenameDialogComponent, RenameDialogData } from '../features/rename/rename-dialog.component';
-import { AudioLibraryService } from './audio/audio-library.service';
+import { SourceFilesDialogComponent } from '../features/sources/source-files-dialog.component';
 import { ExportOptions, ExportService } from './audio/export.service';
 import { MixService } from './audio/mix.service';
 import { DropTarget, DropTargetService } from './drop-target.service';
 import { TimelineService } from './timeline/timeline.service';
 import { I18nService } from './i18n/i18n.service';
 import type { TranslationKey } from './i18n/it';
-import { fileFingerprint } from './montage/fingerprint';
 import {
   AUDIO_EXTENSIONS,
   BUNDLE_EXTENSION,
@@ -18,11 +17,11 @@ import {
   baseName,
   dirName,
   fileExtension,
-  fileName,
   isAudioFile,
   isMontageFile,
 } from './montage/montage.model';
 import { MontageService } from './montage/montage.service';
+import { SourceFilesService } from './montage/source-files.service';
 import { AudioEnginePort } from './platform/audio-engine.port';
 import { DevToolsPort } from './platform/dev-tools.port';
 import { FileSystemPort } from './platform/file-system.port';
@@ -33,6 +32,8 @@ interface StatusMessage {
   key: TranslationKey;
   params?: Record<string, string | number>;
 }
+
+const SOURCE_FILES_DIALOG = 'source-files';
 
 const errorMessage = (err: unknown) => String((err as { message?: string })?.message ?? err);
 
@@ -50,7 +51,7 @@ export class DocumentService {
   private readonly devTools = inject(DevToolsPort);
   private readonly settings = inject(SettingsService);
   private readonly files = inject(FileSystemPort);
-  private readonly library = inject(AudioLibraryService);
+  private readonly sourceFiles = inject(SourceFilesService);
   private readonly shell = inject(ShellPort);
   /** Options of the last export, proposed again by the next one. */
   private exportOptions?: ExportOptions;
@@ -64,10 +65,10 @@ export class DocumentService {
   constructor() {
     effect(() => void this.shell.setTitle(`${this.title()}${this.montages.dirty() ? ' •' : ''} — edimus`));
     this.shell.onCloseRequest(() => void this.close());
-    this.drops.drops.subscribe(async ({ files, target }) => {
+    this.drops.drops.subscribe(async ({ files, handles, target }) => {
       this.pendingDrop.set(target);
       try {
-        const { paths, imported } = await this.files.resolveDropped(files);
+        const { paths, imported } = await this.files.resolveDropped(files, handles);
         await this.open(paths, target);
         if (imported) this.message.set({ key: 'drop.imported', params: { n: imported } });
       } finally {
@@ -107,12 +108,17 @@ export class DocumentService {
       if (!this.montages.pristine() && !(await this.confirmDiscard())) return;
       try {
         await this.montages.openMontage(montagePath);
-        return this.message.set({ key: 'open.montage', params: { path: montagePath } });
+        this.message.set({ key: 'open.montage', params: { path: montagePath } });
+        // files moved, deleted or (in the browser) to allow again: asked at once
+        const files = await this.sourceFiles.check();
+        if (files.some((f) => f.access !== 'ready')) this.showSourceFiles();
+        return;
       } catch (err) {
         return this.message.set({ key: 'open.error', params: { message: errorMessage(err) } });
       }
     }
-    const relinked = await this.relink(paths);
+    // files of missing sources relink them instead of being added
+    const relinked = await this.sourceFiles.relink(paths);
     if (relinked.length) {
       paths = paths.filter((p) => !relinked.includes(p));
       if (!paths.some(isAudioFile)) return this.message.set({ key: 'relink.done', params: { n: relinked.length } });
@@ -125,28 +131,6 @@ export class DocumentService {
     }
     const count = this.montages.addAudio(paths);
     this.message.set(count ? { key: 'add.done', params: { n: count } } : { key: 'open.unsupported' });
-  }
-
-  /**
-   * Audio files that are missing sources of the montage relink them, instead of being added:
-   * same fingerprint, or same name for sources saved without one. Returns the paths used.
-   */
-  private async relink(paths: string[]): Promise<string[]> {
-    const states = this.library.sources();
-    const missing = this.montages.montage().sources.filter((s) => states[s.id]?.status === 'error');
-    const used: string[] = [];
-    for (const path of paths.filter(isAudioFile)) {
-      if (!missing.length) break;
-      const fingerprint = await fileFingerprint(this.files, path);
-      const index = missing.findIndex((s) =>
-        s.fingerprint ? s.fingerprint === fingerprint : fileName(s.path).toLowerCase() === fileName(path).toLowerCase(),
-      );
-      if (index < 0) continue;
-      const [source] = missing.splice(index, 1);
-      this.montages.relinkSource(source.id, path, fingerprint);
-      used.push(path);
-    }
-    return used;
   }
 
   /** Saves over the montage file, or asks where when it was never saved. Returns false if not saved. */
@@ -179,6 +163,12 @@ export class DocumentService {
       return false;
     }
     return this.write(renamed);
+  }
+
+  /** Dialog of the audio files of the montage that cannot be read (see SourceFilesService). */
+  showSourceFiles(): void {
+    if (this.dialogs.getDialogById(SOURCE_FILES_DIALOG)) return;
+    this.dialogs.open(SourceFilesDialogComponent, { id: SOURCE_FILES_DIALOG, autoFocus: 'dialog' });
   }
 
   /** Rename dialog (click on the title): the new name is applied to the file by the next save. */

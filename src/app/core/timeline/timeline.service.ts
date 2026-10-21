@@ -58,8 +58,23 @@ export class TimelineService {
     return end;
   });
 
+  /**
+   * Extent kept during a drag (see `holdExtent`): trimming or moving the last clip shortens the
+   * montage at every move, and the view would scroll under the pointer.
+   */
+  private readonly heldExtent = signal(0);
+
   /** Visible length when scrolled to the end: the montage plus some room after it. */
-  readonly extent = computed(() => Math.max(this.duration() * 1.05, this.viewWidth() / this.pxPerSec()));
+  readonly extent = computed(() => Math.max(this.duration() * 1.05, this.viewWidth() / this.pxPerSec(), this.heldExtent()));
+
+  /** Keeps the current extent until `releaseExtent` (a pointer gesture is in progress). */
+  holdExtent(): void {
+    this.heldExtent.set(this.extent());
+  }
+
+  releaseExtent(): void {
+    this.heldExtent.set(0);
+  }
 
   /** Length of the source of a clip (seconds), 0 while not decoded. */
   sourceLength(clip: Clip): number {

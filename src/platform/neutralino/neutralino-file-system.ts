@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { filesystem, os } from '@neutralinojs/lib';
-import { FileFilter, FileSystemPort } from '../../app/core/platform/file-system.port';
-import { baseName, dirName } from '../../app/core/montage/montage.model';
+import { FileAccess, FileFilter, FileSystemPort } from '../../app/core/platform/file-system.port';
+import { baseName, dirName, fileExtension } from '../../app/core/montage/montage.model';
 import { resolveDroppedFiles } from './dropped-files';
 
 /** Bytes written per call (Neutralino transfers files through its socket). */
@@ -14,6 +14,16 @@ export class NeutralinoFileSystem extends FileSystemPort {
       () => true,
       () => false,
     );
+  }
+
+  async access(path: string): Promise<FileAccess> {
+    return (await this.exists(path)) ? 'ready' : 'missing';
+  }
+
+  async requestAccess(paths: string[]): Promise<string[]> {
+    // no permissions on the desktop: the files are there or not
+    const ready = await Promise.all(paths.map((path) => this.exists(path)));
+    return paths.filter((_, i) => ready[i]);
   }
 
   size(path: string): Promise<number | undefined> {
@@ -74,6 +84,15 @@ export class NeutralinoFileSystem extends FileSystemPort {
 
   async showSaveDialog(title: string, filters: FileFilter[], defaultPath?: string): Promise<string | undefined> {
     return (await os.showSaveDialog(title, { defaultPath, filters })) || undefined;
+  }
+
+  async showFolderDialog(title: string, extensions: readonly string[]): Promise<string[]> {
+    const dir = await os.showFolderDialog(title);
+    if (!dir) return [];
+    const entries = await filesystem.readDirectory(dir, { recursive: true });
+    return entries
+      .filter((e) => e.type === 'FILE' && extensions.includes(fileExtension(e.path)))
+      .map((e) => e.path.replaceAll('\\', '/'));
   }
 
   resolveDropped(files: File[]): Promise<{ paths: string[]; imported: number }> {

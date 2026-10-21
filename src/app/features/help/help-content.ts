@@ -73,7 +73,9 @@ const IT: HelpContent = {
         {
           title: 'File audio mancanti',
           text: [
-            'Se un file audio del montaggio non si trova più, la sua traccia mostra un errore. Apri o trascina il file giusto: edimus lo riconosce dal contenuto (anche con un altro nome o in un’altra cartella) e lo ricollega, senza aggiungere una nuova traccia.',
+            'Se all’apertura di un montaggio qualche file audio non è raggiungibile, si apre la finestra File del montaggio con lo stato di ogni file. Puoi selezionare più file insieme o indicare una cartella (anche con sottocartelle): edimus li riconosce dal contenuto, anche con un altro nome, e li ricollega da solo. Con Trova… indichi il file di una sola traccia.',
+            'Le clip dei file mancanti restano al loro posto, disegnate come un riquadro tratteggiato; la finestra si riapre con Trova i file… sotto la traccia in errore. Anche aprire o trascinare il file giusto lo ricollega, senza aggiungere una nuova traccia.',
+            'Nella versione web il browser chiede di nuovo il permesso di leggere i file usati in una sessione precedente: basta Consenti l’accesso nella stessa finestra.',
           ],
         },
         {
@@ -118,6 +120,12 @@ const IT: HelpContent = {
           text: ['Il pulsante con il mirino porta il cursore al centro della vista (all’inizio o alla fine se è vicino agli estremi).'],
         },
         {
+          title: 'Durata udibile',
+          text: [
+            'Accanto al tempo, “udibile” indica quanto dura il mix senza i silenzi iniziale e finale: dal primo suono dell’insieme delle tracce udibili alla fine dell’ultimo, con volumi e inviluppi (sotto −60 dB è silenzio). Il tooltip mostra inizio e fine; un clic seleziona quell’intervallo, per esempio per ritagliarlo o esportarlo.',
+          ],
+        },
+        {
           title: 'Volume d’ascolto e uscita audio',
           text: [
             'Il cursore del volume e il pulsante muto agiscono solo sull’ascolto, non sull’esportazione.',
@@ -158,9 +166,11 @@ const IT: HelpContent = {
         },
         {
           title: 'Selezionare e spostare una clip',
+          keys: ['←', '→', 'Shift+← →'],
           text: [
             'Una clip è una porzione di un file audio posata su una traccia. Clic per selezionarla, trascina per spostarla nel tempo o su un’altra traccia; trascinandola sotto l’ultima traccia ne crea una nuova.',
             'Inizio e fine della clip si agganciano all’inizio o alla fine delle altre clip, su qualsiasi traccia, quando ci passano vicino. Con la griglia delle battute visibile la clip si sposta a passi (battuta, semiminima o croma, da scegliere nelle Impostazioni): il punto della griglia della clip sotto il puntatore si aggancia al più vicino delle altre clip. Tieni premuto Alt per spostarla liberamente.',
+            'Con la tastiera, le frecce ← → spostano le clip selezionate di un pixel (più ingrandisci, più il passo è fine); con Shift saltano al punto di aggancio successivo: inizio, fine o punto d’inviluppo di un’altra clip, oppure il cursore. Tenendo premuta la freccia, o premendola più volte di seguito, lo spostamento è un solo passo di annulla.',
           ],
         },
         {
@@ -192,7 +202,7 @@ const IT: HelpContent = {
           keys: ['Canc'],
           text: [
             '“Ritaglia alla selezione” tiene solo l’intervallo selezionato e lo porta all’inizio.',
-            'Canc elimina l’intervallo selezionato da tutte le tracce chiudendo il buco; senza intervallo elimina le clip selezionate.',
+            'Canc elimina l’intervallo selezionato da tutte le tracce chiudendo il buco; senza intervallo elimina le clip selezionate (se sono tutte quelle di una traccia, la traccia viene eliminata dopo una conferma).',
           ],
         },
         {
@@ -285,7 +295,7 @@ const IT: HelpContent = {
           title: 'edimus nel browser',
           text: [
             'La versione web lavora tutta sul tuo computer: i file audio non vengono mai caricati su un server.',
-            'Con Chrome o Edge apri e salvi i file con le finestre del sistema, e edimus li ritrova anche nelle sessioni successive (il browser chiede di nuovo il permesso). Con gli altri browser i file si aprono in sola lettura e ogni salvataggio diventa un download.',
+            'Con Chrome o Edge i file aperti o trascinati vengono ritrovati anche nelle sessioni successive (il browser chiede di nuovo il permesso, vedi File audio mancanti) e il salvataggio usa le finestre del sistema. Con gli altri browser i file vanno indicati di nuovo a ogni sessione e ogni salvataggio diventa un download.',
             'Esportazione in wav, mp3 e ogg. Velocità e intonazione usano lo stesso motore (Rubber Band) dell’app desktop; i render restano in una cache del browser.',
             'Per collegare un assistente AI, avvia il server MCP sul PC e inserisci porta e token nella scheda Assistente AI di questo Aiuto.',
           ],
@@ -415,7 +425,9 @@ const EN: HelpContent = {
         {
           title: 'Missing audio files',
           text: [
-            'When an audio file of the montage cannot be found any more, its track shows an error. Open or drop the right file: edimus recognizes it by its content (also with another name or in another folder) and relinks it, without adding a new track.',
+            'When some audio files cannot be reached as a montage is opened, the Files of the montage window shows the state of each file. Choose several files at once or a folder (subfolders included): edimus recognizes them by their content, also with another name, and relinks them by itself. With Find… you choose the file of a single track.',
+            'The clips of the missing files stay in place, drawn as a dashed box; the window opens again with Find the files… below the track in error. Opening or dropping the right file relinks it too, without adding a new track.',
+            'In the web version the browser asks again the permission to read the files used in an earlier session: just Allow access in the same window.',
           ],
         },
         {
@@ -460,6 +472,12 @@ const EN: HelpContent = {
           text: ['The crosshair button brings the playhead to the middle of the view (to the start or the end when it is close to them).'],
         },
         {
+          title: 'Audible length',
+          text: [
+            'Next to the time, “audible” tells how long the mix lasts without its leading and trailing silences: from the first sound of the audible tracks to the end of the last one, with volumes and envelopes (below −60 dB is silence). The tooltip shows start and end; a click selects that range, for example to crop or export it.',
+          ],
+        },
+        {
           title: 'Listening volume and audio output',
           text: [
             'The volume slider and the mute button affect only listening, not the export.',
@@ -498,9 +516,11 @@ const EN: HelpContent = {
         },
         {
           title: 'Select and move a clip',
+          keys: ['←', '→', 'Shift+← →'],
           text: [
             'A clip is a portion of an audio file placed on a track. Click to select it, drag to move it in time or to another track; dragging it below the last track creates a new one.',
             'The start and end of the clip snap to the start or end of the other clips, on any track, when they pass close by. With the bar grid shown the clip moves by steps (bar, quarter or eighth note, chosen in the Settings): the grid point of the clip under the pointer snaps to the nearest one of the other clips. Hold Alt to move it freely.',
+            'With the keyboard, the arrows ← → move the selected clips by one pixel (the more you zoom in, the finer the step); with Shift they jump to the next snap point: start, end or envelope point of another clip, or the playhead. Holding the arrow down, or pressing it several times in a row, makes the move a single undo step.',
           ],
         },
         {
@@ -530,7 +550,7 @@ const EN: HelpContent = {
           keys: ['Delete'],
           text: [
             '“Crop to selection” keeps only the selected range and moves it to the start.',
-            'Delete removes the selected range from all the tracks closing the gap; with no range it removes the selected clips.',
+            'Delete removes the selected range from all the tracks closing the gap; with no range it removes the selected clips (when they are all the clips of a track, the track is removed after a confirmation).',
           ],
         },
         {
@@ -621,7 +641,7 @@ const EN: HelpContent = {
           title: 'edimus in the browser',
           text: [
             'The web version works entirely on your computer: the audio files are never uploaded to a server.',
-            'With Chrome or Edge you open and save files with the system dialogs, and edimus finds them again in later sessions (the browser asks the permission again). With other browsers files open read only and every save becomes a download.',
+            'With Chrome or Edge the files opened or dropped are found again in later sessions (the browser asks the permission again, see Missing audio files) and saving uses the system dialogs. With other browsers the files must be shown again at every session and every save becomes a download.',
             'Export to wav, mp3 and ogg. Speed and pitch use the same engine (Rubber Band) as the desktop app; the renders are kept in a browser cache.',
             'To connect an AI assistant, start the MCP server on the PC and enter its port and token in the AI assistant tab of this Help.',
           ],

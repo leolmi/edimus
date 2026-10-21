@@ -24,6 +24,8 @@ import {
   type Clip,
 } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
+import { EditService } from '../edit.service';
+import { SourceFilesService } from '../montage/source-files.service';
 import { FileSystemPort } from '../platform/file-system.port';
 import { AlignOptions, alignTempo } from '../montage/tempo-align';
 import { TimelineService } from '../timeline/timeline.service';
@@ -51,6 +53,8 @@ const FADE_CURVES = { linear: 0, exponential: 4, logarithmic: -4, smooth: 2 } as
 export class AiCommandsService {
   private readonly montages = inject(MontageService);
   private readonly files = inject(FileSystemPort);
+  private readonly sourceFiles = inject(SourceFilesService);
+  private readonly edits = inject(EditService);
   private readonly timeline = inject(TimelineService);
   private readonly library = inject(AudioLibraryService);
   private readonly processed = inject(ProcessedAudioService);
@@ -72,11 +76,16 @@ export class AiCommandsService {
       return this.state();
     },
     open: async (p) => {
-      const paths = this.strings(p, 'paths');
+      let paths = this.strings(p, 'paths');
       const montagePath = paths.find(isMontageFile);
+      // files of missing sources relink them, as in the window
+      const relinked = montagePath ? [] : await this.sourceFiles.relink(paths);
+      paths = paths.filter((path) => !relinked.includes(path));
       if (montagePath) {
         this.ensureDiscardable(p);
         await this.montages.openMontage(montagePath);
+      } else if (!paths.length) {
+        // only relinked files
       } else if (p['trackId'] !== undefined) {
         const track = this.track(String(p['trackId']));
         const lengths = await Promise.all(paths.map(() => 0));
@@ -86,7 +95,7 @@ export class AiCommandsService {
       }
       await this.waitReady();
       await this.waitTempo();
-      if (p['trackId'] !== undefined && !montagePath) this.placeInSequence(String(p['trackId']), Number(p['start'] ?? 0), paths.length);
+      if (p['trackId'] !== undefined && !montagePath && paths.length) this.placeInSequence(String(p['trackId']), Number(p['start'] ?? 0), paths.length);
       return this.state();
     },
     save: async (p) => {
@@ -410,6 +419,8 @@ export class AiCommandsService {
   async execute(method: string, params: Params): Promise<unknown> {
     const handler = this.handlers[method];
     if (!handler) throw new Error(`Unknown command ${method}`);
+    // a run of arrow moves in progress becomes its own undo step first
+    this.edits.endNudge();
     return handler(params ?? {});
   }
 
@@ -419,11 +430,14 @@ export class AiCommandsService {
   private state() {
     const montage = this.montages.montage();
     const audible = new Set(audibleTracks(montage).map((t) => t.id));
+    const heard = this.mixer.audibleRange();
     return {
       file: this.montages.path(),
       dirty: this.montages.dirty(),
       channels: montage.channels,
       duration: round(this.timeline.duration()),
+      // the mix without its leading and trailing silences (null while some audio is not ready)
+      audible: heard && { start: round(heard.start), end: round(heard.end), duration: round(heard.end - heard.start) },
       playhead: round(this.playback.position()),
       playing: this.playback.playing(),
       selection: this.selection(),

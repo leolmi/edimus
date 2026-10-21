@@ -9,14 +9,20 @@ import { AlignClip, AlignDialogData, AlignTempoDialogComponent } from '../featur
 import { AlignContext, AlignOptions, alignTempo } from './montage/tempo-align';
 import { PlaybackService } from './audio/playback.service';
 import { applyCrossfade, findCrossfade } from './montage/crossfade';
-import { cropToRange, deleteRange, setClipTiming, splitAt } from './montage/edits';
-import { Clip, clipRate } from './montage/montage.model';
+import { cropToRange, deleteRange, moveClips, setClipTiming, splitAt } from './montage/edits';
+import { Clip, Montage, clipRate } from './montage/montage.model';
+import { nextAnchorShift } from './timeline/edge-snap';
 import { MontageService } from './montage/montage.service';
 import { BarMarking, TimelineService } from './timeline/timeline.service';
+import { I18nService } from './i18n/i18n.service';
+import { ShellPort } from './platform/shell.port';
 
 /** Tempo range of a bar stretched by hand. */
 const MIN_MARK_BPM = 20;
 const MAX_MARK_BPM = 400;
+
+/** Pause (ms) after which the next arrow press starts a new undo step. */
+const NUDGE_PAUSE = 800;
 
 /** Editing commands on the selection (clip or time range) and at the playhead. */
 @Injectable({ providedIn: 'root' })
@@ -26,6 +32,8 @@ export class EditService {
   private readonly playback = inject(PlaybackService);
   private readonly dialogs = inject(MatDialog);
   private readonly tempos = inject(TempoService);
+  private readonly i18n = inject(I18nService);
+  private readonly shell = inject(ShellPort);
 
   private readonly length = (clip: Clip) => this.timeline.clipLength(clip);
 
@@ -97,8 +105,11 @@ export class EditService {
     if (crossfade) this.montages.update((m) => applyCrossfade(m, crossfade));
   }
 
-  /** Deletes the selected range (closing the gap) or else the selected clips. */
-  delete(): void {
+  /**
+   * Deletes the selected range (closing the gap) or else the selected clips; when these are all
+   * the clips of a track, the track goes too: asked first, as with the remove button of a track.
+   */
+  async delete(): Promise<void> {
     const range = this.timeline.range();
     if (range) {
       this.montages.edit((m) => deleteRange(m, range.start, range.end, this.length));
@@ -107,8 +118,57 @@ export class EditService {
     }
     const ids = this.timeline.selectedClipIds();
     if (!ids.length) return;
+    const selected = new Set(ids);
+    const emptied = this.montages.montage().tracks.filter((t) => t.clips.length && t.clips.every((c) => selected.has(c.id)));
+    if (emptied.length) {
+      const [track] = emptied;
+      const message =
+        emptied.length === 1
+          ? this.i18n.t('track.removeConfirm', { name: track.name, n: track.clips.length })
+          : this.i18n.t('track.removeManyConfirm', { names: emptied.map((t) => `"${t.name}"`).join(', ') });
+      if ((await this.shell.ask(this.i18n.t('track.remove'), message)) !== 'yes') return;
+    }
     this.timeline.selectClip(null);
     this.montages.removeClips(ids);
+  }
+
+  /** Montage before a run of nudges (arrow key held, or pressed again soon): one undo step for all. */
+  private nudgeFrom: Montage | null = null;
+  private nudgeTimer?: ReturnType<typeof setTimeout>;
+
+  /**
+   * Moves the selected clips with the keyboard: by one pixel at the current zoom, or
+   * (`toAnchor`) to the next edge or envelope point of the other clips, or the playhead.
+   */
+  nudge(direction: 1 | -1, toAnchor: boolean): void {
+    const ids = this.timeline.selectedClips();
+    if (!ids.size) return;
+    const montage = this.montages.montage();
+    const earliest = Math.min(...montage.tracks.flatMap((t) => t.clips.filter((c) => ids.has(c.id)).map((c) => c.start)));
+    const shift = toAnchor
+      ? nextAnchorShift(montage, ids, direction, this.length, [this.playback.position()])
+      : direction / this.timeline.pxPerSec();
+    if (shift === null) return;
+    const delta = Math.max(-earliest, shift);
+    if (!delta) return;
+    clearTimeout(this.nudgeTimer);
+    this.nudgeFrom ??= montage;
+    this.montages.preview(moveClips(montage, ids, delta, 0));
+  }
+
+  /**
+   * Ends a run of nudges with one undo step: at once (another action), or (`soon`, an arrow
+   * released) after a pause, so that quick presses make a single step.
+   */
+  endNudge(soon = false): void {
+    clearTimeout(this.nudgeTimer);
+    if (!this.nudgeFrom) return;
+    if (soon) {
+      this.nudgeTimer = setTimeout(() => this.endNudge(), NUDGE_PAUSE);
+      return;
+    }
+    this.montages.commit(this.nudgeFrom);
+    this.nudgeFrom = null;
   }
 
   /** Selects every clip of the montage. */

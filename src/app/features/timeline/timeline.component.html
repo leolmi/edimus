@@ -52,7 +52,8 @@
             <span class="info">{{ tempo }}</span>
           }
         } @else if (source?.status === 'error') {
-          <span class="info error">{{ 'source.error' | t: { message: source.error } }}</span>
+          <span class="info error" [title]="source.error">{{ 'source.error' | t: { message: source.error } }}</span>
+          <a href="#" class="info find" (click)="$event.preventDefault(); documents.showSourceFiles()">{{ 'sourceFiles.open' | t }}</a>
         }
       </div>
       <app-track-lane

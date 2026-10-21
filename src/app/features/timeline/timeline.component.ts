@@ -258,7 +258,10 @@ export class TimelineComponent {
     }
     if (this.timeline.envelopeMode()) return this.onEnvelopeDown(event, lane, target);
     if (event.button !== 0) return;
+    this.edits.endNudge();
     target.setPointerCapture(event.pointerId);
+    // the view stays still under the pointer until the release
+    this.timeline.holdExtent();
     const hit = lane.clipAt(this.xAt(event));
     const from = this.montages.montage();
     if (!hit) {
@@ -387,6 +390,7 @@ export class TimelineComponent {
     if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
     target.style.cursor = '';
     this.gesture = undefined;
+    this.timeline.releaseExtent();
     this.activePoint.set(null);
     // a plain click (no move) on a clip of the selection selects just that clip
     if (gesture?.kind === 'move' && gesture.group.size > 1 && Math.abs(event.clientX - gesture.pointerX) < RANGE_THRESHOLD && Math.abs(event.clientY - gesture.pointerY) < RANGE_THRESHOLD) {

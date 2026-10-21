@@ -28,7 +28,8 @@ Nell'ordine:
 1. per la clip selezionata, l'estensione dell'intera sorgente (grigio tratteggiato);
 2. corpo della clip e forma d'onda per canale, **scalata dall'inviluppo della clip e dal volume
    della traccia** (si vede il livello ascoltato); oltre lo zoom dei campioni diventa una
-   polilinea; le clip in render mostrano l'avanzamento;
+   polilinea; le clip in render mostrano l'avanzamento; le clip senza audio (file mancante o in
+   caricamento) sono un riquadro tratteggiato con il nome del file, rosso se il file manca;
 3. griglia delle battute (se attiva), esclusa la clip in marcatura;
 4. battuta in marcatura (vedi sotto);
 5. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
@@ -57,7 +58,9 @@ un passo di annulla per trascinamento).
 | ovunque | Ctrl+rotella | zoom attorno al puntatore |
 | ovunque | Shift+rotella / rotella orizzontale | scorre il tempo |
 
-I gesti trascinati usano `preview` + `commit` (un passo di annulla per gesto).
+I gesti trascinati usano `preview` + `commit` (un passo di annulla per gesto). Durante un gesto
+l'estensione della timeline resta quella di partenza (`holdExtent`): accorciando o spostando
+l'ultima clip la vista non scorre sotto il puntatore; si adegua al rilascio.
 Durante la riproduzione la vista segue il playhead pagina per pagina; all'apertura di un
 montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono decodificate.
 
@@ -70,7 +73,9 @@ montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono 
 | Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y | annulla / ripeti |
 | Spazio, Home, End | play/pausa, inizio, fine |
 | S | divide al playhead (le clip selezionate, o tutte se nessuna) |
-| Canc / Backspace | elimina la selezione (intervallo, altrimenti le clip selezionate) |
+| Canc / Backspace | elimina la selezione (intervallo, altrimenti le clip selezionate; se svuota tracce, chiede conferma) |
+| ← / → | sposta le clip selezionate di un pixel allo zoom corrente; tasto tenuto o pressioni a meno di 0,8 s l'una dall'altra = un passo di annulla (`EditService.nudge` / `endNudge`) |
+| Shift+← / → | sposta le clip selezionate al punto di aggancio successivo: bordi e punti d'inviluppo delle altre clip, playhead (`nextAnchorShift`) |
 | E | modalità inviluppo |
 | B | griglia delle battute |
 | Ctrl+A | seleziona tutte le clip |

@@ -6,6 +6,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ExportService } from './core/audio/export.service';
+import { MixService } from './core/audio/mix.service';
+import { I18nService } from './core/i18n/i18n.service';
 import { AiBridgeService } from './core/ai/ai-bridge.service';
 import { PlaybackService } from './core/audio/playback.service';
 import { DocumentService } from './core/document.service';
@@ -23,7 +25,7 @@ import { ScaleSliderComponent } from './shared/scale-slider.component';
 
 @Component({
   selector: 'app-root',
-  host: { '(window:keydown)': 'onKeydown($event)' },
+  host: { '(window:keydown)': 'onKeydown($event)', '(window:keyup)': 'onKeyup($event)', '(window:blur)': 'edits.endNudge()' },
   imports: [
     MatToolbarModule,
     MatButtonModule,
@@ -46,6 +48,8 @@ export class App {
   protected readonly documents = inject(DocumentService);
   protected readonly edits = inject(EditService);
   protected readonly exporter = inject(ExportService);
+  private readonly mixer = inject(MixService);
+  private readonly i18n = inject(I18nService);
   /** Started with the app: connects this window to the MCP server when it runs. */
   private readonly ai = inject(AiBridgeService);
   private readonly dialogs = inject(MatDialog);
@@ -62,6 +66,22 @@ export class App {
     () => `${formatDuration(this.playback.position())} / ${formatDuration(this.timeline.duration())}`,
   );
 
+  /** Length of the mix without its leading and trailing silences, with its span in the tooltip. */
+  protected readonly audible = computed(() => {
+    const range = this.mixer.audibleRange();
+    if (!range) return null;
+    return {
+      label: this.i18n.t('audible.label', { d: formatDuration(range.end - range.start) }),
+      tooltip: this.i18n.t('audible.tooltip', { from: formatDuration(range.start), to: formatDuration(range.end) }),
+    };
+  });
+
+  /** Selects the audible span (to crop, export or loop it). */
+  protected selectAudible(): void {
+    const range = this.mixer.audibleRange();
+    if (range) this.timeline.range.set({ ...range });
+  }
+
   protected showSettings(): void {
     if (this.dialogs.openDialogs.some((d) => d.componentInstance instanceof SettingsDialogComponent)) return;
     this.dialogs.open(SettingsDialogComponent, { autoFocus: 'dialog', maxWidth: '95vw' });
@@ -72,9 +92,14 @@ export class App {
     this.dialogs.open(HelpDialogComponent, { data: tab, autoFocus: 'dialog', maxWidth: '95vw' });
   }
 
+  /** Releasing an arrow ends the move after a pause: holding it or pressing it again soon makes one undo step. */
+  protected onKeyup(event: KeyboardEvent): void {
+    if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') this.edits.endNudge(true);
+  }
+
   /**
    * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y, Ctrl+A select all clips), transport (Space, Home, End) and edit
-   * (S split, E envelope, B beat grid, Delete, Escape) shortcuts.
+   * (S split, E envelope, B beat grid, arrows move the selected clips, Delete, Escape) shortcuts.
    */
   protected onKeydown(event: KeyboardEvent): void {
     if (event.code === 'F1') {
@@ -83,6 +108,8 @@ export class App {
     }
     const editing = event.target instanceof Element && event.target.closest('input, textarea, [contenteditable]');
     if (editing) return;
+    // any other key closes a run of arrow moves (one undo step)
+    if (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') this.edits.endNudge();
     if (this.timeline.beatMarking()) {
       // marking a bar: Enter confirms, Backspace starts again from the 1, Escape cancels
       const actions: Record<string, () => unknown> = {
@@ -117,10 +144,15 @@ export class App {
       case 'End':
         event.preventDefault();
         return this.playback.seek(this.timeline.duration());
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        if (!this.timeline.selectedClipIds().length) return;
+        event.preventDefault();
+        return this.edits.nudge(event.code === 'ArrowRight' ? 1 : -1, event.shiftKey);
       case 'Delete':
       case 'Backspace':
         event.preventDefault();
-        return this.edits.delete();
+        return void this.edits.delete();
       case 'KeyS':
         event.preventDefault();
         return this.edits.split();

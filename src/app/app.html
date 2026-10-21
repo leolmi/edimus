@@ -145,6 +145,9 @@
       <button mat-icon-button (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
         <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
       </button>
+      @if (audible(); as audible) {
+        <button mat-button class="audible" (click)="selectAudible()" [matTooltip]="audible.tooltip">{{ audible.label }}</button>
+      }
       <span class="time">{{ time() }}</span>
     </div>
   }

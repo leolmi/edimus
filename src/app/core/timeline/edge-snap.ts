@@ -33,6 +33,36 @@ export function snapTime(time: number, anchors: readonly number[], tolerance: nu
 }
 
 /**
+ * Shift (seconds) that brings the start or the end of one of the given clips to the nearest
+ * anchor in `direction` (1 later, -1 earlier): edges and envelope points of the other clips, and
+ * the `extra` times (e.g. the playhead). Null when there is none (or the clips would go before 0).
+ */
+export function nextAnchorShift(
+  montage: Montage,
+  clipIds: ReadonlySet<string>,
+  direction: 1 | -1,
+  length: (clip: Clip) => number,
+  extra: readonly number[] = [],
+): number | null {
+  const anchors = [...snapAnchors(montage, length, clipIds), ...extra];
+  const clips = montage.tracks.flatMap((t) => t.clips).filter((c) => clipIds.has(c.id));
+  if (!clips.length) return null;
+  const earliest = Math.min(...clips.map((c) => c.start));
+  let best: number | null = null;
+  for (const clip of clips) {
+    for (const edge of [clip.start, clip.start + length(clip)]) {
+      for (const anchor of anchors) {
+        const shift = anchor - edge;
+        // past the current position (a millisecond at least), and not before 0
+        if (shift * direction < 0.001 || earliest + shift < 0) continue;
+        if (best === null || Math.abs(shift) < Math.abs(best)) best = shift;
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Shift (seconds) that aligns the start or end of one of the dragged clips (each `start` +
  * `delta`, as `length` long) to the nearest anchor of the other clips (edges and envelope
  * points, on any track), when one is within `tolerance` seconds; null when none is.

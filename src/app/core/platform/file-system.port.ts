@@ -1,3 +1,9 @@
+/**
+ * Whether a file can be read now: `permission` when the browser knows the file but wants the
+ * user to allow reading it again (see `requestAccess`), `missing` when it must be found again.
+ */
+export type FileAccess = 'ready' | 'permission' | 'missing';
+
 /** Filter of an open or save dialog. */
 export interface FileFilter {
   name: string;
@@ -10,6 +16,12 @@ export interface FileFilter {
  */
 export abstract class FileSystemPort {
   abstract exists(path: string): Promise<boolean>;
+  abstract access(path: string): Promise<FileAccess>;
+  /**
+   * Asks the user to allow reading the files in state `permission`; to be called from a click
+   * (the browser requires a user gesture). Returns the paths now readable.
+   */
+  abstract requestAccess(paths: string[]): Promise<string[]>;
   /** Size in bytes, undefined when the file cannot be read. */
   abstract size(path: string): Promise<number | undefined>;
   abstract readText(path: string): Promise<string>;
@@ -32,6 +44,12 @@ export abstract class FileSystemPort {
    * on the desktop in a folder next to it, in the browser in memory. Returns its path.
    */
   abstract importFile(name: string, data: ArrayBuffer, near: string): Promise<string>;
-  /** Paths of files dropped on the page; `imported` counts the ones that had to be copied to be read. */
-  abstract resolveDropped(files: File[]): Promise<{ paths: string[]; imported: number }>;
+  /** Files with the given extensions in a folder chosen by the user and its subfolders (empty when cancelled). */
+  abstract showFolderDialog(title: string, extensions: readonly string[]): Promise<string[]>;
+  /**
+   * Paths of files dropped on the page; `imported` counts the ones that had to be copied to be
+   * read. `handles`: the handles of the dropped items, asked during the drop event (where the
+   * browser gives them), so that the files can be reached again in later sessions.
+   */
+  abstract resolveDropped(files: File[], handles?: Promise<FileSystemHandle | null>[]): Promise<{ paths: string[]; imported: number }>;
 }

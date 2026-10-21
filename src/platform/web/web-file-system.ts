@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { FileFilter, FileSystemPort } from '../../app/core/platform/file-system.port';
-import { dirName, fileName } from '../../app/core/montage/montage.model';
+import { FileAccess, FileFilter, FileSystemPort } from '../../app/core/platform/file-system.port';
+import { dirName, fileExtension, fileName } from '../../app/core/montage/montage.model';
 import { WebFile, WebFileRegistry } from './web-file-registry';
 
 /** Parts of the File System Access API not yet in the DOM typings (Chromium only). */
@@ -11,6 +11,7 @@ interface PickerType {
 type PickerWindow = Window & {
   showOpenFilePicker?: (options: { id?: string; multiple?: boolean; types?: PickerType[] }) => Promise<FileSystemFileHandle[]>;
   showSaveFilePicker?: (options: { id?: string; suggestedName?: string; types?: PickerType[] }) => Promise<FileSystemFileHandle>;
+  showDirectoryPicker?: (options: { id?: string; mode?: 'read' }) => Promise<FileSystemDirectoryHandle>;
 };
 type PermissionMode = { mode: 'read' | 'readwrite' };
 type ExtendedHandle = FileSystemFileHandle & {
@@ -34,17 +35,26 @@ async function ensurePermission(handle: ExtendedHandle, mode: PermissionMode['mo
   if ((await handle.requestPermission?.({ mode })) !== 'granted') throw new Error(`Access to ${handle.name} was not allowed`);
 }
 
-/** File chooser of the page, for browsers without the File System Access API. */
-function chooseFiles(filters: FileFilter[]): Promise<File[]> {
+/** File chooser of the page (a folder with `folder`), for browsers without the File System Access API. */
+function chooseFiles(filters: FileFilter[], folder = false): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
+    input.webkitdirectory = folder;
     input.accept = filters.flatMap((f) => f.extensions.filter((e) => e !== '*').map((e) => `.${e}`)).join(',');
     input.onchange = () => resolve([...(input.files ?? [])]);
     input.oncancel = () => resolve([]);
     input.click();
   });
+}
+
+/** Files of a folder and of its subfolders. */
+async function* walk(dir: FileSystemDirectoryHandle): AsyncGenerator<FileSystemFileHandle> {
+  for await (const handle of (dir as unknown as { values(): AsyncIterable<FileSystemHandle> }).values()) {
+    if (handle.kind === 'file') yield handle as FileSystemFileHandle;
+    else yield* walk(handle as FileSystemDirectoryHandle);
+  }
 }
 
 function download(name: string, data: BlobPart): void {
@@ -63,6 +73,32 @@ export class WebFileSystem extends FileSystemPort {
 
   async exists(path: string): Promise<boolean> {
     return (await this.registry.get(path)) !== undefined;
+  }
+
+  async access(path: string): Promise<FileAccess> {
+    const file = await this.registry.get(path);
+    if (!file || file.kind === 'download') return 'missing';
+    if (file.kind === 'file') return 'ready';
+    const handle = file.handle as ExtendedHandle;
+    const permission = handle.queryPermission ? await handle.queryPermission({ mode: 'read' }) : 'granted';
+    // denied: the browser does not ask again, the file must be chosen again
+    if (permission !== 'granted') return permission === 'prompt' ? 'permission' : 'missing';
+    return handle.getFile().then(
+      () => 'ready' as const,
+      () => 'missing' as const,
+    );
+  }
+
+  async requestAccess(paths: string[]): Promise<string[]> {
+    const ready: string[] = [];
+    for (const path of paths) {
+      const file = await this.registry.get(path);
+      const handle = file?.kind === 'handle' ? (file.handle as ExtendedHandle) : undefined;
+      // one prompt per file: a refused one (or one no longer allowed) stays in state permission
+      await handle?.requestPermission?.({ mode: 'read' }).catch(() => undefined);
+      if ((await this.access(path)) === 'ready') ready.push(path);
+    }
+    return ready;
   }
 
   async size(path: string): Promise<number | undefined> {
@@ -152,9 +188,36 @@ export class WebFileSystem extends FileSystemPort {
     }
   }
 
-  async resolveDropped(files: File[]): Promise<{ paths: string[]; imported: number }> {
-    // dropped files are read where they are: nothing is copied
-    return { paths: files.map((file) => this.registry.add(file.name, { kind: 'file', file })), imported: 0 };
+  async showFolderDialog(_title: string, extensions: readonly string[]): Promise<string[]> {
+    const audio = (name: string) => extensions.includes(fileExtension(name));
+    if (!picker.showDirectoryPicker) {
+      const files = await chooseFiles([], true);
+      return files.filter((file) => audio(file.name)).map((file) => this.registry.add(file.name, { kind: 'file', file }));
+    }
+    try {
+      const dir = await picker.showDirectoryPicker({ id: 'edimus-folder', mode: 'read' });
+      const paths: string[] = [];
+      for await (const handle of walk(dir)) {
+        if (audio(handle.name)) paths.push(this.registry.add(handle.name, { kind: 'handle', handle }, false));
+      }
+      return paths;
+    } catch (err) {
+      if (isAbort(err)) return [];
+      throw err;
+    }
+  }
+
+  async resolveDropped(files: File[], handles: Promise<FileSystemHandle | null>[] = []): Promise<{ paths: string[]; imported: number }> {
+    // dropped files are read where they are: nothing is copied; with their handle (Chromium)
+    // they are found again in later sessions, like the files opened with the dialog
+    const resolved = await Promise.all(handles);
+    const paths = files.map((file, i) => {
+      const handle = resolved[i];
+      return handle?.kind === 'file' && handle.name === file.name
+        ? this.registry.add(file.name, { kind: 'handle', handle: handle as FileSystemFileHandle })
+        : this.registry.add(file.name, { kind: 'file', file });
+    });
+    return { paths, imported: 0 };
   }
 
   private async require(path: string): Promise<WebFile> {
@@ -170,6 +233,7 @@ export class WebFileSystem extends FileSystemPort {
         return file.file;
       case 'handle':
         await ensurePermission(file.handle, 'read');
+        this.registry.remember(path);
         return file.handle.getFile();
       case 'download':
         throw new Error(`${fileName(path)} was downloaded and cannot be read back`);
