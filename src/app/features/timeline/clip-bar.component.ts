@@ -48,6 +48,9 @@ import { TimelineService } from '../../core/timeline/timeline.service';
       @if (rendering(); as progress) {
         <span class="rendering">{{ 'clip.rendering' | t: { p: progress } }}</span>
       }
+    } @else if (count() > 1) {
+      <span class="name">{{ 'clip.many' | t: { n: count() } }}</span>
+      <span class="placeholder">{{ 'clip.manyHint' | t }}</span>
     } @else {
       <span class="placeholder">{{ 'clip.none' | t }}</span>
     }
@@ -118,6 +121,8 @@ export class ClipBarComponent {
     }
     return null;
   });
+
+  protected readonly count = computed(() => this.timeline.selectedClipIds().length);
 
   protected readonly length = computed(() => {
     const sel = this.selection();

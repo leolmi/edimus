@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, signal, viewChild } from '@angular/core';
 import { AudioLibraryService } from '../../core/audio/audio-library.service';
 import { rangePeak } from '../../core/audio/peaks';
-import { MAX_GAIN, gainAt, gainToDb } from '../../core/montage/envelope';
-import { Clip, Track, clipRate, isProcessed } from '../../core/montage/montage.model';
+import { MAX_GAIN, clipGainAt, gainAt, gainToDb } from '../../core/montage/envelope';
+import { Clip, Track, clipRate, isProcessed, toTimeline, trackVolume } from '../../core/montage/montage.model';
 import { ProcessedAudioService } from '../../core/audio/processed-audio.service';
 import { beatsPerBar } from '../../core/audio/tempo';
 import { TempoService } from '../../core/audio/tempo.service';
@@ -19,6 +19,12 @@ export interface ClipHit {
   clip: Clip;
   /** Part of the clip under the pointer. */
   zone: 'start' | 'end' | 'body';
+}
+
+/** Envelope point (or segment starting at it) of a clip. */
+export interface EnvelopeHit {
+  clip: Clip;
+  index: number;
 }
 
 /** Distance (px) within which the pointer grabs an envelope point. */
@@ -41,8 +47,8 @@ export class TrackLaneComponent {
   readonly track = input.required<Track>();
   /** Muted or excluded by a solo: drawn dimmed. */
   readonly silent = input(false);
-  /** Index of the envelope point being dragged: its value is shown next to it. */
-  readonly activePoint = input<number | null>(null);
+  /** Envelope point being dragged (clip id and index): its value is shown next to it. */
+  readonly activePoint = input<{ clipId: string; index: number } | null>(null);
 
   protected readonly cursor = signal<string | null>(null);
 
@@ -59,12 +65,11 @@ export class TrackLaneComponent {
     effect(() => this.draw());
   }
 
-  /** Clips in drawing order: the selected one last, on top of the others (so its edges stay reachable). */
+  /** Clips in drawing order: the selected ones last, on top of the others (so their edges stay reachable). */
   private stacked(): Clip[] {
-    const selectedId = this.timeline.selectedClipId();
+    const selected = this.timeline.selectedClips();
     const clips = this.track().clips;
-    const selected = clips.find((c) => c.id === selectedId);
-    return selected ? [...clips.filter((c) => c !== selected), selected] : clips;
+    return [...clips.filter((c) => !selected.has(c.id)), ...clips.filter((c) => selected.has(c.id))];
   }
 
   /** Topmost clip under the x coordinate (px from the lane start), with the zone hit. */
@@ -105,38 +110,71 @@ export class TrackLaneComponent {
     return x > bar.x0 && x < bar.x1 ? 'body' : undefined;
   }
 
-  /** Index of the segment whose bend handle is near (x, y), if any. */
-  curveHandleAt(x: number, y: number): number | undefined {
-    const points = this.track().envelope ?? [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const handle = this.curveHandle(points, i);
-      if (!handle) continue;
-      const dx = handle.x - x;
-      const dy = handle.y - y;
-      if (dx * dx + dy * dy <= POINT_GRAB * POINT_GRAB) return i;
+  /** Lane x of a source time of a clip. */
+  private sourceX(clip: Clip, source: number): number {
+    return this.timeline.timeToX(toTimeline(clip, source));
+  }
+
+  /** Lane x range of a clip. */
+  private clipSpan(clip: Clip): { x0: number; x1: number } {
+    return { x0: this.timeline.timeToX(clip.start), x1: this.timeline.timeToX(clip.start + this.timeline.clipLength(clip)) };
+  }
+
+  /** Envelope segment whose bend handle is near (x, y), if any (topmost clip first). */
+  curveHandleAt(x: number, y: number): EnvelopeHit | undefined {
+    const clips = this.stacked();
+    for (let c = clips.length - 1; c >= 0; c--) {
+      const points = clips[c].envelope ?? [];
+      for (let i = 0; i < points.length - 1; i++) {
+        const handle = this.curveHandle(clips[c], i);
+        if (!handle) continue;
+        const dx = handle.x - x;
+        const dy = handle.y - y;
+        if (dx * dx + dy * dy <= POINT_GRAB * POINT_GRAB) return { clip: clips[c], index: i };
+      }
     }
     return undefined;
   }
 
-  /** Position of the bend handle of a segment: its curve at half of its duration (none when flat). */
-  private curveHandle(points: readonly { time: number; gain: number }[], index: number): { x: number; y: number } | null {
+  /** Position of the bend handle of a segment: its curve at half of its duration (none when flat or hidden). */
+  private curveHandle(clip: Clip, index: number): { x: number; y: number } | null {
+    const points = clip.envelope ?? [];
     const a = points[index];
     const b = points[index + 1];
     if (!b || Math.abs(b.gain - a.gain) < 0.01 || b.time <= a.time) return null;
-    const x0 = this.timeline.timeToX(a.time);
-    const x1 = this.timeline.timeToX(b.time);
+    const x0 = this.sourceX(clip, a.time);
+    const x1 = this.sourceX(clip, b.time);
     if (x1 - x0 < 4 * POINT_GRAB) return null;
-    const time = (a.time + b.time) / 2;
-    return { x: this.timeline.timeToX(time), y: this.gainToY(gainAt(this.track().envelope, time)) };
+    const x = (x0 + x1) / 2;
+    const span = this.clipSpan(clip);
+    if (x < span.x0 || x > span.x1) return null;
+    return { x, y: this.gainToY(gainAt(points, (a.time + b.time) / 2)) };
   }
 
-  /** Index of the envelope point near (x, y), if any. */
-  pointAt(x: number, y: number): number | undefined {
-    const points = this.track().envelope ?? [];
-    for (let i = 0; i < points.length; i++) {
-      const dx = this.timeline.timeToX(points[i].time) - x;
-      const dy = this.gainToY(points[i].gain) - y;
-      if (dx * dx + dy * dy <= POINT_GRAB * POINT_GRAB) return i;
+  /** Envelope point near (x, y), if any (topmost clip first; only the points inside the clip). */
+  pointAt(x: number, y: number): EnvelopeHit | undefined {
+    const clips = this.stacked();
+    for (let c = clips.length - 1; c >= 0; c--) {
+      const clip = clips[c];
+      const span = this.clipSpan(clip);
+      const points = clip.envelope ?? [];
+      for (let i = 0; i < points.length; i++) {
+        const px = this.sourceX(clip, points[i].time);
+        if (px < span.x0 - 1 || px > span.x1 + 1) continue;
+        const dx = px - x;
+        const dy = this.gainToY(points[i].gain) - y;
+        if (dx * dx + dy * dy <= POINT_GRAB * POINT_GRAB) return { clip, index: i };
+      }
+    }
+    return undefined;
+  }
+
+  /** Topmost clip whose body covers x (for adding envelope points). */
+  clipBodyAt(x: number): Clip | undefined {
+    const clips = this.stacked();
+    for (let i = clips.length - 1; i >= 0; i--) {
+      const span = this.clipSpan(clips[i]);
+      if (x >= span.x0 && x <= span.x1) return clips[i];
     }
     return undefined;
   }
@@ -147,7 +185,8 @@ export class TrackLaneComponent {
     return Math.min(MAX_GAIN, Math.max(0, (1 - (y - ENVELOPE_MARGIN) / height) * MAX_GAIN));
   }
 
-  private gainToY(gain: number): number {
+  /** Vertical coordinate of a gain in the lane. */
+  gainToY(gain: number): number {
     const height = this.size().height - 2 * ENVELOPE_MARGIN;
     return ENVELOPE_MARGIN + (1 - gain / MAX_GAIN) * height;
   }
@@ -164,7 +203,8 @@ export class TrackLaneComponent {
     }
     if (this.timeline.envelopeMode()) {
       const y = event.clientY - rect.top;
-      this.cursor.set(this.pointAt(x, y) !== undefined ? 'move' : this.curveHandleAt(x, y) !== undefined ? 'ns-resize' : 'crosshair');
+      // points are added only on a clip
+      this.cursor.set(this.pointAt(x, y) ? 'move' : this.curveHandleAt(x, y) ? 'ns-resize' : this.clipBodyAt(x) ? 'crosshair' : null);
       return;
     }
     const zone = this.clipAt(x)?.zone;
@@ -175,10 +215,10 @@ export class TrackLaneComponent {
     const size = this.size();
     const colors = this.theme.colors();
     const ctx = prepareCanvas(this.canvas().nativeElement, size);
-    const selectedId = this.timeline.selectedClipId();
+    const selection = this.timeline.selectedClips();
     ctx.globalAlpha = this.silent() ? 0.35 : 1;
     for (const clip of this.stacked()) {
-      const selected = clip.id === selectedId;
+      const selected = selection.has(clip.id);
       const source = this.library.ready(clip.sourceId);
       if (!source) continue;
       // each source has its own color (index of the source in the montage)
@@ -217,10 +257,10 @@ export class TrackLaneComponent {
       // start of the clip inside the buffer: the rendered source runs at the clip speed
       const bufferOffset = processed ? clip.offset / clipRate(clip) : clip.offset;
       const channels = buffer.numberOfChannels;
-      // the waveform shows the audio as heard: scaled by the volume envelope of the track
-      const envelope = this.track().envelope;
+      // the waveform shows the audio as heard: scaled by the clip envelope and the track volume
+      const volume = trackVolume(this.track());
       const gains = new Float32Array(right - left + 1);
-      for (let x = left; x <= right; x++) gains[x - left] = gainAt(envelope, this.timeline.xToTime(x));
+      for (let x = left; x <= right; x++) gains[x - left] = volume * clipGainAt(clip, this.timeline.xToTime(x));
       const rowHeight = (size.height - 4 - CHANNEL_GAP * (channels - 1)) / channels;
       for (let c = 0; c < channels; c++) {
         const top = 2 + c * (rowHeight + CHANNEL_GAP);
@@ -382,11 +422,14 @@ export class TrackLaneComponent {
     ctx.globalAlpha = base;
   }
 
-  /** Envelope polyline (shown when it has points or while editing), with its points when editing. */
+  /**
+   * Envelope of each clip, inside the clip (shown when it has points or while editing), with
+   * its points and bend handles when editing.
+   */
   private drawEnvelope(ctx: CanvasRenderingContext2D, colors: CanvasColors, width: number): void {
-    const points = this.track().envelope ?? [];
     const editing = this.timeline.envelopeMode();
-    if (!points.length && !editing) return;
+    const clips = this.stacked().filter((c) => editing || c.envelope?.length);
+    if (!clips.length) return;
     ctx.strokeStyle = colors.envelope;
     ctx.fillStyle = colors.envelope;
     if (editing) {
@@ -401,46 +444,53 @@ export class TrackLaneComponent {
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
     }
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    // sampled every few pixels, plus the points themselves (sharp corners)
-    const xs = new Set<number>();
-    for (let x = 0; x <= width; x += 3) xs.add(x);
-    for (const point of points) {
-      const x = this.timeline.timeToX(point.time);
-      if (x > 0 && x < width) xs.add(x);
-    }
-    xs.add(width);
-    [...xs]
-      .sort((a, b) => a - b)
-      .forEach((x, i) => {
-        const y = this.gainToY(gainAt(points, this.timeline.xToTime(x)));
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    if (!editing) return;
-    // bend handles: hollow circles at half of each sloped segment
-    for (let i = 0; i < points.length - 1; i++) {
-      const handle = this.curveHandle(points, i);
-      if (!handle || handle.x < 0 || handle.x > width) continue;
-      ctx.beginPath();
-      ctx.arc(handle.x, handle.y, 4, 0, Math.PI * 2);
-      ctx.stroke();
-    }
     const active = this.activePoint();
     ctx.font = colors.font;
-    points.forEach((point, index) => {
-      const x = this.timeline.timeToX(point.time);
-      if (x < -POINT_GRAB || x > width + POINT_GRAB) return;
-      const y = this.gainToY(point.gain);
-      ctx.fillRect(x - 3.5, y - 3.5, 7, 7);
-      if (index === active) {
-        ctx.textBaseline = y < 20 ? 'top' : 'bottom';
-        ctx.fillText(gainToDb(point.gain), x + 7, y < 20 ? y + 4 : y - 4);
+    for (const clip of clips) {
+      const span = this.clipSpan(clip);
+      const x0 = Math.max(0, span.x0);
+      const x1 = Math.min(width, span.x1);
+      if (x1 <= x0) continue;
+      const points = clip.envelope ?? [];
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      // sampled every few pixels, plus the points themselves (sharp corners)
+      const xs = new Set<number>([x0, x1]);
+      for (let x = Math.ceil(x0); x < x1; x += 3) xs.add(x);
+      for (const point of points) {
+        const x = this.sourceX(clip, point.time);
+        if (x > x0 && x < x1) xs.add(x);
       }
-    });
+      [...xs]
+        .sort((a, b) => a - b)
+        .forEach((x, i) => {
+          const y = this.gainToY(clipGainAt(clip, this.timeline.xToTime(x)));
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+      ctx.stroke();
+      ctx.lineWidth = 1;
+      if (!editing) continue;
+      // bend handles: hollow circles at half of each sloped segment
+      for (let i = 0; i < points.length - 1; i++) {
+        const handle = this.curveHandle(clip, i);
+        if (!handle || handle.x < 0 || handle.x > width) continue;
+        ctx.beginPath();
+        ctx.arc(handle.x, handle.y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      points.forEach((point, index) => {
+        const x = this.sourceX(clip, point.time);
+        // points hidden by a trim stay hidden
+        if (x < span.x0 - 1 || x > span.x1 + 1 || x < -POINT_GRAB || x > width + POINT_GRAB) return;
+        const y = this.gainToY(point.gain);
+        ctx.fillRect(x - 3.5, y - 3.5, 7, 7);
+        if (active?.clipId === clip.id && index === active.index) {
+          ctx.textBaseline = y < 20 ? 'top' : 'bottom';
+          ctx.fillText(gainToDb(point.gain), x + 7, y < 20 ? y + 4 : y - 4);
+        }
+      });
+    }
   }
 
   private drawChannel(

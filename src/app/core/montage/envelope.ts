@@ -1,4 +1,6 @@
-/** Breakpoint of a volume envelope: linear gain at a timeline time (seconds). */
+import { type Clip, toSource, toTimeline } from './montage.model';
+
+/** Breakpoint of a volume envelope: linear gain at a time (seconds; source time on a clip). */
 export interface EnvelopePoint {
   time: number;
   gain: number;
@@ -88,26 +90,28 @@ export function movePoint(points: readonly EnvelopePoint[], index: number, time:
   return points.map((p, i) => (i === index ? { ...p, ...clamped } : p));
 }
 
-/** Envelope after removing [from, to) from the timeline (what follows moves back). */
-export function envelopeWithoutRange(points: readonly EnvelopePoint[] | undefined, from: number, to: number): EnvelopePoint[] | undefined {
-  if (!points?.length) return points as EnvelopePoint[] | undefined;
-  const gap = to - from;
-  return [
-    ...points.filter((p) => p.time < from).map((p, i, kept) => (i === kept.length - 1 ? { ...p, curve: undefined } : p)),
-    { time: from, gain: gainAt(points, from) },
-    { time: from, gain: gainAt(points, to) },
-    ...points.filter((p) => p.time > to).map((p) => ({ ...p, time: p.time - gap })),
-  ];
+/**
+ * Envelope with a fade over [from, to] (`inward`: silence → the level it had at `to`; else the
+ * level at `from` → silence), bent by `curve`. The points inside are replaced; on the faded
+ * side (before an inward fade, after an outward one) the points are dropped, so the silence
+ * lasts; on the other side they are kept.
+ */
+export function withFade(points: readonly EnvelopePoint[] | undefined, from: number, to: number, inward: boolean, curve = 0): EnvelopePoint[] {
+  const all = points ?? [];
+  const level = gainAt(all, inward ? to : from);
+  const bend = curve || undefined;
+  if (inward) return [{ time: from, gain: 0, curve: bend }, { time: to, gain: level }, ...all.filter((p) => p.time > to)];
+  return [...all.filter((p) => p.time < from), { time: from, gain: level, curve: bend }, { time: to, gain: 0 }];
 }
 
-/** Envelope of the range [from, to) moved to the start of the timeline. */
-export function envelopeOfRange(points: readonly EnvelopePoint[] | undefined, from: number, to: number): EnvelopePoint[] | undefined {
-  if (!points?.length) return points as EnvelopePoint[] | undefined;
-  return [
-    { time: 0, gain: gainAt(points, from) },
-    ...points.filter((p) => p.time > from && p.time < to).map((p) => ({ ...p, time: p.time - from })),
-    { time: to - from, gain: gainAt(points, to) },
-  ];
+/** Gain of a clip's envelope at a timeline time. */
+export function clipGainAt(clip: Clip, time: number): number {
+  return gainAt(clip.envelope, toSource(clip, time));
+}
+
+/** Envelope of a clip with its points in timeline time (for the audio graph). */
+export function clipEnvelopeOnTimeline(clip: Clip): EnvelopePoint[] | undefined {
+  return clip.envelope?.map((p) => ({ ...p, time: toTimeline(clip, p.time) }));
 }
 
 /**

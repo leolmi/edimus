@@ -3,7 +3,8 @@ import type { EnvelopePoint } from './envelope';
 
 /** Extension of the montage project files. */
 export const MONTAGE_EXTENSION = 'edimus';
-export const MONTAGE_VERSION = 1;
+/** 2: volume envelopes on the clips (in source time) and a single volume per track. */
+export const MONTAGE_VERSION = 2;
 
 export const AUDIO_EXTENSIONS = ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aif', 'aiff', 'wma'];
 
@@ -37,10 +38,21 @@ export interface Clip {
    * stretching artefacts; `pitch` is then an extra shift on top of it.
    */
   varispeed?: boolean;
+  /**
+   * Volume envelope (fades) in **source** time, sorted: it moves, splits, trims and stretches
+   * with the clip; none = unity gain.
+   */
+  envelope?: EnvelopePoint[];
 }
 
 /** Speed factor of a clip. */
 export const clipRate = (clip: Clip) => clip.rate ?? 1;
+
+/** Timeline time of a source time of a clip. */
+export const toTimeline = (clip: Clip, source: number) => clip.start + (source - clip.offset) / clipRate(clip);
+
+/** Source time of a timeline time of a clip. */
+export const toSource = (clip: Clip, time: number) => clip.offset + (time - clip.start) * clipRate(clip);
 
 /** True when the clip plays its source altered (speed or pitch), through a rendered version. */
 export const isProcessed = (clip: Clip) => clipRate(clip) !== 1 || (clip.pitch ?? 0) !== 0;
@@ -51,9 +63,12 @@ export interface Track {
   clips: Clip[];
   muted?: boolean;
   solo?: boolean;
-  /** Volume envelope over the timeline (sorted by time); none = unity gain. */
-  envelope?: EnvelopePoint[];
+  /** Volume of the whole track (linear gain, up to MAX_GAIN); default 1. */
+  volume?: number;
 }
+
+/** Volume of a track (linear gain). */
+export const trackVolume = (track: Track) => track.volume ?? 1;
 
 /** Tracks heard in the mix: not muted and, when some track is soloed, soloed. */
 export function audibleTracks(montage: Montage): Track[] {

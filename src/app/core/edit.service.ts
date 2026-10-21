@@ -8,6 +8,7 @@ import { snapToOnsets } from './audio/tempo';
 import { AlignClip, AlignDialogData, AlignTempoDialogComponent } from '../features/timeline/align-tempo-dialog.component';
 import { AlignContext, AlignOptions, alignTempo } from './montage/tempo-align';
 import { PlaybackService } from './audio/playback.service';
+import { applyCrossfade, findCrossfade } from './montage/crossfade';
 import { cropToRange, deleteRange, setClipTiming, splitAt } from './montage/edits';
 import { Clip, clipRate } from './montage/montage.model';
 import { MontageService } from './montage/montage.service';
@@ -43,8 +44,18 @@ export class EditService {
     return clips;
   });
   readonly canAlign = computed(() => this.tempoClips().length >= 2);
-  /** Something to delete: a range or a clip. */
-  readonly canDelete = computed(() => this.hasRange() || this.timeline.selectedClipId() !== null);
+  /**
+   * Crossfade possible: between the selected clips (two or more), within the range when there is
+   * one; with fewer clips selected, any clip ending in the range over one starting there.
+   */
+  readonly crossfadeAt = computed(() => {
+    const range = this.timeline.range();
+    const clips = this.timeline.selectedClips();
+    if (clips.size >= 2) return findCrossfade(this.montages.montage(), range?.start ?? 0, range?.end ?? Infinity, this.length, clips);
+    return range ? findCrossfade(this.montages.montage(), range.start, range.end, this.length) : null;
+  });
+  /** Something to delete: a range or some clips. */
+  readonly canDelete = computed(() => this.hasRange() || this.timeline.selectedClipIds().length > 0);
 
   constructor() {
     // a new montage clears the selection
@@ -52,16 +63,23 @@ export class EditService {
       this.montages.generation();
       untracked(() => {
         this.timeline.range.set(null);
-        this.timeline.selectedClipId.set(null);
+        this.timeline.selectClip(null);
+      });
+    });
+    // clips removed (undo, delete, crop...) leave the selection
+    effect(() => {
+      const ids = new Set(this.montages.montage().tracks.flatMap((t) => t.clips.map((c) => c.id)));
+      untracked(() => {
+        const selected = this.timeline.selectedClipIds();
+        if (selected.some((id) => !ids.has(id))) this.timeline.selectedClipIds.set(selected.filter((id) => ids.has(id)));
       });
     });
   }
 
-  /** Splits at the playhead the selected clip or, with no clip selected, every clip crossing it. */
+  /** Splits at the playhead the selected clips or, with no clip selected, every clip crossing it. */
   split(): void {
-    const selected = this.timeline.selectedClipId();
-    const ids = selected ? new Set([selected]) : undefined;
-    this.montages.edit((m) => splitAt(m, this.playback.position(), this.length, ids));
+    const selected = this.timeline.selectedClips();
+    this.montages.edit((m) => splitAt(m, this.playback.position(), this.length, selected.size ? selected : undefined));
   }
 
   /** Keeps only the selected range of every track, moved to the start. */
@@ -73,7 +91,13 @@ export class EditService {
     this.playback.seek(0);
   }
 
-  /** Deletes the selected range (closing the gap) or else the selected clip. */
+  /** Fades out the clip that ends in the selected range and fades in the one that starts there. */
+  crossfade(): void {
+    const crossfade = this.crossfadeAt();
+    if (crossfade) this.montages.update((m) => applyCrossfade(m, crossfade));
+  }
+
+  /** Deletes the selected range (closing the gap) or else the selected clips. */
   delete(): void {
     const range = this.timeline.range();
     if (range) {
@@ -81,10 +105,15 @@ export class EditService {
       this.timeline.range.set(null);
       return this.playback.seek(range.start);
     }
-    const clipId = this.timeline.selectedClipId();
-    if (!clipId) return;
-    this.timeline.selectedClipId.set(null);
-    this.montages.removeClip(clipId);
+    const ids = this.timeline.selectedClipIds();
+    if (!ids.length) return;
+    this.timeline.selectClip(null);
+    this.montages.removeClips(ids);
+  }
+
+  /** Selects every clip of the montage. */
+  selectAll(): void {
+    this.timeline.selectedClipIds.set(this.montages.montage().tracks.flatMap((t) => t.clips.map((c) => c.id)));
   }
 
   /** Sets speed and pitch (semitones) of a clip. */
@@ -153,8 +182,9 @@ export class EditService {
   async alignTempo(): Promise<void> {
     const clips = this.tempoClips();
     if (clips.length < 2) return;
-    const selected = this.timeline.selectedClipId();
-    const data: AlignDialogData = { clips, referenceId: clips.some((c) => c.id === selected) ? selected! : clips[0].id };
+    // reference: the first selected clip with a tempo
+    const selected = this.timeline.selectedClipIds().find((id) => clips.some((c) => c.id === id));
+    const data: AlignDialogData = { clips, referenceId: selected ?? clips[0].id };
     const ref = this.dialogs.open<AlignTempoDialogComponent, AlignDialogData, AlignOptions>(AlignTempoDialogComponent, {
       data,
       autoFocus: 'dialog',
@@ -174,7 +204,7 @@ export class EditService {
   startBeatMarking(clipId: string, beatsPerBar: number, bpm: number): void {
     const clip = this.markingClip(clipId);
     if (!clip) return;
-    this.timeline.selectedClipId.set(clipId);
+    this.timeline.selectClip(clipId);
     this.timeline.beatMarking.set({ clipId, sourceId: clip.sourceId, beatsPerBar, bpm, downbeat: null });
   }
 
@@ -248,6 +278,6 @@ export class EditService {
 
   clearSelection(): void {
     this.timeline.range.set(null);
-    this.timeline.selectedClipId.set(null);
+    this.timeline.selectClip(null);
   }
 }

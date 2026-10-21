@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { automate } from '../montage/envelope';
-import { Clip, audibleTracks, clipRate, isProcessed } from '../montage/montage.model';
+import { automate, clipEnvelopeOnTimeline } from '../montage/envelope';
+import { Clip, audibleTracks, clipRate, isProcessed, trackVolume } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { AudioLibraryService } from './audio-library.service';
@@ -13,8 +13,9 @@ export interface ScheduledMix {
 }
 
 /**
- * Builds the audio graph of the montage on a context: one gain node per audible track
- * (automated by its envelope) fed by one buffer source per clip. Used by both the live
+ * Builds the audio graph of the montage on a context: one gain node per audible track (its
+ * volume) fed by one buffer source per clip, through a gain automated by the clip's envelope
+ * when it has one. Used by both the live
  * playback and the offline render of the export, so they sound the same.
  */
 @Injectable({ providedIn: 'root' })
@@ -33,7 +34,7 @@ export class MixService {
     for (const track of audibleTracks(this.montages.montage())) {
       const gain = ctx.createGain();
       gain.connect(destination);
-      automate(gain.gain, track.envelope, from, when);
+      gain.gain.value = trackVolume(track);
       mix.gains.push(gain);
       for (const clip of track.clips) {
         const buffer = this.bufferOf(clip);
@@ -41,7 +42,16 @@ export class MixService {
         if (!buffer || clip.start + length <= from || clip.start >= until) continue;
         const node = ctx.createBufferSource();
         node.buffer = buffer;
-        node.connect(gain);
+        if (clip.envelope?.length) {
+          // the fades of the clip, on its own gain
+          const fades = ctx.createGain();
+          automate(fades.gain, clipEnvelopeOnTimeline(clip), from, when);
+          fades.connect(gain);
+          mix.gains.push(fades);
+          node.connect(fades);
+        } else {
+          node.connect(gain);
+        }
         const delay = Math.max(0, clip.start - from);
         const skip = Math.max(0, from - clip.start);
         const play = Math.min(length, until - clip.start) - skip;

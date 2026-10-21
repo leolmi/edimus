@@ -7,6 +7,10 @@ Componenti in `src/app/features/timeline/`; stato di vista in `TimelineService`.
 - `TimelineComponent`: righello, intestazioni delle tracce (nome → dettagli, mute, solo,
   info, elimina), una `TrackLaneComponent` per traccia, scrollbar nativa, area di drop.
   Gestisce tutti i gesti del puntatore sulle lane (`onLaneDown/Move/Up`).
+  Caricamento dei file trascinati: dal rilascio (`DocumentService.pendingDrop`, che copre la
+  risoluzione dei percorsi e il probe) alla fine della decodifica delle sorgenti della traccia,
+  sopra la lane compare un indicatore (indeterminato, poi con la percentuale di decodifica);
+  per i file destinati a tracce nuove compare nell'area vuota finché la traccia non esiste.
 - `TrackLaneComponent`: disegna una traccia su `<canvas>` e offre gli hit test
   (`clipAt`, `pointAt`, `curveHandleAt`, `markedBarAt`) usati dai gesti.
 - `RulerComponent`: righello dei tempi.
@@ -22,12 +26,16 @@ e i colori presi da `ThemeColorsService` / `sourceColors()` (un colore per sorge
 Nell'ordine:
 
 1. per la clip selezionata, l'estensione dell'intera sorgente (grigio tratteggiato);
-2. corpo della clip e forma d'onda per canale, **scalata dall'inviluppo** (si vede il livello
-   ascoltato); oltre lo zoom dei campioni diventa una polilinea; le clip in render mostrano
-   l'avanzamento;
+2. corpo della clip e forma d'onda per canale, **scalata dall'inviluppo della clip e dal volume
+   della traccia** (si vede il livello ascoltato); oltre lo zoom dei campioni diventa una
+   polilinea; le clip in render mostrano l'avanzamento;
 3. griglia delle battute (se attiva), esclusa la clip in marcatura;
 4. battuta in marcatura (vedi sotto);
-5. inviluppo di volume (sempre se ha punti; con punti e maniglie in modalità inviluppo).
+5. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
+   inviluppo anche senza, con punti e maniglie; i punti nascosti da un trim non si vedono).
+
+L'intestazione della traccia ha il cursore del volume della traccia (−30…+6 dB, passo 0,5;
+un passo di annulla per trascinamento).
 
 ## Gesti
 
@@ -35,10 +43,13 @@ Nell'ordine:
 |---|---|---|
 | fuori dalle clip | clic | sposta il playhead, deseleziona |
 | fuori dalle clip | trascina | seleziona un intervallo di tempo |
-| corpo clip | trascina | sposta la clip (anche su altre tracce; oltre l'ultima crea una traccia nuova); con la griglia visibile a passi di battito, Alt per lo spostamento libero |
+| corpo clip | clic | seleziona solo quella clip (anche se era in una selezione multipla) |
+| clip | Ctrl+clic | aggiunge la clip alla selezione o la toglie (`TimelineService.toggleClip`) |
+| corpo clip | trascina | sposta la clip (anche su altre tracce; oltre l'ultima crea una traccia nuova); inizio e fine si agganciano a inizio e fine delle altre clip, con la griglia visibile a passi di battito, Alt per lo spostamento libero |
+| corpo di una clip selezionata | trascina | sposta insieme tutte le clip selezionate (`moveClips`): stesse distanze, cambio traccia solo se restano tutte su tracce esistenti, si ferma quando la prima arriva a 0; l'aggancio considera i bordi di tutte e ignora le clip del gruppo |
 | bordo clip (6 px) | trascina | trim dell'inizio o della fine |
 | corpo clip | doppio clic | dialogo velocità/pitch |
-| modalità inviluppo | clic / trascina | aggiunge e sposta un punto; su un punto lo sposta |
+| modalità inviluppo | clic / trascina su una clip | aggiunge un punto all'inviluppo della clip più in alto sotto il puntatore e lo sposta; su un punto lo sposta. Il punto resta dentro la clip e si aggancia (10 px) ai bordi di tutte le clip e ai punti degli inviluppi delle altre clip, in verticale a 0 dB (6 px); Alt per lo spostamento libero |
 | modalità inviluppo | trascina maniglia | piega il segmento (doppio clic: lo raddrizza) |
 | modalità inviluppo | clic destro su un punto | lo elimina |
 | lane o righello | rotella | zoom attorno al puntatore |
@@ -58,11 +69,21 @@ montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono 
 | Ctrl+, / F1 | Impostazioni / Aiuto |
 | Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y | annulla / ripeti |
 | Spazio, Home, End | play/pausa, inizio, fine |
-| S | divide al playhead |
-| Canc / Backspace | elimina la selezione (clip o intervallo) |
+| S | divide al playhead (le clip selezionate, o tutte se nessuna) |
+| Canc / Backspace | elimina la selezione (intervallo, altrimenti le clip selezionate) |
 | E | modalità inviluppo |
 | B | griglia delle battute |
+| Ctrl+A | seleziona tutte le clip |
 | Esc | toglie la selezione |
+
+## Selezione
+
+`TimelineService.selectedClipIds` è l'elenco delle clip selezionate (nell'ordine in cui sono
+state scelte); `selectedClipId` vale solo quando ce n'è una (barra della clip, dialoghi),
+`selectedClips` è lo stesso elenco come insieme. Le clip che spariscono dal montaggio (annulla,
+elimina, crop) escono dalla selezione. Con più clip la barra della clip mostra quante sono.
+L'intervallo di tempo (`range`) è indipendente dalla selezione delle clip; la dissolvenza
+incrociata usa le clip selezionate se sono almeno due, la fascia altrimenti.
 
 Trasporto (barra di stato, a destra): centra la vista sul playhead (`TimelineService.centerOn`,
 che vicino agli estremi si ferma all'inizio o alla fine), loop, stop, play/pausa, tempo
@@ -92,6 +113,15 @@ della clip. La lettura è **prima per battute, poi per movimenti**:
   precede l'inizio della sorgente);
 - linee dei movimenti più leggere e corte, solo se distanti ≥ 6 px;
 - sotto 6 px per battuta la griglia non si disegna.
+
+### Aggancio ai bordi delle clip
+
+Sempre attivo durante lo spostamento: `snapToEdges()` (`core/timeline/edge-snap.ts`, funzione
+pura) porta l'inizio o la fine della clip trascinata (o di una delle clip del gruppo) sui
+punti di aggancio delle altre clip (`snapAnchors`: inizio, fine e punti visibili del loro
+inviluppo) sull'inizio o sulla fine più vicini delle
+altre clip, su qualsiasi traccia, se distano meno di 10 px. Ha la precedenza sull'aggancio ai
+battiti; Alt li disattiva entrambi.
 
 ### Aggancio ai battiti
 

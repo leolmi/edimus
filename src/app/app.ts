@@ -73,7 +73,7 @@ export class App {
   }
 
   /**
-   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y), transport (Space, Home, End) and edit
+   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y, Ctrl+A select all clips), transport (Space, Home, End) and edit
    * (S split, E envelope, B beat grid, Delete, Escape) shortcuts.
    */
   protected onKeydown(event: KeyboardEvent): void {
@@ -151,6 +151,8 @@ export class App {
         return shift ? () => this.montages.redo() : () => this.montages.undo();
       case 'KeyY':
         return () => this.montages.redo();
+      case 'KeyA':
+        return () => this.edits.selectAll();
       default:
         return undefined;
     }

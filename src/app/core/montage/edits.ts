@@ -1,5 +1,4 @@
-import { envelopeOfRange, envelopeWithoutRange } from './envelope';
-import { Clip, Montage, Track, clipRate } from './montage.model';
+import { Clip, Montage, clipRate } from './montage.model';
 
 /** Length of a clip on the timeline (resolves `duration: 0` with the source length). */
 export type ClipLength = (clip: Clip) => number;
@@ -64,6 +63,22 @@ export function trimClip(
   });
 }
 
+/**
+ * Moves a group of clips by `delta` seconds and `rows` tracks, keeping their spacing; the
+ * caller keeps every clip on an existing track and at or after 0.
+ */
+export function moveClips(montage: Montage, clipIds: ReadonlySet<string>, delta: number, rows: number): Montage {
+  const moved = montage.tracks.map((track) => track.clips.filter((c) => clipIds.has(c.id)).map((c) => ({ ...c, start: c.start + delta })));
+  return {
+    ...montage,
+    tracks: montage.tracks.map((track, index) => {
+      const incoming = moved[index - rows] ?? [];
+      const kept = track.clips.filter((c) => !clipIds.has(c.id));
+      return kept.length === track.clips.length && !incoming.length ? track : { ...track, clips: [...kept, ...incoming] };
+    }),
+  };
+}
+
 /** Splits the clips crossing `time` in two (only `clipIds` when given). */
 export function splitAt(montage: Montage, time: number, length: ClipLength, clipIds?: Set<string>): Montage {
   return mapClips(montage, (clip) => {
@@ -74,24 +89,18 @@ export function splitAt(montage: Montage, time: number, length: ClipLength, clip
   });
 }
 
-function mapEnvelopes(montage: Montage, map: (track: Track) => Track['envelope']): Montage {
-  if (!montage.tracks.some((t) => t.envelope?.length)) return montage;
-  return { ...montage, tracks: montage.tracks.map((t) => (t.envelope?.length ? { ...t, envelope: map(t) } : t)) };
-}
-
-/** Keeps only [from, to) of every track, moved to the start of the timeline. */
+/** Keeps only [from, to) of every track, moved to the start of the timeline (envelopes travel with the clips). */
 export function cropToRange(montage: Montage, from: number, to: number, length: ClipLength): Montage {
-  const cropped = mapClips(montage, (clip) => {
+  return mapClips(montage, (clip) => {
     const part = portion(clip, length(clip), from, to, Math.max(clip.start, from) - from);
     return part ? [part] : [];
   });
-  return mapEnvelopes(cropped, (t) => envelopeOfRange(t.envelope, from, to));
 }
 
 /** Removes [from, to) from every track, moving what follows back to close the gap. */
 export function deleteRange(montage: Montage, from: number, to: number, length: ClipLength): Montage {
   const gap = to - from;
-  const result = mapClips(montage, (clip) => {
+  return mapClips(montage, (clip) => {
     const len = length(clip);
     const end = clip.start + len;
     if (end <= from + EPSILON) return [clip];
@@ -102,7 +111,6 @@ export function deleteRange(montage: Montage, from: number, to: number, length: 
     ];
     return parts.filter((p): p is Clip => p !== null);
   });
-  return mapEnvelopes(result, (t) => envelopeWithoutRange(t.envelope, from, to));
 }
 
 /** Sets speed and pitch of a clip, keeping its start (the end moves with the speed). */

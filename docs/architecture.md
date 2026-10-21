@@ -47,9 +47,10 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   `rubberband=tempo:pitch`; varispeed: `asetrate`+`aresample`, più rubberband per il pitch
   aggiuntivo). Il render è riusato da trim, split, undo/redo e clip con le stesse impostazioni.
   Il buffer renderizzato è in tempo *timeline*: offset nel buffer = `clip.offset / rate`.
-- **Mix** (`MixService`): un `GainNode` per traccia udibile, automatizzato dall'inviluppo, e un
-  `AudioBufferSourceNode` per clip. Lo stesso grafo serve riproduzione ed export, quindi
-  suonano uguali.
+- **Mix** (`MixService`): un `GainNode` per traccia udibile (il volume della traccia) e un
+  `AudioBufferSourceNode` per clip; una clip con inviluppo passa da un suo `GainNode`
+  automatizzato (`automate` con i punti convertiti in tempo di timeline,
+  `clipEnvelopeOnTimeline`). Lo stesso grafo serve riproduzione ed export, quindi suonano uguali.
 - **Export** (`ExportService`): render offline, normalizzazione opzionale, scrittura PCM
   a blocchi, encoding con ffmpeg con progresso letto da `-progress pipe:1`.
 
@@ -59,7 +60,7 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
 |---|---|
 | `MontageService` | montaggio corrente (immutabile), undo/redo (max 200 passi), `dirty`, percorso, apertura/salvataggio |
 | `TimelineService` | zoom (`pxPerSec`), scroll, larghezza vista, selezione clip/intervallo, modalità inviluppo, griglia battute, marcatura battuta; conversioni `timeToX`/`xToTime`, `clipLength` |
-| `EditService` | comandi di editing usati da UI e AI: split, delete, crop, velocità/pitch, dialoghi tempo e allineamento, marcatura battuta |
+| `EditService` | comandi di editing usati da UI e AI: split, delete, crop, dissolvenza incrociata, velocità/pitch, dialoghi tempo e allineamento, marcatura battuta |
 | `DocumentService` | nuovo/apri/salva/salva con nome/rinomina/esporta/chiudi, con conferma per le modifiche non salvate; titolo della finestra |
 | `PlaybackService` | play/stop/seek, loop, punto iniziale, posizione del playhead, `AudioContext` condiviso inviato all'uscita scelta (`setSinkId`; se il dispositivo manca, la predefinita) |
 | `AudioOutputsService` | elenco delle uscite audio (`enumerateDevices`). WebView2 dà i nomi solo a una pagina con permesso microfono: all'apertura delle Impostazioni, la prima volta, si apre e chiude subito un flusso dal microfono. La scelta (id e nome) è nelle impostazioni |

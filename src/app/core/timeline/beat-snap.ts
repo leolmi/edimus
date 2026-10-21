@@ -7,6 +7,8 @@ export interface SnapContext {
   /** Length of a clip on the timeline (seconds). */
   length: (clip: Clip) => number;
   step: SnapStep;
+  /** Clips moving with the dragged one: their grid is not a target. */
+  moving?: ReadonlySet<string>;
 }
 
 /** Seconds around the anchor where the grid points of the other clips are looked for. */
@@ -59,7 +61,7 @@ export function snapToBeats(montage: Montage, clipId: string, start: number, ori
 
   let target: number | undefined;
   for (const clip of clips) {
-    const other = clip.id !== clipId && context.tempoOf(clip.sourceId);
+    const other = clip.id !== clipId && !context.moving?.has(clip.id) && context.tempoOf(clip.sourceId);
     if (!other) continue;
     for (const point of gridOf(clip, other, context.step, clip.start, context.length(clip), anchor - reach, anchor + reach)) {
       if (target === undefined || Math.abs(point - anchor) < Math.abs(target - anchor)) target = point;

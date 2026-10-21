@@ -52,7 +52,7 @@ const IT: HelpContent = {
           keys: ['Ctrl+O', 'trascina i file'],
           text: [
             'I file audio (wav, mp3, flac, ogg, opus, m4a, aiff, wma…) vengono aggiunti come nuove tracce; un file .edimus sostituisce il montaggio aperto.',
-            'Puoi anche trascinare i file sulla finestra: sull’area vuota sotto le tracce diventano nuove tracce, su una traccia esistente vengono inseriti in quella traccia.',
+            'Puoi anche trascinare i file sulla finestra: sull’area vuota sotto le tracce diventano nuove tracce, su una traccia esistente vengono inseriti in quella traccia. Finché il caricamento non è finito, la traccia (o l’area vuota) mostra un indicatore con l’avanzamento.',
           ],
         },
         {
@@ -128,7 +128,7 @@ const IT: HelpContent = {
         {
           title: 'Forma d’onda',
           text: [
-            'Ogni clip mostra la forma d’onda dei suoi canali, già scalata dal volume della traccia: vedi il livello che ascolti. Ogni file sorgente ha un suo colore.',
+            'Ogni clip mostra la forma d’onda dei suoi canali, già scalata dal suo inviluppo e dal volume della traccia: vedi il livello che ascolti. Ogni file sorgente ha un suo colore.',
           ],
         },
       ],
@@ -147,7 +147,15 @@ const IT: HelpContent = {
           title: 'Selezionare e spostare una clip',
           text: [
             'Una clip è una porzione di un file audio posata su una traccia. Clic per selezionarla, trascina per spostarla nel tempo o su un’altra traccia; trascinandola sotto l’ultima traccia ne crea una nuova.',
-            'Con la griglia delle battute visibile la clip si sposta a passi (battuta, semiminima o croma, da scegliere nelle Impostazioni): il punto della griglia della clip sotto il puntatore si aggancia al più vicino delle altre clip. Tieni premuto Alt per spostarla liberamente.',
+            'Inizio e fine della clip si agganciano all’inizio o alla fine delle altre clip, su qualsiasi traccia, quando ci passano vicino. Con la griglia delle battute visibile la clip si sposta a passi (battuta, semiminima o croma, da scegliere nelle Impostazioni): il punto della griglia della clip sotto il puntatore si aggancia al più vicino delle altre clip. Tieni premuto Alt per spostarla liberamente.',
+          ],
+        },
+        {
+          title: 'Selezionare più clip',
+          keys: ['Ctrl+clic', 'Ctrl+A'],
+          text: [
+            'Ctrl+clic aggiunge una clip alla selezione o la toglie; Ctrl+A seleziona tutte le clip, Esc nessuna. Trascinando una delle clip selezionate si spostano tutte insieme, mantenendo le distanze (cambiano traccia insieme finché restano tutte su tracce esistenti); un clic senza trascinare lascia selezionata solo quella clip.',
+            'Le operazioni agiscono sulle clip selezionate: Canc le elimina, S le divide al cursore, la dissolvenza incrociata lavora tra quelle.',
           ],
         },
         {
@@ -157,7 +165,7 @@ const IT: HelpContent = {
         {
           title: 'Dividere',
           keys: ['S'],
-          text: ['Divide in due, nel punto del cursore, la clip selezionata; senza selezione divide tutte le clip attraversate dal cursore.'],
+          text: ['Divide in due, nel punto del cursore, le clip selezionate; senza selezione divide tutte le clip attraversate dal cursore.'],
         },
         {
           title: 'Selezionare un intervallo di tempo',
@@ -171,7 +179,15 @@ const IT: HelpContent = {
           keys: ['Canc'],
           text: [
             '“Ritaglia alla selezione” tiene solo l’intervallo selezionato e lo porta all’inizio.',
-            'Canc elimina l’intervallo selezionato da tutte le tracce chiudendo il buco; senza intervallo elimina la clip selezionata.',
+            'Canc elimina l’intervallo selezionato da tutte le tracce chiudendo il buco; senza intervallo elimina le clip selezionate.',
+          ],
+        },
+        {
+          title: 'Dissolvenza incrociata',
+          text: [
+            'Dove una clip finisce sopra un’altra che inizia (su qualsiasi traccia, anche la stessa), il pulsante “Dissolvenza incrociata” scrive nell’inviluppo delle due clip la sfumatura in uscita della prima e in entrata della seconda, a potenza costante, così il volume complessivo non cala. Le sfumature seguono le clip se poi le sposti.',
+            'Con due o più clip selezionate (Ctrl+clic) la dissolvenza è tra quelle, su tutta la loro sovrapposizione; altrimenti vale la fascia di tempo selezionata e, se contiene più coppie, la più ampia. Con clip e fascia insieme, la dissolvenza è tra le clip e limitata alla fascia.',
+            'Il resto della clip che finisce resta muto, così come l’inizio di quella che entra prima della dissolvenza.',
           ],
         },
       ],
@@ -181,12 +197,18 @@ const IT: HelpContent = {
       icon: 'show_chart',
       topics: [
         {
-          title: 'Inviluppo di volume',
-          keys: ['E'],
+          title: 'Inviluppo di volume della clip',
+          keys: ['E', 'Alt'],
           text: [
-            'Con la modalità inviluppo attiva (pulsante o tasto E) il clic su una traccia aggiunge un punto di volume; i punti si trascinano, il clic destro li elimina.',
+            'Ogni clip ha il suo inviluppo di volume, per sfumature e dissolvenze: segue la clip quando la sposti, la dividi, la accorci o ne cambi la velocità.',
+            'Con la modalità inviluppo attiva (pulsante o tasto E) il clic su una clip aggiunge un punto di volume; i punti si trascinano dentro la clip, il clic destro li elimina.',
+            'Trascinando, il punto si aggancia ai bordi delle clip, ai punti degli inviluppi delle altre clip e, in verticale, a 0 dB; Alt lo sposta liberamente. Anche le clip trascinate si agganciano ai punti degli inviluppi delle altre clip.',
             'Il pallino a metà di un segmento lo curva (per dissolvenze naturali); doppio clic lo raddrizza. Prima del primo punto e dopo l’ultimo il volume resta costante.',
           ],
+        },
+        {
+          title: 'Volume della traccia',
+          text: ['Il cursore nell’intestazione della traccia regola il volume di tutta la traccia (da −30 a +6 dB); doppio clic lo riporta a 0 dB.'],
         },
       ],
     },
@@ -288,14 +310,14 @@ const IT: HelpContent = {
       title: 'Fare una dissolvenza tra due brani',
       steps: [
         'Metti i due brani su tracce diverse e sovrapponi la fine del primo all’inizio del secondo.',
-        'Attiva la modalità inviluppo (E).',
-        'Sulla prima traccia aggiungi un punto all’inizio della sovrapposizione e uno alla fine, abbassato del tutto; sulla seconda il contrario.',
-        'Curva i segmenti con il pallino centrale per una dissolvenza più naturale.',
+        'Seleziona i due brani con Ctrl+clic (oppure trascina su un’area vuota una fascia che comprenda la sovrapposizione).',
+        'Premi “Dissolvenza incrociata”: il primo brano sfuma in uscita, il secondo in entrata, a volume costante.',
+        'Se vuoi ritoccarla, attiva la modalità inviluppo (E) e sposta o curva i punti creati.',
       ],
     },
     {
       title: 'Abbassare il volume di una traccia',
-      steps: ['Attiva la modalità inviluppo (E).', 'Aggiungi un solo punto sulla traccia e trascinalo in basso: il volume cambia per tutta la traccia.'],
+      steps: ['Trascina verso sinistra il cursore del volume nell’intestazione della traccia (doppio clic: torna a 0 dB).'],
     },
     {
       title: 'Ascoltare in loop un passaggio',
@@ -339,7 +361,7 @@ const EN: HelpContent = {
           keys: ['Ctrl+O', 'drag the files'],
           text: [
             'Audio files (wav, mp3, flac, ogg, opus, m4a, aiff, wma…) are added as new tracks; a .edimus file replaces the open montage.',
-            'You can also drag files onto the window: on the empty area below the tracks they become new tracks, on an existing track they are inserted into it.',
+            'You can also drag files onto the window: on the empty area below the tracks they become new tracks, on an existing track they are inserted into it. Until the loading is over, the track (or the empty area) shows an indicator with the progress.',
           ],
         },
         {
@@ -414,7 +436,7 @@ const EN: HelpContent = {
         },
         {
           title: 'Waveform',
-          text: ['Each clip shows the waveform of its channels, already scaled by the track volume: you see the level you hear. Each source file has its own color.'],
+          text: ['Each clip shows the waveform of its channels, already scaled by its envelope and the track volume: you see the level you hear. Each source file has its own color.'],
         },
       ],
     },
@@ -432,7 +454,15 @@ const EN: HelpContent = {
           title: 'Select and move a clip',
           text: [
             'A clip is a portion of an audio file placed on a track. Click to select it, drag to move it in time or to another track; dragging it below the last track creates a new one.',
-            'With the bar grid shown the clip moves by steps (bar, quarter or eighth note, chosen in the Settings): the grid point of the clip under the pointer snaps to the nearest one of the other clips. Hold Alt to move it freely.',
+            'The start and end of the clip snap to the start or end of the other clips, on any track, when they pass close by. With the bar grid shown the clip moves by steps (bar, quarter or eighth note, chosen in the Settings): the grid point of the clip under the pointer snaps to the nearest one of the other clips. Hold Alt to move it freely.',
+          ],
+        },
+        {
+          title: 'Select several clips',
+          keys: ['Ctrl+click', 'Ctrl+A'],
+          text: [
+            'Ctrl+click adds a clip to the selection or removes it; Ctrl+A selects all the clips, Esc none. Dragging one of the selected clips moves them all together, keeping their spacing (they change track together while all of them stay on existing tracks); a click without dragging leaves only that clip selected.',
+            'The operations act on the selected clips: Delete removes them, S splits them at the playhead, the crossfade works between them.',
           ],
         },
         {
@@ -442,7 +472,7 @@ const EN: HelpContent = {
         {
           title: 'Split',
           keys: ['S'],
-          text: ['Splits the selected clip in two at the playhead; with no selection it splits every clip under the playhead.'],
+          text: ['Splits the selected clips in two at the playhead; with no selection it splits every clip under the playhead.'],
         },
         {
           title: 'Select a time range',
@@ -454,7 +484,15 @@ const EN: HelpContent = {
           keys: ['Delete'],
           text: [
             '“Crop to selection” keeps only the selected range and moves it to the start.',
-            'Delete removes the selected range from all the tracks closing the gap; with no range it removes the selected clip.',
+            'Delete removes the selected range from all the tracks closing the gap; with no range it removes the selected clips.',
+          ],
+        },
+        {
+          title: 'Crossfade',
+          text: [
+            'Where a clip ends over another one that starts (on any track, even the same one), the “Crossfade” button writes in the envelopes of the two clips the fade-out of the first and the fade-in of the second, at constant power, so the overall volume does not drop. The fades follow the clips if you move them afterwards.',
+            'With two or more clips selected (Ctrl+click) the crossfade is between them, over their whole overlap; otherwise the selected time range applies and, if it holds several pairs, the widest one. With clips and range together, the crossfade is between the clips, clamped to the range.',
+            'The rest of the ending clip stays silent, and so does the start of the incoming one before the crossfade.',
           ],
         },
       ],
@@ -464,12 +502,18 @@ const EN: HelpContent = {
       icon: 'show_chart',
       topics: [
         {
-          title: 'Volume envelope',
-          keys: ['E'],
+          title: 'Clip volume envelope',
+          keys: ['E', 'Alt'],
           text: [
-            'With the envelope mode on (button or E key) a click on a track adds a volume point; points can be dragged, a right click removes them.',
+            'Each clip has its own volume envelope, for fades and crossfades: it follows the clip when you move it, split it, trim it or change its speed.',
+            'With the envelope mode on (button or E key) a click on a clip adds a volume point; points can be dragged inside the clip, a right click removes them.',
+            'While dragging, the point snaps to the clip edges, to the envelope points of the other clips and, vertically, to 0 dB; Alt moves it freely. Dragged clips also snap to the envelope points of the other clips.',
             'The dot in the middle of a segment bends it (for natural fades); a double click straightens it. Before the first point and after the last one the volume stays constant.',
           ],
+        },
+        {
+          title: 'Track volume',
+          text: ['The slider in the track header sets the volume of the whole track (from −30 to +6 dB); a double click brings it back to 0 dB.'],
         },
       ],
     },
@@ -566,14 +610,14 @@ const EN: HelpContent = {
       title: 'Crossfade two songs',
       steps: [
         'Put the two songs on different tracks and overlap the end of the first with the start of the second.',
-        'Switch on the envelope mode (E).',
-        'On the first track add a point at the start of the overlap and one at its end, lowered all the way; on the second the other way round.',
-        'Bend the segments with the middle dot for a more natural fade.',
+        'Select the two songs with Ctrl+click (or drag on an empty area a band that contains the overlap).',
+        'Press “Crossfade”: the first song fades out, the second fades in, at constant volume.',
+        'To retouch it, switch on the envelope mode (E) and move or bend the points created.',
       ],
     },
     {
       title: 'Lower the volume of a track',
-      steps: ['Switch on the envelope mode (E).', 'Add a single point on the track and drag it down: the volume changes for the whole track.'],
+      steps: ['Drag left the volume slider in the track header (double click: back to 0 dB).'],
     },
     {
       title: 'Loop a passage',

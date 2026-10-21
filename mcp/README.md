@@ -59,9 +59,9 @@ Con più finestre aperte l'AI le vede con `list_instances` e sceglie con `select
 | Guida e istanze | `get_guide`, `list_instances`, `select_instance`, `launch_edimus` |
 | Stato | `get_state` |
 | Progetto | `new_montage`, `open`, `save`, `export` |
-| Trasporto e storia | `play`, `stop`, `seek`, `undo`, `redo` |
+| Trasporto e storia | `play`, `stop`, `seek`, `select`, `undo`, `redo` |
 | Clip e tracce | `move_clip`, `trim_clip`, `split`, `delete_clip`, `delete_range`, `crop`, `set_track`, `delete_track` |
-| Volume | `set_envelope`, `fade` |
+| Volume | `set_envelope`, `fade`, `crossfade` |
 | Velocità e tempo | `set_clip_timing`, `set_tempo`, `align_tempo` |
 | Analisi | `analyze_levels`, `find_silence`, `get_beats`, `snapshot` |
 

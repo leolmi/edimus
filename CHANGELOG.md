@@ -4,6 +4,38 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.1.0 — 2026-10-21
+
+### Volume
+- L'inviluppo di volume appartiene alla clip (non più alla traccia): segue la clip quando viene
+  spostata, divisa, accorciata o ne cambia la velocità. Ogni traccia ha invece un volume unico,
+  regolabile dal cursore nella sua intestazione (−30…+6 dB).
+- Dissolvenza incrociata a potenza costante (pulsante in toolbar): sfuma in uscita la clip che
+  finisce e in entrata quella che inizia, anche sulla stessa traccia, tra le clip selezionate o
+  nella fascia di tempo selezionata.
+- Trascinando un punto dell'inviluppo, si aggancia ai bordi delle clip, ai punti degli
+  inviluppi delle altre clip e, in verticale, a 0 dB (Alt: libero).
+
+### Editing
+- Selezione di più clip: Ctrl+clic aggiunge o toglie, Ctrl+A tutte, Esc nessuna; le clip
+  selezionate si trascinano insieme e si eliminano, dividono o dissolvono insieme.
+- Le clip trascinate si agganciano a inizio, fine e punti dell'inviluppo delle altre clip, su
+  qualsiasi traccia (Alt: libero).
+
+### Interfaccia
+- Indicatore di caricamento sulla traccia per i file trascinati, dal rilascio alla fine della
+  decodifica.
+
+### Assistente AI
+- `set_envelope` e `fade` lavorano sulla clip (`fade` anche con `length`), `set_track` ha
+  `volumeDb`, nuovo strumento `select`, `crossfade` anche tra clip indicate; `get_state`
+  riporta la selezione multipla e l'inviluppo di ogni clip.
+
+### File
+- Formato `.edimus` versione 2. I montaggi salvati con le versioni precedenti si aprono
+  convertiti senza differenze di suono (l'inviluppo della traccia passa a ciascuna delle sue
+  clip); una volta salvati non si aprono più con la 1.0.x.
+
 ## 1.0.1 — 2026-10-19
 
 ### Correzioni

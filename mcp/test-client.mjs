@@ -46,9 +46,11 @@ const c1 = t1.clips[0].id;
 const c2 = t2.clips[0].id;
 await callTool('trim_clip', { clipId: c1, start: 1, end: 25 });
 await callTool('move_clip', { clipId: c2, start: 3 });
-await callTool('split', { time: 10, clipIds: [c1] });
-await callTool('fade', { trackId: t1.id, type: 'out', from: 20, to: 25, shape: 'logarithmic' });
-await callTool('fade', { trackId: t2.id, type: 'in', from: 3, to: 6, shape: 'exponential' });
+// the second half of the split clip
+const tail = (await callTool('split', { time: 10, clipIds: [c1] })).created[0].id;
+await callTool('fade', { clipId: tail, type: 'out', from: 20, to: 25, shape: 'logarithmic' });
+await callTool('fade', { clipId: c2, type: 'in', length: 3, shape: 'exponential' });
+await callTool('set_track', { trackId: t2.id, volumeDb: -3 });
 await callTool('set_clip_timing', { clipId: c2, bpm: 128.05, mode: 'stretch' });
 await callTool('align_tempo', { referenceClipId: c1, targetClipIds: [c2], alignBars: true });
 await callTool('get_beats', { clipId: c2, from: 5, to: 8 });

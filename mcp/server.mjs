@@ -131,7 +131,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.0.1' },
+  { name: 'edimus', version: '1.1.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -305,6 +305,13 @@ appTool('play', 'Play', 'Plays the montage from `from` (default: playhead), stop
 });
 appTool('stop', 'Stop', 'Stops the playback (playhead stays where it is).', {});
 appTool('seek', 'Move playhead', 'Moves the playhead to a timeline time.', { time: z.number().min(0) });
+appTool(
+  'select',
+  'Select',
+  'Sets the selection shown in the window: clips (empty or omitted = none) and time range [from, to) (omitted = none). ' +
+    'The user then acts on it with the toolbar (delete, split, crossfade, drag together).',
+  { clipIds: z.array(z.string()).optional(), from: z.number().min(0).optional(), to: z.number().min(0).optional() },
+);
 appTool('undo', 'Undo', 'Undoes the last edit (also edits made by hand).', {});
 appTool('redo', 'Redo', 'Redoes the last undone edit.', {});
 
@@ -347,11 +354,12 @@ appTool(
   { from: z.number().min(0), to: z.number().min(0) },
   { destructiveHint: true },
 );
-appTool('set_track', 'Track properties', 'Renames, mutes or solos a track.', {
+appTool('set_track', 'Track properties', 'Renames, mutes or solos a track, or sets the volume of the whole track (dB).', {
   trackId: z.string(),
   name: z.string().optional(),
   muted: z.boolean().optional(),
   solo: z.boolean().optional(),
+  volumeDb: z.number().max(6).optional().describe('Volume of the whole track in dB (0 = unchanged, max +6)'),
 });
 appTool('delete_track', 'Delete track', 'Removes a track with its clips.', { trackId: z.string() }, { destructiveHint: true });
 
@@ -363,22 +371,33 @@ const pointSchema = z.object({
 });
 appTool(
   'set_envelope',
-  'Set volume envelope',
-  'Replaces the volume envelope of a track (points sorted by time; empty list = no envelope, unity gain).',
-  { trackId: z.string(), points: z.array(pointSchema) },
+  'Set clip volume envelope',
+  'Replaces the volume envelope of a clip (times in timeline seconds; empty list = no envelope, unity gain). ' +
+    'The envelope belongs to the clip: it moves, splits, trims and stretches with it.',
+  { clipId: z.string(), points: z.array(pointSchema) },
 );
 appTool(
   'fade',
   'Fade in/out',
-  'Adds a fade-in (silence → current level) or fade-out (current level → silence) to a track between two timeline times, ' +
-    'keeping the rest of its envelope. Shapes: linear, exponential (slow start), logarithmic (fast start), smooth.',
+  'Adds a fade-in (silence → current level) or fade-out (current level → silence) to a clip: over `length` seconds at its ' +
+    'start (in) or end (out), or between two timeline times from/to. The clip is silent before a fade-in and after a ' +
+    'fade-out; the rest of its envelope is kept. Shapes: linear, exponential (slow start), logarithmic (fast start), smooth.',
   {
-    trackId: z.string(),
+    clipId: z.string(),
     type: z.enum(['in', 'out']),
-    from: z.number().min(0),
-    to: z.number().min(0),
+    length: z.number().positive().optional(),
+    from: z.number().min(0).optional(),
+    to: z.number().min(0).optional(),
     shape: z.enum(['linear', 'exponential', 'logarithmic', 'smooth']).optional(),
   },
+);
+appTool(
+  'crossfade',
+  'Crossfade',
+  'Equal-power crossfade where a clip ends over another one starting (any track): fades out the first and fades in ' +
+    'the second over their overlap clamped to [from, to] (in the two clip envelopes). With clipIds only those ' +
+    'clips are paired and from/to may be omitted (whole overlap). Returns the span used.',
+  { clipIds: z.array(z.string()).min(2).optional(), from: z.number().min(0).optional(), to: z.number().min(0).optional() },
 );
 
 // --- speed, pitch, tempo ------------------------------------------------------------------------

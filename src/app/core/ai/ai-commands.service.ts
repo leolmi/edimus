@@ -6,9 +6,24 @@ import { MixService } from '../audio/mix.service';
 import { PlaybackService } from '../audio/playback.service';
 import { ProcessedAudioService } from '../audio/processed-audio.service';
 import { TempoService } from '../audio/tempo.service';
+import { applyCrossfade, findCrossfade } from '../montage/crossfade';
 import { cropToRange, deleteRange, setClipTiming, splitAt, trimClip } from '../montage/edits';
-import { EnvelopePoint, gainAt, insertPoint } from '../montage/envelope';
-import { MONTAGE_EXTENSION, Montage, Track, audibleTracks, clipRate, copyName, fileName, isMontageFile, isProcessed, type Clip } from '../montage/montage.model';
+import { EnvelopePoint, clipGainAt, withFade } from '../montage/envelope';
+import {
+  MONTAGE_EXTENSION,
+  Montage,
+  Track,
+  audibleTracks,
+  clipRate,
+  copyName,
+  fileName,
+  isMontageFile,
+  isProcessed,
+  toSource,
+  toTimeline,
+  trackVolume,
+  type Clip,
+} from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
 import { AlignOptions, alignTempo } from '../montage/tempo-align';
 import { TimelineService } from '../timeline/timeline.service';
@@ -128,6 +143,17 @@ export class AiCommandsService {
       this.playback.seek(Number(p['time']));
       return { playhead: round(this.playback.position()) };
     },
+    select: async (p) => {
+      const ids = (p['clipIds'] as string[] | undefined) ?? [];
+      ids.forEach((id) => this.clip(id));
+      this.timeline.selectedClipIds.set([...new Set(ids)]);
+      if (p['from'] === undefined && p['to'] === undefined) this.timeline.range.set(null);
+      else {
+        const [start, end] = this.range(p);
+        this.timeline.range.set({ start, end });
+      }
+      return this.selection();
+    },
     undo: async () => {
       if (!this.montages.canUndo()) throw new Error('Nothing to undo');
       this.montages.undo();
@@ -197,6 +223,7 @@ export class AiCommandsService {
         name: p['name'] !== undefined ? String(p['name']) : t.name,
         muted: p['muted'] !== undefined ? !!p['muted'] : t.muted,
         solo: p['solo'] !== undefined ? !!p['solo'] : t.solo,
+        volume: p['volumeDb'] !== undefined ? (Number(p['volumeDb']) === 0 ? undefined : fromDb(Number(p['volumeDb']))) : t.volume,
       }));
       return this.trackState(this.track(track.id));
     },
@@ -208,28 +235,44 @@ export class AiCommandsService {
 
     // --- volume
     set_envelope: async (p) => {
-      const track = this.track(String(p['trackId']));
+      const { clip } = this.clip(String(p['clipId']));
+      // timeline seconds from the AI, source seconds in the clip
       const points = ((p['points'] as { time: number; gainDb: number; curve?: number }[]) ?? [])
-        .map((point) => ({ time: point.time, gain: fromDb(point.gainDb), curve: point.curve || undefined }))
+        .map((point) => ({ time: toSource(clip, point.time), gain: fromDb(point.gainDb), curve: point.curve || undefined }))
         .sort((a, b) => a.time - b.time);
-      this.montages.updateTrack(track.id, (t) => ({ ...t, envelope: points.length ? points : undefined }));
-      return this.trackState(this.track(track.id));
+      this.setClipEnvelope(clip.id, points);
+      return this.clipState(clip.id);
     },
     fade: async (p) => {
-      const track = this.track(String(p['trackId']));
-      const [from, to] = this.range(p);
-      const shape = (p['shape'] as keyof typeof FADE_CURVES) ?? 'linear';
+      const { clip } = this.clip(String(p['clipId']));
       const inward = p['type'] === 'in';
-      const points = track.envelope ?? [];
-      // level kept around the fade: what the envelope gives just outside it
-      const level = gainAt(points, inward ? to : from);
-      const bend = FADE_CURVES[shape];
-      let next: EnvelopePoint[] = points.filter((pt) => pt.time < from || pt.time > to);
-      [next] = insertPoint(next, { time: from, gain: inward ? 0 : level, curve: bend || undefined });
-      [next] = insertPoint(next, { time: to, gain: inward ? level : 0 });
-      next = next.map((pt) => (pt.time === from ? { ...pt, curve: bend || undefined } : pt));
-      this.montages.updateTrack(track.id, (t) => ({ ...t, envelope: next }));
-      return this.trackState(this.track(track.id));
+      const end = clip.start + this.length(clip);
+      let from: number;
+      let to: number;
+      if (p['length'] !== undefined) {
+        // at the start (in) or at the end (out) of the clip
+        const length = Math.min(end - clip.start, Number(p['length']));
+        [from, to] = inward ? [clip.start, clip.start + length] : [end - length, end];
+      } else {
+        [from, to] = this.range(p);
+      }
+      const shape = (p['shape'] as keyof typeof FADE_CURVES) ?? 'linear';
+      this.setClipEnvelope(clip.id, withFade(clip.envelope, toSource(clip, from), toSource(clip, to), inward, FADE_CURVES[shape]));
+      return this.clipState(clip.id);
+    },
+    crossfade: async (p) => {
+      const ids = p['clipIds'] as string[] | undefined;
+      if (ids) ids.forEach((id) => this.clip(id));
+      const [from, to] = ids && p['from'] === undefined && p['to'] === undefined ? [0, Infinity] : this.range(p);
+      const crossfade = findCrossfade(this.montages.montage(), from, to, this.length, ids && new Set(ids));
+      if (!crossfade) throw new Error('No clip ends in [from, to] over another clip starting there (among clipIds when given)');
+      this.montages.update((m) => applyCrossfade(m, crossfade));
+      return {
+        from: round(crossfade.from),
+        to: round(crossfade.to),
+        fadeOut: this.clipState(crossfade.outClip.id),
+        fadeIn: this.clipState(crossfade.inClip.id),
+      };
     },
 
     // --- speed, pitch, tempo
@@ -387,7 +430,7 @@ export class AiCommandsService {
       duration: round(this.timeline.duration()),
       playhead: round(this.playback.position()),
       playing: this.playback.playing(),
-      selection: { clipId: this.timeline.selectedClipId(), range: this.timeline.range() },
+      selection: this.selection(),
       canUndo: this.montages.canUndo(),
       canRedo: this.montages.canRedo(),
       sources: montage.sources.map((s) => this.sourceState(s.id)),
@@ -423,9 +466,21 @@ export class AiCommandsService {
       name: track.name,
       muted: !!track.muted,
       solo: !!track.solo,
-      envelope: (track.envelope ?? []).map((p) => ({ time: round(p.time), gainDb: toDb(p.gain), ...(p.curve ? { curve: p.curve } : {}) })),
+      volumeDb: toDb(trackVolume(track)),
       clips: track.clips.map((c) => this.clipState(c.id)),
     };
+  }
+
+  /** Replaces the envelope of a clip (none when empty), as one undo step. */
+  private setClipEnvelope(clipId: string, points: EnvelopePoint[]): void {
+    this.montages.update((m) => ({
+      ...m,
+      tracks: m.tracks.map((t) =>
+        t.clips.some((c) => c.id === clipId)
+          ? { ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, envelope: points.length ? points : undefined } : c)) }
+          : t,
+      ),
+    }));
   }
 
   private clipState(id: string) {
@@ -447,6 +502,8 @@ export class AiCommandsService {
       mode: clip.varispeed ? 'varispeed' : 'stretch',
       bpm: tempo ? round(tempo.bpm * clipRate(clip), 2) : null,
       status: render ? render.status : (source?.status ?? 'unknown'),
+      // timeline seconds; points outside [start, end] are hidden by a trim but still shape the gain
+      envelope: (clip.envelope ?? []).map((p) => ({ time: round(toTimeline(clip, p.time)), gainDb: toDb(p.gain), ...(p.curve ? { curve: p.curve } : {}) })),
     };
   }
 
@@ -477,6 +534,10 @@ export class AiCommandsService {
     const value = p[key];
     if (!Array.isArray(value) || !value.length) throw new Error(`${key} must be a non-empty list`);
     return value.map(String);
+  }
+
+  private selection(): { clipIds: readonly string[]; range: { start: number; end: number } | null } {
+    return { clipIds: this.timeline.selectedClipIds(), range: this.timeline.range() };
   }
 
   private range(p: Params): [number, number] {
@@ -546,10 +607,10 @@ export class AiCommandsService {
       const count = Math.floor((to - from) * buffer.sampleRate);
       const samples = Array.from({ length: buffer.numberOfChannels }, (_, c) => {
         const data = buffer.getChannelData(c).slice(first, first + count);
-        // the track envelope, sampled every 10 ms
+        // the clip envelope and the track volume, sampled every 10 ms
         const step = Math.round(buffer.sampleRate / 100);
         for (let i = 0; i < data.length; i += step) {
-          const gain = gainAt(track.envelope, from + i / buffer.sampleRate);
+          const gain = trackVolume(track) * clipGainAt(clip, from + i / buffer.sampleRate);
           for (let j = i; j < Math.min(data.length, i + step); j++) data[j] *= gain;
         }
         return data;

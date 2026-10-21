@@ -162,11 +162,17 @@ export class MontageService {
 
   /** Removes a clip (and its track when it was the last clip). */
   removeClip(id: string): void {
+    this.removeClips([id]);
+  }
+
+  /** Removes clips in one undo step (and the tracks left without clips). */
+  removeClips(ids: readonly string[]): void {
+    const removed = new Set(ids);
     this.update((m) =>
       withoutUnusedSources({
         ...m,
         tracks: m.tracks
-          .map((t) => (t.clips.some((c) => c.id === id) ? { ...t, clips: t.clips.filter((c) => c.id !== id) } : t))
+          .map((t) => (t.clips.some((c) => removed.has(c.id)) ? { ...t, clips: t.clips.filter((c) => !removed.has(c.id)) } : t))
           .filter((t) => t.clips.length > 0),
       }),
     );

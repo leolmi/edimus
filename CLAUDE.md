@@ -46,7 +46,8 @@ src/app/
       montage.model.ts    tipi Montage/AudioSource/Track/Clip
       montage.service.ts  stato corrente immutabile + undo/redo, dirty, path
       edits.ts            operazioni pure: move/trim/split/crop/deleteRange/setClipTiming
-      envelope.ts         inviluppo di volume (punti, curve, dB)
+      envelope.ts         inviluppo di volume delle clip (punti in tempo sorgente, curve, fade)
+      crossfade.ts        dissolvenza incrociata tra due clip
       tempo-align.ts      allineamento del tempo tra clip
       montage-file.ts     lettura/scrittura .edimus (percorsi relativi)
     audio/              decodifica, libreria buffer, picchi, tempo, render processato, mix, playback, export, ffmpeg

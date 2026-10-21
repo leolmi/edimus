@@ -19,7 +19,21 @@
           <button mat-icon-button class="small" [class.active]="track.solo" (click)="toggleSolo(track)" [matTooltip]="'track.solo' | t">
             <mat-icon>headphones</mat-icon>
           </button>
-          <span class="spacer"></span>
+          <app-scale-slider
+            class="track-volume"
+            compact
+            [min]="-30"
+            [max]="6"
+            [step]="0.5"
+            [origin]="0"
+            [majorTicks]="6"
+            [minorTicks]="2"
+            [format]="dbLabel"
+            [ariaLabel]="'track.volume' | t"
+            [value]="volumeDb(track)"
+            (valueChange)="previewVolume(track, $event)"
+            (committed)="commitVolume(track, $event)"
+          />
           <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
             <mat-icon>info</mat-icon>
           </button>
@@ -46,7 +60,7 @@
         class="lane"
         [track]="track"
         [silent]="!audible().has(track.id)"
-        [activePoint]="activePoint()?.trackId === track.id ? activePoint()!.index : null"
+        [activePoint]="activePoint()"
         (contextmenu)="$event.preventDefault()"
         (dblclick)="onLaneDoubleClick($event, lane)"
         (pointerdown)="onLaneDown($event, lane, index)"
@@ -54,6 +68,15 @@
         (pointerup)="onLaneUp($event)"
         (pointercancel)="onLaneUp($event)"
       />
+      @if (loading().has(track.id)) {
+        @let progress = loading().get(track.id) ?? null;
+        <div class="lane-loader">
+          <div class="loader">
+            <mat-progress-spinner [mode]="progress === null ? 'indeterminate' : 'determinate'" [value]="(progress ?? 0) * 100" diameter="24" />
+            <span>{{ progress === null ? ('track.loading' | t) : ('track.loadingProgress' | t: { p: (progress * 100).toFixed(0) }) }}</span>
+          </div>
+        </div>
+      }
     </div>
   }
   <!-- empty strips: dropping audio files here adds them as new tracks -->
@@ -61,9 +84,16 @@
     <div class="slots-header"></div>
     <div class="slots-lane">
       <div class="slot-hint">
-        <mat-icon>library_add</mat-icon>
-        <span>{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}</span>
-        <a class="link" href="#" (click)="$event.preventDefault(); documents.openDialog()">{{ 'slots.browse' | t }}</a>
+        @if (loadingNew()) {
+          <div class="loader">
+            <mat-progress-spinner mode="indeterminate" diameter="24" />
+            <span>{{ 'track.loading' | t }}</span>
+          </div>
+        } @else {
+          <mat-icon>library_add</mat-icon>
+          <span>{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}</span>
+          <a class="link" href="#" (click)="$event.preventDefault(); documents.openDialog()">{{ 'slots.browse' | t }}</a>
+        }
       </div>
     </div>
   </div>

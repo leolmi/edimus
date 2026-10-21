@@ -90,8 +90,32 @@
 }
 
 .track {
+  position: relative;
   height: var(--track-height);
   border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+/* loading of dropped files: over the lane, the header keeps its details */
+.lane-loader {
+  position: absolute;
+  inset: 0 0 0 var(--header-width);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--mat-sys-surface) 60%, transparent);
+  pointer-events: none;
+}
+
+.loader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-medium);
+  font-variant-numeric: tabular-nums;
 }
 
 .header {
@@ -216,6 +240,11 @@
 
 .spacer {
   flex: 1 1 auto;
+}
+
+.track-volume {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* compact icon buttons: sized through the Material tokens, so icon and state layer stay aligned */

@@ -16,6 +16,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { os, type Icon, type MessageBoxChoice } from '@neutralinojs/lib';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { AudioInfo } from '../../core/audio/audio-decoder.service';
 import { AudioLibraryService, SourceState } from '../../core/audio/audio-library.service';
@@ -26,12 +27,14 @@ import { EditService } from '../../core/edit.service';
 import { formatDuration } from '../../core/format';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
-import { trimClip } from '../../core/montage/edits';
-import { EnvelopePoint, curveThroughMidpoint, insertPoint, movePoint, setCurve } from '../../core/montage/envelope';
-import { Clip, Montage, Track, audibleTracks, copyName, fileName } from '../../core/montage/montage.model';
+import { moveClips, trimClip } from '../../core/montage/edits';
+import { EnvelopePoint, MAX_GAIN, curveThroughMidpoint, insertPoint, movePoint, setCurve } from '../../core/montage/envelope';
+import { ScaleSliderComponent } from '../../shared/scale-slider.component';
+import { Clip, Montage, Track, audibleTracks, copyName, fileName, toSource, trackVolume } from '../../core/montage/montage.model';
 import { MontageService } from '../../core/montage/montage.service';
 import { SettingsService } from '../../core/settings.service';
 import { snapToBeats } from '../../core/timeline/beat-snap';
+import { snapAnchors, snapTime, snapToEdges } from '../../core/timeline/edge-snap';
 import { BarMarking, TimelineService } from '../../core/timeline/timeline.service';
 import { sourceColors } from '../../core/source-colors';
 import { ThemeColorsService } from '../../core/theme-colors.service';
@@ -39,11 +42,15 @@ import { RulerComponent } from './ruler.component';
 import { TrackInfoData, TrackInfoDialogComponent, TrackInfoResult, TrackInfoSource } from './track-info-dialog.component';
 import { ClipHit, TrackLaneComponent } from './track-lane.component';
 
-/** Replaces the envelope of a track (none when empty). */
-function withEnvelope(montage: Montage, trackId: string, points: EnvelopePoint[]): Montage {
+/** Replaces the envelope of a clip (none when empty). */
+function withClipEnvelope(montage: Montage, clipId: string, points: EnvelopePoint[]): Montage {
   return {
     ...montage,
-    tracks: montage.tracks.map((t) => (t.id === trackId ? { ...t, envelope: points.length ? points : undefined } : t)),
+    tracks: montage.tracks.map((t) =>
+      t.clips.some((c) => c.id === clipId)
+        ? { ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, envelope: points.length ? points : undefined } : c)) }
+        : t,
+    ),
   };
 }
 
@@ -66,6 +73,10 @@ const MAX_SCROLL_WIDTH = 10_000_000;
 const WHEEL_ZOOM_STEP = 1.15;
 /** Pointer movement (px) that turns a click on a lane into a range selection. */
 const RANGE_THRESHOLD = 3;
+/** Distance (px) within which a dragged clip aligns to the start or end of another clip. */
+const EDGE_SNAP = 10;
+/** Vertical distance (px) within which a dragged envelope point snaps to unity gain (0 dB). */
+const UNITY_SNAP = 6;
 
 /** Multitrack view: time ruler, track headers and lanes with the waveforms. */
 @Component({
@@ -74,9 +85,11 @@ const RANGE_THRESHOLD = 3;
     MatButtonModule,
     MatIconModule,
     MatProgressBarModule,
+    MatProgressSpinnerModule,
     MatTooltipModule,
     TranslatePipe,
     RulerComponent,
+    ScaleSliderComponent,
     TrackLaneComponent,
   ],
   templateUrl: './timeline.component.html',
@@ -129,9 +142,12 @@ export class TimelineComponent {
         kind: 'move';
         from: Montage;
         clipId: string;
+        /** Clips moving together: the selection when the grabbed clip is in it. */
+        group: ReadonlySet<string>;
         trackIndex: number;
         clipStart: number;
         pointerTime: number;
+        pointerX: number;
         pointerY: number;
         rowHeight: number;
         /** Track created when the clip is dragged on the empty strips (same id for the whole gesture). */
@@ -139,12 +155,22 @@ export class TimelineComponent {
       }
     | { kind: 'trim'; from: Montage; clip: Clip; edge: 'start' | 'end' }
     | { kind: 'range'; anchor: number; anchorX: number }
-    | { kind: 'envelope'; from: Montage; trackId: string; points: EnvelopePoint[]; index: number; lane: TrackLaneComponent }
+    | {
+        kind: 'envelope';
+        from: Montage;
+        clip: Clip;
+        /** Points in source time of the clip. */
+        points: EnvelopePoint[];
+        index: number;
+        lane: TrackLaneComponent;
+        /** Timeline times the point snaps to. */
+        anchors: number[];
+      }
     | { kind: 'mark'; from: BarMarking; zone: ClipHit['zone']; pointerTime: number }
-    | { kind: 'curve'; from: Montage; trackId: string; points: EnvelopePoint[]; index: number; lane: TrackLaneComponent };
+    | { kind: 'curve'; from: Montage; clipId: string; points: EnvelopePoint[]; index: number; lane: TrackLaneComponent };
 
   /** Envelope point being dragged. */
-  protected readonly activePoint = signal<{ trackId: string; index: number } | null>(null);
+  protected readonly activePoint = signal<{ clipId: string; index: number } | null>(null);
 
 
   /** Ids of the tracks heard in the mix. */
@@ -236,25 +262,32 @@ export class TimelineComponent {
     const from = this.montages.montage();
     if (!hit) {
       const time = this.timeAt(event);
-      this.timeline.selectedClipId.set(null);
+      this.timeline.selectClip(null);
       this.timeline.range.set(null);
       this.playback.seek(time);
       this.gesture = { kind: 'range', anchor: time, anchorX: event.clientX };
       return;
     }
-    this.timeline.selectedClipId.set(hit.clip.id);
+    // Ctrl+click adds the clip to the selection or takes it away
+    if (event.ctrlKey || event.metaKey) return this.timeline.toggleClip(hit.clip.id);
     if (hit.zone !== 'body') {
+      this.timeline.selectClip(hit.clip.id);
       this.gesture = { kind: 'trim', from, clip: hit.clip, edge: hit.zone };
       return;
     }
+    // grabbing a selected clip moves the whole selection
+    const selected = this.timeline.selectedClips();
+    if (!selected.has(hit.clip.id)) this.timeline.selectClip(hit.clip.id);
     target.style.cursor = 'grabbing';
     this.gesture = {
       kind: 'move',
       from,
       clipId: hit.clip.id,
+      group: selected.has(hit.clip.id) ? selected : new Set([hit.clip.id]),
       trackIndex,
       clipStart: hit.clip.start,
       pointerTime: this.timeAt(event),
+      pointerX: event.clientX,
       pointerY: event.clientY,
       rowHeight: (target.parentElement as HTMLElement).offsetHeight,
       newTrack: {
@@ -271,16 +304,34 @@ export class TimelineComponent {
     const time = this.timeAt(event);
     switch (gesture.kind) {
       case 'move': {
-        let start = Math.max(0, gesture.clipStart + time - gesture.pointerTime);
-        // with the beat grid shown the clip moves beat by beat (Alt: free)
-        if (this.timeline.beatGrid() && !event.altKey) {
-          start = snapToBeats(gesture.from, gesture.clipId, start, gesture.clipStart, time, {
-            tempoOf: (sourceId) => this.tempos.sourceTempo(sourceId),
-            length: (clip) => this.timeline.clipLength(clip),
-            step: this.settings.snapStep(),
-          });
+        const { from, group } = gesture;
+        // the group stops when its first clip reaches 0
+        const earliest = Math.min(...from.tracks.flatMap((t) => t.clips.filter((c) => group.has(c.id)).map((c) => c.start)));
+        let delta = Math.max(-earliest, time - gesture.pointerTime);
+        if (!event.altKey) {
+          const length = (clip: Clip) => this.timeline.clipLength(clip);
+          // the edges of the other clips win over the beat grid (Alt: free)
+          const edge = snapToEdges(from, group, delta, length, EDGE_SNAP / this.timeline.pxPerSec());
+          if (edge !== null) delta += edge;
+          // with the beat grid shown the clip moves beat by beat
+          else if (this.timeline.beatGrid()) {
+            const start = snapToBeats(from, gesture.clipId, gesture.clipStart + delta, gesture.clipStart, time, {
+              tempoOf: (sourceId) => this.tempos.sourceTempo(sourceId),
+              length,
+              step: this.settings.snapStep(),
+              moving: group,
+            });
+            delta = Math.max(-earliest, start - gesture.clipStart);
+          }
         }
         const rows = Math.round((event.clientY - gesture.pointerY) / gesture.rowHeight);
+        if (group.size > 1) {
+          // the group changes track only while all its clips stay on existing tracks
+          const rowsOf = from.tracks.flatMap((t, i) => (t.clips.some((c) => group.has(c.id)) ? [i] : []));
+          const shift = Math.min(from.tracks.length - 1 - Math.max(...rowsOf), Math.max(-Math.min(...rowsOf), rows));
+          return this.montages.preview(moveClips(from, group, delta, shift));
+        }
+        const start = gesture.clipStart + delta;
         // one row past the last track = a new track, unless the clip is alone on its track
         // (the new track would just replace the one left empty)
         const alone = gesture.from.tracks[gesture.trackIndex].clips.length === 1;
@@ -296,9 +347,18 @@ export class TimelineComponent {
         );
       }
       case 'envelope': {
+        const { clip, lane } = gesture;
         const y = event.clientY - (event.currentTarget as HTMLElement).getBoundingClientRect().top;
-        const points = movePoint(gesture.points, gesture.index, Math.max(0, time), gesture.lane.yToGain(y));
-        return this.montages.preview(withEnvelope(gesture.from, gesture.trackId, points));
+        // the point stays inside its clip; it snaps to the clip edges and the other envelopes (Alt: free)
+        let at = Math.min(clip.start + this.length(clip), Math.max(clip.start, time));
+        let gain = lane.yToGain(y);
+        if (!event.altKey) {
+          at = snapTime(at, gesture.anchors, EDGE_SNAP / this.timeline.pxPerSec()) ?? at;
+          // and to unity gain (0 dB)
+          if (Math.abs(y - lane.gainToY(1)) <= UNITY_SNAP) gain = 1;
+        }
+        const points = movePoint(gesture.points, gesture.index, toSource(clip, at), gain);
+        return this.montages.preview(withClipEnvelope(gesture.from, clip.id, points));
       }
       case 'mark':
         return this.edits.dragBar(gesture.from, gesture.zone, time - gesture.pointerTime);
@@ -309,7 +369,7 @@ export class TimelineComponent {
         const b = gesture.points[gesture.index + 1];
         const fraction = (gesture.lane.yToGain(y) - a.gain) / (b.gain - a.gain);
         const points = setCurve(gesture.points, gesture.index, curveThroughMidpoint(fraction));
-        return this.montages.preview(withEnvelope(gesture.from, gesture.trackId, points));
+        return this.montages.preview(withClipEnvelope(gesture.from, gesture.clipId, points));
       }
       case 'range': {
         if (Math.abs(event.clientX - gesture.anchorX) < RANGE_THRESHOLD) return this.timeline.range.set(null);
@@ -327,56 +387,94 @@ export class TimelineComponent {
     target.style.cursor = '';
     this.gesture = undefined;
     this.activePoint.set(null);
+    // a plain click (no move) on a clip of the selection selects just that clip
+    if (gesture?.kind === 'move' && gesture.group.size > 1 && Math.abs(event.clientX - gesture.pointerX) < RANGE_THRESHOLD && Math.abs(event.clientY - gesture.pointerY) < RANGE_THRESHOLD) {
+      this.montages.preview(gesture.from);
+      this.timeline.selectClip(gesture.clipId);
+    }
     if (gesture && gesture.kind !== 'range' && gesture.kind !== 'mark') this.montages.commit(gesture.from);
   }
 
 
   /**
-   * Envelope editing: dragging a point moves it, clicking elsewhere adds a point (and drags it),
-   * right click on a point removes it.
+   * Envelope editing, on the envelope of the clip under the pointer: dragging a point moves it,
+   * clicking elsewhere on a clip adds a point (and drags it), right click on a point removes it.
    */
   private onEnvelopeDown(event: PointerEvent, lane: TrackLaneComponent, target: HTMLElement): void {
-    // current state of the track (the lane input is refreshed only at the next render)
-    const id = lane.track().id;
-    const track = this.montages.montage().tracks.find((t) => t.id === id) ?? lane.track();
+    const x = this.xAt(event);
     const y = event.clientY - target.getBoundingClientRect().top;
-    const hit = lane.pointAt(this.xAt(event), y);
+    const hit = lane.pointAt(x, y);
+    const handle = hit ? undefined : lane.curveHandleAt(x, y);
     const from = this.montages.montage();
-    let points = track.envelope ?? [];
-    const handle = hit === undefined ? lane.curveHandleAt(this.xAt(event), y) : undefined;
-    if (handle !== undefined && event.button === 0) {
+    // current state of the clip (the lane input is refreshed only at the next render)
+    const current = (id?: string) => from.tracks.flatMap((t) => t.clips).find((c) => c.id === id);
+    if (handle && event.button === 0) {
+      const clip = current(handle.clip.id);
+      if (!clip) return;
       target.setPointerCapture(event.pointerId);
-      this.gesture = { kind: 'curve', from, trackId: track.id, points, index: handle, lane };
+      this.gesture = { kind: 'curve', from, clipId: clip.id, points: clip.envelope ?? [], index: handle.index, lane };
       return;
     }
     if (event.button === 2) {
-      if (hit !== undefined) this.montages.update((m) => withEnvelope(m, track.id, points.filter((_, i) => i !== hit)));
+      const clip = current(hit?.clip.id);
+      if (hit && clip) this.montages.update((m) => withClipEnvelope(m, clip.id, (clip.envelope ?? []).filter((_, i) => i !== hit.index)));
       return;
     }
     if (event.button !== 0) return;
-    let index = hit;
+    const clip = current(hit?.clip.id ?? lane.clipBodyAt(x)?.id);
+    if (!clip) return;
+    let points = clip.envelope ?? [];
+    let index = hit?.index;
     if (index === undefined) {
-      [points, index] = insertPoint(points, { time: Math.max(0, this.timeAt(event)), gain: lane.yToGain(y) });
-      this.montages.preview(withEnvelope(from, track.id, points));
+      [points, index] = insertPoint(points, { time: toSource(clip, this.timeAt(event)), gain: lane.yToGain(y) });
+      this.montages.preview(withClipEnvelope(from, clip.id, points));
     }
     target.setPointerCapture(event.pointerId);
-    this.activePoint.set({ trackId: track.id, index });
-    this.gesture = { kind: 'envelope', from, trackId: track.id, points, index, lane };
+    this.activePoint.set({ clipId: clip.id, index });
+    // anchors: edges of every clip, points of the other clips
+    const anchors = [...snapAnchors(from, this.length, new Set([clip.id])), clip.start, clip.start + this.length(clip)];
+    this.gesture = { kind: 'envelope', from, clip, points, index, lane, anchors };
   }
+
+  private readonly length = (clip: Clip) => this.timeline.clipLength(clip);
 
   /** Double click on a clip: speed and pitch dialog; on an envelope bend handle: straight segment. */
   protected onLaneDoubleClick(event: MouseEvent, lane: TrackLaneComponent): void {
     if (this.timeline.envelopeMode()) {
       const y = event.clientY - (event.currentTarget as HTMLElement).getBoundingClientRect().top;
       const handle = lane.curveHandleAt(event.clientX - this.lanes().nativeElement.getBoundingClientRect().left, y);
-      const track = lane.track();
-      if (handle !== undefined && track.envelope) {
-        this.montages.update((m) => withEnvelope(m, track.id, setCurve(track.envelope!, handle, 0)));
-      }
+      const clip = handle && this.montages.montage().tracks.flatMap((t) => t.clips).find((c) => c.id === handle.clip.id);
+      if (handle && clip?.envelope) this.montages.update((m) => withClipEnvelope(m, clip.id, setCurve(clip.envelope!, handle.index, 0)));
       return;
     }
     const hit = lane.clipAt(event.clientX - this.lanes().nativeElement.getBoundingClientRect().left);
     if (hit?.zone === 'body') void this.edits.editTiming(hit.clip.id);
+  }
+
+  /** State before the track volume being dragged, for one undo step per gesture. */
+  private volumeFrom?: Montage;
+
+  protected readonly dbLabel = (db: number) => `${db > 0 ? '+' : ''}${db.toFixed(1)} dB`;
+
+  protected volumeDb(track: Track): number {
+    return Math.round(20 * Math.log10(trackVolume(track)) * 2) / 2;
+  }
+
+  private withVolume(montage: Montage, trackId: string, db: number): Montage {
+    const volume = db === 0 ? undefined : Math.min(MAX_GAIN, Math.pow(10, db / 20));
+    return { ...montage, tracks: montage.tracks.map((t) => (t.id === trackId ? { ...t, volume } : t)) };
+  }
+
+  protected previewVolume(track: Track, db: number): void {
+    this.volumeFrom ??= this.montages.montage();
+    this.montages.preview(this.withVolume(this.volumeFrom, track.id, db));
+  }
+
+  protected commitVolume(track: Track, db: number): void {
+    const from = this.volumeFrom ?? this.montages.montage();
+    this.volumeFrom = undefined;
+    this.montages.preview(this.withVolume(from, track.id, db));
+    this.montages.commit(from);
   }
 
   /** Details of the track and of its files, with its name editable. */
@@ -408,7 +506,7 @@ export class TimelineComponent {
       length: track.clips.length ? end - start : 0,
       muted: !!track.muted,
       solo: !!track.solo,
-      envelopePoints: track.envelope?.length ?? 0,
+      envelopePoints: track.clips.reduce((n, c) => n + (c.envelope?.length ?? 0), 0),
       sources: [...sources.values()],
     };
     const ref = this.dialogs.open<TrackInfoDialogComponent, TrackInfoData, TrackInfoResult>(TrackInfoDialogComponent, {
@@ -489,6 +587,32 @@ export class TimelineComponent {
   }
 
   /** State of the source played by the first clip of the track. */
+  /**
+   * Tracks being loaded: files dropped on them not yet added, or clips whose source is still
+   * probed or decoded. Value: decoding progress (0–1), null while it is not known.
+   */
+  protected readonly loading = computed(() => {
+    const drop = this.documents.pendingDrop();
+    const sources = this.library.sources();
+    const loading = new Map<string, number | null>();
+    for (const track of this.montages.montage().tracks) {
+      let progress: number | null | undefined = drop?.kind === 'track' && drop.trackId === track.id ? null : undefined;
+      for (const clip of track.clips) {
+        const state = sources[clip.sourceId];
+        if (state?.status === 'probing') progress = null;
+        else if (state?.status === 'decoding' && progress !== null) progress = Math.min(progress ?? 1, state.progress);
+      }
+      if (progress !== undefined) loading.set(track.id, progress);
+    }
+    return loading;
+  });
+
+  /** Dropped files on their way to new tracks. */
+  protected readonly loadingNew = computed(() => {
+    const drop = this.documents.pendingDrop();
+    return !!drop && drop.kind !== 'track';
+  });
+
   protected sourceOf(track: Track): SourceState | undefined {
     const sourceId = track.clips[0]?.sourceId;
     return sourceId ? this.library.sources()[sourceId] : undefined;

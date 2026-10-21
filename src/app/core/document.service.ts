@@ -45,14 +45,21 @@ export class DocumentService {
   private readonly message = signal<StatusMessage>({ key: 'app.ready' });
   readonly status = computed(() => this.i18n.t(this.message().key, this.message().params));
   readonly title = computed(() => this.montages.displayName() ?? this.i18n.t('montage.new'));
+  /** Where dropped files are going, from the drop until they are on the montage (their tracks then show the decoding). */
+  readonly pendingDrop = signal<DropTarget | null>(null);
 
   constructor() {
     effect(() => void appWindow.setTitle(`${this.title()}${this.montages.dirty() ? ' •' : ''} — edimus`));
     events.on('windowClose', () => void this.close());
     this.drops.drops.subscribe(async ({ files, target }) => {
-      const { paths, imported } = await resolveDroppedFiles(files);
-      await this.open(paths, target);
-      if (imported) this.message.set({ key: 'drop.imported', params: { n: imported } });
+      this.pendingDrop.set(target);
+      try {
+        const { paths, imported } = await resolveDroppedFiles(files);
+        await this.open(paths, target);
+        if (imported) this.message.set({ key: 'drop.imported', params: { n: imported } });
+      } finally {
+        this.pendingDrop.set(null);
+      }
     });
     const startup = this.instances.startupFiles();
     if (startup.length) void this.open(startup);

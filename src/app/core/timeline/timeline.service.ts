@@ -31,8 +31,15 @@ export class TimelineService {
   readonly scroll = signal(0);
   /** Width (px) of the lanes viewport. */
   readonly viewWidth = signal(0);
-  /** Selected clip. */
-  readonly selectedClipId = signal<string | null>(null);
+  /** Selected clips, in the order they were picked. */
+  readonly selectedClipIds = signal<readonly string[]>([]);
+  /** The selected clip when it is the only one. */
+  readonly selectedClipId = computed(() => {
+    const ids = this.selectedClipIds();
+    return ids.length === 1 ? ids[0] : null;
+  });
+  /** Selected clips as a set, for lookups. */
+  readonly selectedClips = computed(() => new Set(this.selectedClipIds()));
   /** Bar marking in progress, to set the tempo of the clip's source by hand. */
   readonly beatMarking = signal<BarMarking | null>(null);
   /** Shows the beat grid of the clips with a known tempo. */
@@ -64,6 +71,16 @@ export class TimelineService {
     if (clip.duration > 0) return clip.duration / clipRate(clip);
     const source = this.library.ready(clip.sourceId);
     return source ? Math.max(0, source.buffer.duration - clip.offset) / clipRate(clip) : 0;
+  }
+
+  /** Selects only `id` (none with null). */
+  selectClip(id: string | null): void {
+    this.selectedClipIds.set(id ? [id] : []);
+  }
+
+  /** Adds `id` to the selection or takes it away. */
+  toggleClip(id: string): void {
+    this.selectedClipIds.update((ids) => (ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]));
   }
 
   timeToX(time: number): number {

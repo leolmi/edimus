@@ -14,7 +14,8 @@ l'esportazione.
 - **Multitraccia**: clip trascinabili tra tracce, trim dei bordi, divisione, eliminazione di
   intervalli, crop; mute/solo per traccia.
 - **Forma d'onda** per canale, zoom dal campione all'intero brano.
-- **Inviluppo di volume** per traccia (punti in dB, segmenti curvabili, fade).
+- **Inviluppo di volume** per clip (punti in dB, segmenti curvabili, fade e dissolvenze incrociate
+  che seguono la clip) e volume per traccia.
 - **Velocità e pitch** per clip: stretch (pitch invariato, Rubber Band) o varispeed (come un
   nastro).
 - **Tempo**: rilevamento automatico dei BPM, griglia delle battute, correzione manuale

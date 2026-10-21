@@ -53,6 +53,9 @@
     <button mat-icon-button (click)="edits.split()" [matTooltip]="'edit.split' | t">
       <mat-icon>content_cut</mat-icon>
     </button>
+    <button mat-icon-button (click)="edits.crossfade()" [disabled]="!edits.crossfadeAt()" [matTooltip]="'edit.crossfade' | t">
+      <mat-icon>join</mat-icon>
+    </button>
     <button mat-icon-button (click)="edits.crop()" [disabled]="!edits.hasRange()" [matTooltip]="'edit.crop' | t">
       <mat-icon>crop</mat-icon>
     </button>
