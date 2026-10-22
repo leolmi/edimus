@@ -20,6 +20,7 @@ const desktop = (): PlatformInfo => ({
   runtime: `Neutralinojs ${window.NL_VERSION ?? ''}`,
   canRevealFiles: true,
   canSetupAi: true,
+  filesBesideSources: true,
   hasDevTools: true,
 });
 

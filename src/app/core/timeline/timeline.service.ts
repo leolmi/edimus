@@ -77,7 +77,7 @@ export class TimelineService {
   }
 
   /** Length of the source of a clip (seconds), 0 while not decoded. */
-  sourceLength(clip: Clip): number {
+  sourceLength(clip: Pick<Clip, 'sourceId'>): number {
     return this.library.ready(clip.sourceId)?.buffer.duration ?? 0;
   }
 

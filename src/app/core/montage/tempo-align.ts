@@ -1,6 +1,7 @@
 import type { Tempo } from '../audio/tempo';
+import { barAt, barTime, meanBpm } from '../audio/tempo-map';
 import { ClipLength, setClipTiming } from './edits';
-import { Clip, Montage, clipRate } from './montage.model';
+import { Clip, Montage, clipRate, toSource, toTimeline } from './montage.model';
 
 export type AlignTarget = 'reference' | 'middle' | 'custom';
 
@@ -23,9 +24,9 @@ export interface AlignContext {
 
 const findClip = (montage: Montage, id: string) => montage.tracks.flatMap((t) => t.clips).find((c) => c.id === id);
 
-/** Tempo heard in a clip (source tempo × speed). */
+/** Tempo heard in a clip (average source tempo × speed). */
 export function heardBpm(clip: Clip, tempo: Tempo): number {
-  return tempo.bpm * clipRate(clip);
+  return meanBpm(tempo) * clipRate(clip);
 }
 
 /** BPM every clip must reach. */
@@ -53,7 +54,7 @@ export function alignTempo(montage: Montage, options: AlignOptions, context: Ali
     const clip = findClip(result, id);
     const tempo = clip && context.tempoOf(clip.sourceId);
     if (!clip || !tempo) continue;
-    const rate = Math.round((bpm / tempo.bpm) * 10000) / 10000;
+    const rate = Math.round((bpm / meanBpm(tempo)) * 10000) / 10000;
     const pitch = options.varispeed ? (clip.varispeed ? (clip.pitch ?? 0) : 0) : (clip.pitch ?? 0);
     result = setClipTiming(result, id, rate, pitch, context.sourceLength(clip), options.varispeed);
   }
@@ -63,16 +64,6 @@ export function alignTempo(montage: Montage, options: AlignOptions, context: Ali
   return result;
 }
 
-/** Timeline time of the downbeats of a clip: first one inside it, and the bar length. */
-function downbeats(clip: Clip, tempo: Tempo, from: number): { first: number; bar: number } {
-  const rate = clipRate(clip);
-  const bar = ((tempo.beatsPerBar ?? 4) * 60) / tempo.bpm; // source seconds
-  // first downbeat at or after source time `from`
-  const k = Math.ceil((from - tempo.offset) / bar - 1e-9);
-  const sourceTime = tempo.offset + k * bar;
-  return { first: clip.start + (sourceTime - clip.offset) / rate, bar: bar / rate };
-}
-
 /** Moves a clip so that its first downbeat falls on the nearest downbeat of the reference. */
 export function alignToBars(montage: Montage, clipId: string, referenceId: string, context: AlignContext): Montage {
   const clip = findClip(montage, clipId);
@@ -80,12 +71,12 @@ export function alignToBars(montage: Montage, clipId: string, referenceId: strin
   const tempo = clip && context.tempoOf(clip.sourceId);
   const refTempo = reference && context.tempoOf(reference.sourceId);
   if (!clip || !reference || !tempo || !refTempo) return montage;
-  const own = downbeats(clip, tempo, clip.offset);
-  // the reference grid extends before and after the reference clip (j may be negative)
-  const ref = downbeats(reference, refTempo, reference.offset);
-  const j = Math.round((own.first - ref.first) / ref.bar);
-  let shift = ref.first + j * ref.bar - own.first;
-  while (clip.start + shift < 0) shift += ref.bar;
+  // first downbeat inside the clip
+  const own = toTimeline(clip, barTime(tempo, Math.ceil(barAt(tempo, clip.offset) - 1e-9)));
+  // the reference grid extends before and after the reference clip
+  let bar = Math.round(barAt(refTempo, toSource(reference, own)));
+  let shift = toTimeline(reference, barTime(refTempo, bar)) - own;
+  while (clip.start + shift < 0) shift = toTimeline(reference, barTime(refTempo, ++bar)) - own;
   if (Math.abs(shift) < 1e-6) return montage;
   return {
     ...montage,

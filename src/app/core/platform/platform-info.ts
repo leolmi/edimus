@@ -9,6 +9,11 @@ export abstract class PlatformInfo {
   abstract readonly canRevealFiles: boolean;
   /** AI clients can be configured by the app, which also finds the MCP bridge by itself. */
   abstract readonly canSetupAi: boolean;
+  /**
+   * Files can be read and written next to the audio sources (the bar files of the sources):
+   * found by themselves on opening and saved without asking where.
+   */
+  abstract readonly filesBesideSources: boolean;
   /** The developer tools of the window can be turned on and off. */
   abstract readonly hasDevTools: boolean;
 }

@@ -261,6 +261,17 @@ const IT: HelpContent = {
           ],
         },
         {
+          title: 'Brani a tempo non costante',
+          text: [
+            'Se il brano è stato registrato senza un tempo fisso, la griglia dopo qualche battuta non coincide più con la musica. Puoi far seguire alla griglia l’audio, senza modificarlo: la mappa delle battute appartiene al file, quindi vale per tutte le sue clip.',
+            'A mano: con la griglia visibile tieni premuto Maiusc e trascina una linea di battuta sul colpo giusto (si aggancia all’attacco più vicino; Alt per muoverla liberamente). Quella battuta resta fissata, segnata da un triangolino: le battute tra lei e la battuta fissata precedente si allargano o stringono in modo uniforme, quelle successive prendono la nuova durata. Maiusc+clic destro su una battuta fissata la libera.',
+            'In automatico: nel dialogo del tempo “Rileva le battute” trova l’inizio di ogni battuta su tutto il file e ne fa un’ancora automatica, partendo dalla battuta segnata o da quelle fissate a mano, che restano. Dove la griglia sbaglia ancora, fissa a mano la battuta giusta e rilancia.',
+            'Sempre nel dialogo: “Rimuovi ancore” toglie tutte le battute fissate e torna alla griglia costante di partenza; “Rimuovi ancore automatiche” toglie solo quelle trovate da “Rileva le battute” e tiene le tue; “Tempo costante” toglie la mappa lasciando un tempo costante pari alla sua media.',
+            '“Salva le battute” scrive tempo e ancore in un file accanto all’audio, con lo stesso nome e l’estensione .edimusbars (per esempio brano.mp3.edimusbars): quando riapri quell’audio, anche in un altro montaggio, edimus lo usa al posto del tempo rilevato. “Carica le battute” lo ricarica a mano. Nelle Impostazioni puoi farlo salvare da solo a ogni modifica. Nella versione web il file si salva e si apre scegliendolo, e non viene letto da solo.',
+            'Allineare il tempo di più clip cambia solo la velocità: non rende costante un brano che accelera o rallenta.',
+          ],
+        },
+        {
           title: 'Allineare il tempo di più clip',
           text: [
             'Il pulsante con le frecce nella barra in alto porta più clip allo stesso tempo: scegli la clip di riferimento, quelle da adattare, il tempo da raggiungere e, se vuoi, l’allineamento delle battute.',
@@ -334,6 +345,17 @@ const IT: HelpContent = {
         'Lascia attivo l’allineamento delle battute: le clip si spostano perché i loro “1” cadano sugli “1” del riferimento.',
       ],
       note: 'Stretch mantiene l’intonazione; varispeed suona più naturale per piccole correzioni ma cambia l’intonazione.',
+    },
+    {
+      title: 'Far seguire la griglia a un brano che va fuori tempo',
+      steps: [
+        'Attiva la griglia (B) e, se serve, segna la battuta all’inizio del brano (pulsante BPM, “Segna la battuta”).',
+        'Nel dialogo del tempo premi “Rileva le battute”: la griglia segue il brano su tutto il file.',
+        'Scorri il brano: dove una battuta non cade sul colpo, Maiusc+trascina la sua linea sul colpo giusto.',
+        'Se le correzioni sono molte, premi di nuovo “Rileva le battute”: le battute fissate a mano restano e guidano la ricerca.',
+        'Premi “Salva le battute” per ritrovarle la prossima volta che apri lo stesso audio.',
+      ],
+      note: 'Maiusc+clic destro su una battuta fissata la libera; “Rimuovi ancore” le toglie tutte.',
     },
     {
       title: 'Mettere a tempo l’ultima traccia aggiunta con quelle già presenti',
@@ -607,6 +629,17 @@ const EN: HelpContent = {
           ],
         },
         {
+          title: 'Songs without a steady tempo',
+          text: [
+            'When a song was recorded without a steady tempo, after a few bars the grid no longer matches the music. You can make the grid follow the audio, without changing it: the bar map belongs to the file, so it holds for all its clips.',
+            'By hand: with the grid shown hold Shift and drag a bar line onto the right hit (it snaps to the nearest attack; Alt to move it freely). That bar stays pinned, marked by a small triangle: the bars between it and the previous pinned bar stretch or shrink evenly, the following ones take the new length. Shift+right click on a pinned bar unpins it.',
+            'Automatically: in the tempo dialog “Detect bars” finds the start of every bar along the whole file and makes it an automatic anchor, starting from the marked bar or the bars pinned by hand, which stay. Where the grid is still wrong, pin the right bar by hand and run it again.',
+            'In the same dialog: “Remove anchors” removes all the pinned bars and goes back to the steady grid the map started from; “Remove automatic anchors” removes only those found by “Detect bars” and keeps yours; “Steady tempo” drops the map leaving a steady tempo equal to its average.',
+            '“Save bars” writes tempo and anchors to a file next to the audio, with the same name and the .edimusbars extension (for example song.mp3.edimusbars): when you open that audio again, even in another montage, edimus uses it instead of the detected tempo. “Load bars” loads it by hand. In the Settings you can have it saved by itself at every change. In the web version the file is saved and opened by choosing it, and it is not read by itself.',
+            'Aligning the tempo of several clips changes only their speed: it does not make a song that speeds up or slows down steady.',
+          ],
+        },
+        {
           title: 'Matching the tempo of several clips',
           text: [
             'The arrows button in the top bar brings several clips to the same tempo: choose the reference clip, the clips to adapt, the tempo to reach and, if you want, the alignment of the bars.',
@@ -677,6 +710,17 @@ const EN: HelpContent = {
         'Keep the bar alignment on: the clips move so that their “1” fall on the “1” of the reference.',
       ],
       note: 'Stretch keeps the pitch; varispeed sounds more natural for small corrections but changes the pitch.',
+    },
+    {
+      title: 'Make the grid follow a song that drifts out of time',
+      steps: [
+        'Switch on the grid (B) and, if needed, mark the bar at the start of the song (BPM button, “Mark a bar”).',
+        'In the tempo dialog press “Detect bars”: the grid follows the song along the whole file.',
+        'Scroll through the song: where a bar does not fall on the hit, Shift+drag its line onto the right hit.',
+        'If there are many corrections, press “Detect bars” again: the bars pinned by hand stay and guide the search.',
+        'Press “Save bars” to find them again the next time you open the same audio.',
+      ],
+      note: 'Shift+right click on a pinned bar unpins it; “Remove anchors” removes them all.',
     },
     {
       title: 'Put the last track added in time with the existing ones',

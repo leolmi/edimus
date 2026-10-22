@@ -11,7 +11,7 @@
   | `AudioEnginePort` | probe, decodifica (con velocità/pitch, `AudioProcessing`), encoding dell'export |
   | `SettingsPort` | archivio delle impostazioni |
   | `ShellPort` | titolo e chiusura della finestra, domande sì/no, link esterni, mostra file |
-  | `PlatformInfo` | capacità della piattaforma (mostra file, configurazione AI, strumenti sviluppatori): la UI nasconde ciò che manca |
+  | `PlatformInfo` | capacità della piattaforma (mostra file, configurazione AI, file accanto alle sorgenti, strumenti sviluppatori): la UI nasconde ciò che manca |
 
   | `DevToolsPort` | strumenti per sviluppatori della finestra (solo desktop) |
   | `AiHostPort` | indirizzo del server MCP e configurazione dei client AI installati |
@@ -67,7 +67,7 @@
 - **Una istanza = un montaggio.** Il file da aprire all'avvio arriva da riga di comando
   (`ShellPort.startupFiles`, su desktop da `NL_ARGS`). Più montaggi = più finestre/processi.
 - **Cartella dell'app** (`appPath()` in `platform/neutralino/app-paths.ts`, da `NL_PATH`): contiene `.cache/` per i file PCM
-  temporanei; le impostazioni (tema, lingua, volume d'ascolto, uscita audio, passo di aggancio)
+  temporanei; le impostazioni (tema, lingua, volume d’ascolto, uscita audio, passo di aggancio, salvataggio automatico delle battute)
   si cambiano dal dialog Impostazioni (`features/settings`, Ctrl+,; il volume dalla toolbar) e stanno nello storage di
   Neutralino (`SettingsService` tramite `SettingsPort`).
 - **ffmpeg/ffprobe** sono cercati accanto all'exe, in `ffmpeg/` o in `tools/ffmpeg/bin/`
@@ -136,9 +136,13 @@ AI ──stdio──▶ edimus-mcp.exe | node mcp/server.mjs ──WebSocket 127
   `mcp/build-exe.mjs`, `npm run mcp:build`), quindi chi lo usa non deve installare Node.
   Niente top-level await nel server: viene impacchettato come CommonJS.
 
-- Il server scrive porta e token in `%APPDATA%/edimus/mcp.json`; l'app li ottiene da
-  `AiHostPort.bridgeConfig()` e si collega, riprovando finché il server non c'è. Sul desktop
-  `NeutralinoAiHost` legge il file; nel web la pagina non può leggerlo: porta e token si
+- Ogni sessione AI avvia il proprio server. Il server ascolta sulla 47816 (`EDIMUS_MCP_PORT`)
+  se è libera, altrimenti su una porta libera qualsiasi, e scrive porta e token in
+  `%USERPROFILE%/.edimus/mcp-<pid>.json` (lo cancella all'uscita; all'avvio rimuove quelli di
+  server non più vivi). Non `%APPDATA%`: un client AI impacchettato MSIX (Claude Desktop) vi
+  reindirizza le scritture dei processi figli nella cartella del pacchetto, invisibile all'app. L'app li ottiene da `AiHostPort.bridgeConfigs()` e si collega a **tutti**,
+  ricontrollando ogni 3 secondi i server nuovi: così ogni sessione vede la finestra. Sul desktop
+  `NeutralinoAiHost` legge i file; nel web la pagina non può leggerli: porta e token si
   inseriscono nella scheda *Assistente AI* (`AiWebSetupComponent`) e restano nelle impostazioni
   (`aiBridge`). Una pagina https può aprire `ws://127.0.0.1` (localhost è un'origine sicura), ma
   il browser può chiedere il permesso di accesso alla rete locale.

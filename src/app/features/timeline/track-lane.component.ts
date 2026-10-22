@@ -2,9 +2,10 @@ import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, 
 import { AudioLibraryService } from '../../core/audio/audio-library.service';
 import { rangePeak } from '../../core/audio/peaks';
 import { MAX_GAIN, clipGainAt, gainAt, gainToDb } from '../../core/montage/envelope';
-import { Clip, Track, clipRate, fileName, isProcessed, toTimeline, trackVolume } from '../../core/montage/montage.model';
+import { Clip, Track, clipRate, fileName, isProcessed, toSource, toTimeline, trackVolume } from '../../core/montage/montage.model';
 import { ProcessedAudioService } from '../../core/audio/processed-audio.service';
-import { beatsPerBar } from '../../core/audio/tempo';
+import { Tempo, beatsPerBar } from '../../core/audio/tempo';
+import { anchorOf, barAt, barTime } from '../../core/audio/tempo-map';
 import { TempoService } from '../../core/audio/tempo.service';
 import { sourceColors } from '../../core/source-colors';
 import { CanvasColors, ThemeColorsService } from '../../core/theme-colors.service';
@@ -110,6 +111,25 @@ export class TrackLaneComponent {
     return x > bar.x0 && x < bar.x1 ? 'body' : undefined;
   }
 
+  /**
+   * Bar line of the grid near x (topmost clip first, only with the grid shown), to stretch the
+   * bar map of the clip's source there.
+   */
+  barLineAt(x: number): { clip: Clip; bar: number; anchored: boolean } | undefined {
+    if (!this.timeline.beatGrid() || this.timeline.beatMarking()) return undefined;
+    const clips = this.stacked();
+    for (let i = clips.length - 1; i >= 0; i--) {
+      const clip = clips[i];
+      const span = this.clipSpan(clip);
+      const tempo = this.tempos.sourceTempo(clip.sourceId);
+      if (!tempo || x < span.x0 || x > span.x1) continue;
+      const bar = Math.round(barAt(tempo, toSource(clip, this.timeline.xToTime(x))));
+      if (Math.abs(this.sourceX(clip, barTime(tempo, bar)) - x) <= EDGE_GRAB) return { clip, bar, anchored: !!anchorOf(tempo, bar) };
+      return undefined;
+    }
+    return undefined;
+  }
+
   /** Lane x of a source time of a clip. */
   private sourceX(clip: Clip, source: number): number {
     return this.timeline.timeToX(toTimeline(clip, source));
@@ -207,6 +227,8 @@ export class TrackLaneComponent {
       this.cursor.set(this.pointAt(x, y) ? 'move' : this.curveHandleAt(x, y) ? 'ns-resize' : this.clipBodyAt(x) ? 'crosshair' : null);
       return;
     }
+    // Shift on a bar line: the bar map is stretched there
+    if (event.shiftKey && this.barLineAt(x)) return this.cursor.set('col-resize');
     const zone = this.clipAt(x)?.zone;
     this.cursor.set(zone === 'body' ? 'grab' : zone ? 'ew-resize' : null);
   }
@@ -352,7 +374,8 @@ export class TrackLaneComponent {
     const { clip, x0, x1 } = bar;
     const clipX0 = Math.max(0, this.timeline.timeToX(clip.start));
     const clipX1 = Math.min(width, this.timeline.timeToX(clip.start + this.timeline.clipLength(clip)));
-    this.drawBarGrid(ctx, colors, clip, marking.bpm, marking.downbeat, marking.beatsPerBar, clipX0, clipX1, height, 0.6);
+    const steady: Tempo = { bpm: marking.bpm, offset: marking.downbeat, confidence: 1, beatsPerBar: marking.beatsPerBar };
+    this.drawBarGrid(ctx, colors, clip, steady, clipX0, clipX1, height, 0.6);
     if (x1 < 0 || x0 > width) return;
     ctx.fillStyle = colors.envelope;
     ctx.strokeStyle = colors.envelope;
@@ -383,36 +406,26 @@ export class TrackLaneComponent {
     if (!tempo) return;
     const x0 = Math.max(0, this.timeline.timeToX(clip.start));
     const x1 = Math.min(width, this.timeline.timeToX(clip.start + this.timeline.clipLength(clip)));
-    this.drawBarGrid(ctx, colors, clip, tempo.bpm, tempo.offset, beatsPerBar(tempo), x0, x1, height, 1);
+    this.drawBarGrid(ctx, colors, clip, tempo, x0, x1, height, 1);
   }
 
   /**
    * Bars first: alternate bands, one per bar, with a strong line and its number on the
-   * downbeat; then the beats inside the bar, lighter. Between x0 and x1 (lane px), faded by `alpha`.
+   * downbeat; then the beats inside the bar, lighter. Bars pinned by hand have a mark on top,
+   * those placed by the bar tracking a small one at the bottom. Between x0 and x1 (lane px),
+   * faded by `alpha`.
    */
-  private drawBarGrid(
-    ctx: CanvasRenderingContext2D,
-    colors: CanvasColors,
-    clip: Clip,
-    bpm: number,
-    offset: number,
-    meter: number,
-    x0: number,
-    x1: number,
-    height: number,
-    alpha: number,
-  ): void {
+  private drawBarGrid(ctx: CanvasRenderingContext2D, colors: CanvasColors, clip: Clip, tempo: Tempo, x0: number, x1: number, height: number, alpha: number): void {
     if (x1 <= x0) return;
-    const rate = clipRate(clip);
-    const beat = 60 / bpm; // source seconds
-    const bar = beat * meter;
-    const pxPerSec = this.timeline.pxPerSec();
-    const barPx = (bar / rate) * pxPerSec;
-    if (barPx < 6) return;
-    const beatPx = barPx / meter;
-    const sourceToX = (sourceTime: number) => this.timeline.timeToX(clip.start + (sourceTime - clip.offset) / rate);
-    // bar holding the first visible pixel
-    const fromSource = clip.offset + (this.timeline.xToTime(x0) - clip.start) * rate;
+    const meter = beatsPerBar(tempo);
+    const sourceToX = (sourceTime: number) => this.sourceX(clip, sourceTime);
+    // source times of the first and last visible pixels
+    const fromSource = toSource(clip, this.timeline.xToTime(x0));
+    const toSourceTime = toSource(clip, this.timeline.xToTime(x1));
+    const firstBar = Math.floor(barAt(tempo, fromSource));
+    const lastBar = Math.ceil(barAt(tempo, toSourceTime));
+    // too dense on average: no grid
+    if ((x1 - x0) / Math.max(1, lastBar - firstBar) < 6) return;
     const base = ctx.globalAlpha;
     ctx.save();
     ctx.beginPath();
@@ -422,9 +435,10 @@ export class TrackLaneComponent {
     ctx.strokeStyle = colors.beat;
     ctx.font = colors.font;
     ctx.textBaseline = 'top';
-    for (let b = Math.floor((fromSource - offset) / bar); ; b++) {
-      const left = sourceToX(offset + b * bar);
-      if (left > x1) break;
+    let left = sourceToX(barTime(tempo, firstBar));
+    for (let b = firstBar; b <= lastBar && left <= x1; b++) {
+      const right = sourceToX(barTime(tempo, b + 1));
+      const barPx = right - left;
       // alternate bands: the even bars (1, 3, …) shaded
       if (b % 2 === 0) {
         ctx.globalAlpha = base * alpha * 0.1;
@@ -437,17 +451,30 @@ export class TrackLaneComponent {
       ctx.lineTo(x, height);
       ctx.stroke();
       if (barPx >= 28 && b >= 0) ctx.fillText(String(b + 1), x + 3, 3);
+      const anchor = anchorOf(tempo, b);
+      if (anchor) {
+        ctx.globalAlpha = base * alpha * (anchor.auto ? 0.5 : 1);
+        ctx.beginPath();
+        if (anchor.auto) ctx.rect(x - 1.5, height - 4, 3, 3);
+        else {
+          ctx.moveTo(x - 5, 0);
+          ctx.lineTo(x + 5, 0);
+          ctx.lineTo(x, 7);
+        }
+        ctx.fill();
+      }
       // beats inside the bar, only when far enough apart
-      if (beatPx >= 6) {
+      if (barPx / meter >= 6) {
         ctx.globalAlpha = base * alpha * 0.18;
         ctx.beginPath();
         for (let k = 1; k < meter; k++) {
-          const bx = Math.round(left + k * beatPx) + 0.5;
+          const bx = Math.round(left + (k * barPx) / meter) + 0.5;
           ctx.moveTo(bx, height * 0.25);
           ctx.lineTo(bx, height * 0.75);
         }
         ctx.stroke();
       }
+      left = right;
     }
     ctx.restore();
     ctx.globalAlpha = base;

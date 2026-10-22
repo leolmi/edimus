@@ -19,12 +19,14 @@ interface Settings {
   snapStep: SnapStep;
   /** Opens the developer tools of the window at startup. */
   devTools: boolean;
+  /** Saves the bar map of a source in its bar file at every change (only where files beside the sources can be written). */
+  autoSaveBars: boolean;
   /** Address of the MCP server set by hand (web app: the page cannot read it from the PC). */
   aiBridge: BridgeConfig | null;
 }
 
 const STORAGE_KEY = 'settings';
-const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat', devTools: false, aiBridge: null };
+const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat', autoSaveBars: false, devTools: false, aiBridge: null };
 
 /** User preferences (theme, language, listening volume and output), persisted by the platform (`SettingsPort`). */
 @Injectable({ providedIn: 'root' })
@@ -38,6 +40,7 @@ export class SettingsService {
   readonly muted = signal(DEFAULTS.muted);
   readonly audioOutput = signal<AudioOutput | null>(DEFAULTS.audioOutput);
   readonly snapStep = signal<SnapStep>(DEFAULTS.snapStep);
+  readonly autoSaveBars = signal(DEFAULTS.autoSaveBars);
   readonly devTools = signal(DEFAULTS.devTools);
   readonly aiBridge = signal<BridgeConfig | null>(DEFAULTS.aiBridge);
 
@@ -61,6 +64,7 @@ export class SettingsService {
       if (typeof saved.muted === 'boolean') this.muted.set(saved.muted);
       if (saved.audioOutput?.id) this.audioOutput.set(saved.audioOutput);
       if (saved.snapStep === 'bar' || saved.snapStep === 'beat' || saved.snapStep === 'half') this.snapStep.set(saved.snapStep);
+      if (typeof saved.autoSaveBars === 'boolean') this.autoSaveBars.set(saved.autoSaveBars);
       if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
       if (saved.aiBridge?.port && saved.aiBridge.token) this.aiBridge.set(saved.aiBridge);
     } catch {
@@ -100,6 +104,11 @@ export class SettingsService {
     void this.save();
   }
 
+  setAutoSaveBars(on: boolean): void {
+    this.autoSaveBars.set(on);
+    void this.save();
+  }
+
   setDevTools(open: boolean): void {
     this.devTools.set(open);
     void this.save();
@@ -118,6 +127,7 @@ export class SettingsService {
       muted: this.muted(),
       audioOutput: this.audioOutput(),
       snapStep: this.snapStep(),
+      autoSaveBars: this.autoSaveBars(),
       devTools: this.devTools(),
       aiBridge: this.aiBridge(),
     };

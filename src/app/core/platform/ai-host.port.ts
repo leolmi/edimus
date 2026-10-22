@@ -37,8 +37,8 @@ export interface BridgeConfig {
 export abstract class AiHostPort {
   /** Process id of this window, shown by the server to tell instances apart. */
   abstract readonly pid?: string | number;
-  /** Address of the running server, null when it is not known. */
-  abstract bridgeConfig(): Promise<BridgeConfig | null>;
+  /** Addresses of the running servers (one per AI session that started one). */
+  abstract bridgeConfigs(): Promise<BridgeConfig[]>;
   /** Command that starts the server, null when the server is not installed. */
   abstract serverCommand(): Promise<ServerCommand | null>;
   abstract detect(server: ServerCommand): Promise<AiClient[]>;

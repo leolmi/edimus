@@ -20,13 +20,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import type { AudioInfo } from '../../core/platform/audio-engine.port';
 import { AudioLibraryService, SourceState } from '../../core/audio/audio-library.service';
 import { PlaybackService } from '../../core/audio/playback.service';
+import { OnsetCurve, Tempo, beatsPerBar, snapToOnsets } from '../../core/audio/tempo';
+import { isVariable, meanBpm, pinBar } from '../../core/audio/tempo-map';
 import { TempoService } from '../../core/audio/tempo.service';
 import { DocumentService } from '../../core/document.service';
 import { EditService } from '../../core/edit.service';
 import { formatDuration } from '../../core/format';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
-import { moveClips, trimClip } from '../../core/montage/edits';
+import { moveClips, trimClip, withSourceTempo } from '../../core/montage/edits';
 import { ShellPort } from '../../core/platform/shell.port';
 import { EnvelopePoint, MAX_GAIN, curveThroughMidpoint, insertPoint, movePoint, setCurve } from '../../core/montage/envelope';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
@@ -77,6 +79,10 @@ const RANGE_THRESHOLD = 3;
 const EDGE_SNAP = 10;
 /** Vertical distance (px) within which a dragged envelope point snaps to unity gain (0 dB). */
 const UNITY_SNAP = 6;
+/** Seconds within which a dragged bar line lands on an attack. */
+const BAR_ONSET_SNAP = 0.05;
+/** Shortest beat a stretched bar map may get (seconds: 400 BPM). */
+const MIN_BEAT = 60 / 400;
 
 /** Multitrack view: time ruler, track headers and lanes with the waveforms. */
 @Component({
@@ -168,6 +174,15 @@ export class TimelineComponent {
         anchors: number[];
       }
     | { kind: 'mark'; from: BarMarking; zone: ClipHit['zone']; pointerTime: number }
+    | {
+        kind: 'bar';
+        from: Montage;
+        clip: Clip;
+        tempo: Tempo;
+        bar: number;
+        /** Attacks of the source, to land the bar line on a hit (once computed). */
+        curve: OnsetCurve | null;
+      }
     | { kind: 'curve'; from: Montage; clipId: string; points: EnvelopePoint[]; index: number; lane: TrackLaneComponent };
 
   /** Envelope point being dragged. */
@@ -257,6 +272,9 @@ export class TimelineComponent {
       return;
     }
     if (this.timeline.envelopeMode()) return this.onEnvelopeDown(event, lane, target);
+    // Shift on a bar line of the grid: drag to pin the bar there, right click to unpin it
+    const barLine = event.shiftKey ? lane.barLineAt(this.xAt(event)) : undefined;
+    if (barLine) return this.onBarLineDown(event, barLine, target);
     if (event.button !== 0) return;
     this.edits.endNudge();
     target.setPointerCapture(event.pointerId);
@@ -366,6 +384,13 @@ export class TimelineComponent {
       }
       case 'mark':
         return this.edits.dragBar(gesture.from, gesture.zone, time - gesture.pointerTime);
+      case 'bar': {
+        let at = toSource(gesture.clip, time);
+        // on the nearest attack (Alt: free)
+        if (gesture.curve && !event.altKey) at = snapToOnsets(gesture.curve, [at], BAR_ONSET_SNAP)[0];
+        const tempo = pinBar(gesture.tempo, gesture.bar, at, MIN_BEAT * beatsPerBar(gesture.tempo));
+        return this.montages.preview(withSourceTempo(gesture.from, gesture.clip.sourceId, tempo));
+      }
       case 'curve': {
         // the handle follows the pointer: the bend that puts the curve's midpoint there
         const y = event.clientY - (event.currentTarget as HTMLElement).getBoundingClientRect().top;
@@ -443,6 +468,22 @@ export class TimelineComponent {
 
   private readonly length = (clip: Clip) => this.timeline.clipLength(clip);
 
+  /** Bar line of the grid with Shift: dragging pins the bar where it is dropped, right click unpins it. */
+  private onBarLineDown(event: PointerEvent, line: { clip: Clip; bar: number; anchored: boolean }, target: HTMLElement): void {
+    const tempo = this.tempos.sourceTempo(line.clip.sourceId);
+    if (!tempo) return;
+    if (event.button === 2) {
+      if (line.anchored) this.edits.unpinBar(line.clip.sourceId, line.bar);
+      return;
+    }
+    if (event.button !== 0) return;
+    this.edits.endNudge();
+    target.setPointerCapture(event.pointerId);
+    const gesture = { kind: 'bar' as const, from: this.montages.montage(), clip: line.clip, tempo, bar: line.bar, curve: null as OnsetCurve | null };
+    this.gesture = gesture;
+    void this.tempos.onsetCurve(line.clip.sourceId).then((curve) => (gesture.curve = curve));
+  }
+
   /** Double click on a clip: speed and pitch dialog; on an envelope bend handle: straight segment. */
   protected onLaneDoubleClick(event: MouseEvent, lane: TrackLaneComponent): void {
     if (this.timeline.envelopeMode()) {
@@ -498,7 +539,7 @@ export class TimelineComponent {
       sources.set(clip.sourceId, {
         path: source?.path ?? '',
         ...info,
-        bpm: tempo?.bpm,
+        bpm: tempo ? meanBpm(tempo) : undefined,
         bpmManual: !!source?.tempo,
         clips: 1,
       });
@@ -633,9 +674,13 @@ export class TimelineComponent {
     const sourceId = track.clips[0]?.sourceId;
     if (!sourceId) return null;
     if (this.tempos.isDetecting(sourceId)) return this.i18n.t('tempo.detecting');
+    if (this.edits.trackingSource() === sourceId) return this.i18n.t('tempo.tracking');
     const tempo = this.tempos.sourceTempo(sourceId);
     if (tempo === undefined) return null;
     if (tempo === null) return this.i18n.t('tempo.unknown');
+    if (isVariable(tempo)) return this.i18n.t('tempo.variableValue', { bpm: meanBpm(tempo).toFixed(1) });
+    const state = this.tempos.detected()[sourceId];
+    if (state?.status === 'ready' && state.fromFile && tempo === state.tempo) return this.i18n.t('tempo.fileValue', { bpm: tempo.bpm.toFixed(1) });
     return this.i18n.t('tempo.value', { bpm: tempo.bpm.toFixed(1), confidence: Math.round(tempo.confidence * 100) });
   }
 

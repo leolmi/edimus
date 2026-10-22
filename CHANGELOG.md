@@ -4,6 +4,30 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.4.0 — 2026-10-22
+
+### Tempo
+- Mappa delle battute per i brani a tempo non costante: la griglia segue l'audio, con battute di
+  durata variabile. Con la griglia visibile, Maiusc+trascina una linea di battuta la fissa lì
+  (le battute vicine si allargano o stringono), Maiusc+clic destro la libera.
+- Dialogo Tempo: "Rileva le battute" traccia l'inizio di ogni battuta su tutto il brano partendo
+  da quelle fissate a mano; si possono rimuovere tutte le ancore, solo quelle automatiche, o
+  tornare a un tempo costante pari alla media. La battuta segnata a mano diventa un'ancora.
+- Griglia, aggancio ai battiti e allineamento del tempo seguono la mappa.
+
+### File
+- File delle battute (`brano.mp3.edimusbars`): tempo e mappa di un audio, per riusarli in altri
+  montaggi. Sul desktop sta accanto all'audio, viene letto da solo all'apertura e può
+  aggiornarsi da solo (Impostazioni); nel web si salva e si carica a mano.
+
+### Assistente AI
+- Strumento `set_bar_map` per tracciare, fissare e liberare battute, salvare e caricare il file
+  delle battute.
+- Più sessioni AI insieme: ogni server MCP apre il proprio collegamento (porta 47816 se libera,
+  altrimenti una qualsiasi) e l'app si collega a tutti.
+- I dati di collegamento sono ora in `%USERPROFILE%\.edimus`: in `%APPDATA%` Claude Desktop li
+  rendeva invisibili all'app.
+
 ## 1.3.0 — 2026-10-21
 
 ### File

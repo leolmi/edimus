@@ -46,17 +46,27 @@ const sameServer = (entry: ServerEntry | undefined, server: ServerCommand) =>
   JSON.stringify((entry.args ?? []).map(slashes)) === JSON.stringify(server.args);
 
 /**
- * The MCP server on this PC: its address, written by the server to <app data>/edimus/mcp.json,
- * and its registration in the AI clients found here (Claude Code through its command line, the
+ * The MCP servers on this PC: their addresses, written by each server to
+ * %USERPROFILE%/.edimus/mcp-<pid>.json, and the registration of the server in the AI clients found here (Claude Code through its command line, the
  * others by adding an entry to their configuration file, backed up first).
  */
 @Injectable()
 export class NeutralinoAiHost extends AiHostPort {
   readonly pid = window.NL_PID;
 
-  async bridgeConfig(): Promise<BridgeConfig | null> {
-    const dataDir = await os.getPath('data');
-    return JSON.parse(await filesystem.readFile(`${dataDir}/edimus/mcp.json`)) as BridgeConfig;
+  async bridgeConfigs(): Promise<BridgeConfig[]> {
+    const dir = `${slashes(await os.getEnv('USERPROFILE'))}/.edimus`;
+    const entries = await filesystem.readDirectory(dir).catch(() => []);
+    const files = entries.filter((e) => e.type === 'FILE' && /^mcp-\d+\.json$/.test(e.entry));
+    const configs = await Promise.all(
+      files.map((e) =>
+        filesystem
+          .readFile(`${dir}/${e.entry}`)
+          .then((text) => JSON.parse(text) as BridgeConfig)
+          .catch(() => null),
+      ),
+    );
+    return configs.filter((c): c is BridgeConfig => !!c?.port && !!c.token);
   }
 
   /**

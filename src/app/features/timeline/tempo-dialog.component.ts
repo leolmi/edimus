@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { Tempo } from '../../core/audio/tempo';
+import { isVariable, meanBpm } from '../../core/audio/tempo-map';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 export interface TempoDialogData {
@@ -15,15 +16,31 @@ export interface TempoDialogData {
   tempo: Tempo | null;
   /** Detected tempo, to go back to it. */
   detected: Tempo | null;
+  /** The "detected" tempo comes from the bar file next to the audio. */
+  fromFile?: boolean;
   manual: boolean;
   /** Source time under the playhead, null when the playhead is outside the clip. */
   playheadSourceTime: number | null;
   /** Speed of the clip, to show the tempo heard. */
   rate: number;
+  /** Bar tracking of this source in progress. */
+  tracking?: boolean;
 }
 
-/** Tempo set by hand, null to go back to the detected one, or a request to mark the beats on the clip. */
-export type TempoDialogResult = { tempo: Tempo | null; mark?: { beatsPerBar: number; bpm: number } };
+/**
+ * Tempo set by hand, null to go back to the detected one, or a request: mark the beats on the
+ * clip, track the bars along the source, drop the bar map or its anchors.
+ */
+export type TempoDialogResult = {
+  tempo: Tempo | null;
+  mark?: { beatsPerBar: number; bpm: number };
+  track?: boolean;
+  steady?: boolean;
+  /** Removes all the anchors, or only those of the bar tracking. */
+  clear?: 'all' | 'auto';
+  /** Saves the tempo in the bar file of the audio, or loads it from there. */
+  file?: 'save' | 'load';
+};
 
 const MIN_BPM = 20;
 const MAX_BPM = 400;
@@ -38,7 +55,9 @@ const TAP_RESET = 2000;
     <h2 mat-dialog-title>{{ 'tempo.title' | t }} — {{ data.name }}</h2>
     <mat-dialog-content class="content">
       <p class="state">
-        @if (data.detected; as detected) {
+        @if (data.detected && data.fromFile) {
+          {{ 'tempo.fromFile' | t }}
+        } @else if (data.detected; as detected) {
           {{ 'tempo.detectedValue' | t: { bpm: detected.bpm.toFixed(2), confidence: (detected.confidence * 100).toFixed(0) } }}
         } @else {
           {{ 'tempo.unknown' | t }}
@@ -62,6 +81,53 @@ const TAP_RESET = 2000;
           {{ 'tempo.mark' | t }}
         </button>
         <span class="hint">{{ 'tempo.markHint' | t: { n: meter() } }}</span>
+      </div>
+
+      <div class="mark">
+        <button mat-stroked-button [disabled]="!data.tempo || data.tracking" (click)="track()">
+          <mat-icon>timeline</mat-icon>
+          {{ 'tempo.track' | t }}
+        </button>
+        <span class="hint">
+          @if (data.tracking) {
+            {{ 'tempo.tracking' | t }}
+          } @else if (variable()) {
+            {{ 'tempo.mapState' | t: { n: anchors(), manual: manualAnchors(), bpm: meanBpm().toFixed(2) } }}
+          } @else {
+            {{ 'tempo.trackHint' | t }}
+          }
+        </span>
+      </div>
+      @if (anchors()) {
+        <div class="anchors">
+          <button mat-button (click)="clear('all')" [matTooltip]="'tempo.clearHint' | t">
+            <mat-icon>restart_alt</mat-icon>
+            {{ 'tempo.clear' | t }}
+          </button>
+          @if (autoAnchors() && manualAnchors()) {
+            <button mat-button (click)="clear('auto')" [matTooltip]="'tempo.clearAutoHint' | t">
+              <mat-icon>auto_fix_off</mat-icon>
+              {{ 'tempo.clearAuto' | t }}
+            </button>
+          }
+          @if (variable()) {
+            <button mat-button (click)="steady()" [matTooltip]="'tempo.steadyHint' | t">
+              <mat-icon>straighten</mat-icon>
+              {{ 'tempo.steady' | t }}
+            </button>
+          }
+        </div>
+      }
+
+      <div class="anchors">
+        <button mat-stroked-button [disabled]="!data.tempo" (click)="file('save')" [matTooltip]="'bars.saveHint' | t">
+          <mat-icon>save</mat-icon>
+          {{ 'bars.save' | t }}
+        </button>
+        <button mat-stroked-button (click)="file('load')" [matTooltip]="'bars.loadHint' | t">
+          <mat-icon>file_open</mat-icon>
+          {{ 'bars.load' | t }}
+        </button>
       </div>
 
       <div class="row">
@@ -156,6 +222,16 @@ const TAP_RESET = 2000;
         margin: 0;
       }
     }
+    .anchors {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: -8px 0 16px;
+      button {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+    }
     .spacer {
       flex: 1 1 auto;
     }
@@ -178,6 +254,12 @@ export class TempoDialogComponent {
     { beats: 6, label: '6/8' },
   ];
   protected readonly meter = signal(this.data.tempo?.beatsPerBar ?? 4);
+  /** Bar map of the tempo: anchors in all and set by hand. */
+  protected readonly anchors = signal(this.data.tempo?.anchors?.length ?? 0);
+  protected readonly manualAnchors = signal(this.data.tempo?.anchors?.filter((a) => !a.auto).length ?? 0);
+  protected readonly autoAnchors = computed(() => this.anchors() - this.manualAnchors());
+  protected readonly variable = signal(!!this.data.tempo && isVariable(this.data.tempo));
+  protected readonly meanBpm = signal(this.data.tempo ? meanBpm(this.data.tempo) : 0);
 
   private tapTimes: number[] = [];
   protected readonly taps = signal(0);
@@ -225,7 +307,29 @@ export class TempoDialogComponent {
     this.dialog.close({ tempo: null, mark: { beatsPerBar: this.meter(), bpm: this.bpm() } });
   }
 
+  /** Closes to follow the bars along the whole source. */
+  protected track(): void {
+    this.dialog.close({ tempo: null, track: true });
+  }
+
+  protected file(action: 'save' | 'load'): void {
+    this.dialog.close({ tempo: null, file: action });
+  }
+
+  protected clear(which: 'all' | 'auto'): void {
+    this.dialog.close({ tempo: null, clear: which });
+  }
+
+  protected steady(): void {
+    this.dialog.close({ tempo: null, steady: true });
+  }
+
   protected apply(): void {
+    const tempo = this.data.tempo;
+    // nothing changed: the bar map stays; otherwise the tempo becomes steady
+    if (tempo && this.data.manual && tempo.bpm === this.bpm() && tempo.offset === this.offset() && (tempo.beatsPerBar ?? 4) === this.meter()) {
+      return this.dialog.close();
+    }
     this.dialog.close({ tempo: { bpm: this.bpm(), offset: this.offset(), confidence: 1, beatsPerBar: this.meter() } });
   }
 }

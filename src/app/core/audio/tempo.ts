@@ -8,6 +8,20 @@ export interface Tempo {
   confidence: number;
   /** Beats per bar (the meter: 4 for 4/4); default 4. `offset` is then a downbeat. */
   beatsPerBar?: number;
+  /**
+   * Bar map of a tempo that is not steady: the start of some bars (bar 0 is the one at `offset`
+   * in the steady grid), sorted by bar. Between two anchors the bars are even; outside, they keep
+   * the length of the nearest span (of the steady grid with a single anchor). See tempo-map.ts.
+   */
+  anchors?: BarAnchor[];
+}
+
+/** Start of a bar pinned on the audio (source seconds). */
+export interface BarAnchor {
+  bar: number;
+  time: number;
+  /** Placed by the bar tracking (replaced when it runs again); otherwise set by hand. */
+  auto?: boolean;
 }
 
 /** Beats per bar of a tempo. */

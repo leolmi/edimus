@@ -91,6 +91,12 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
         </mat-button-toggle-group>
       </div>
       <p class="hint">{{ 'settings.snapHint' | t }}</p>
+      @if (platform.filesBesideSources) {
+        <mat-slide-toggle [checked]="settings.autoSaveBars()" (change)="settings.setAutoSaveBars($event.checked)">
+          {{ 'settings.autoSaveBars' | t }}
+        </mat-slide-toggle>
+        <p class="hint">{{ 'settings.autoSaveBarsHint' | t }}</p>
+      }
 
       @if (platform.hasDevTools) {
         <h3>{{ 'settings.advanced' | t }}</h3>
@@ -150,6 +156,12 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       .hint {
         margin: 0;
       }
+    }
+    // the state layer of the handle is taller than the toggle: the room around it keeps it
+    // inside the content (as the last element it would make the dialog scroll)
+    mat-slide-toggle {
+      display: block;
+      padding: 4px 0;
     }
     .symbol {
       font-size: 18px;

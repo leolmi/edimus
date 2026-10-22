@@ -1,10 +1,12 @@
-import { Injectable, computed, effect, inject, untracked } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ClipTiming, ClipTimingData, ClipTimingDialogComponent } from '../features/timeline/clip-timing-dialog.component';
 import { TempoDialogComponent, TempoDialogData, TempoDialogResult } from '../features/timeline/tempo-dialog.component';
+import { BarFileService } from './audio/bar-file.service';
 import { TempoService } from './audio/tempo.service';
 import { snapToOnsets } from './audio/tempo';
+import { clearAnchors, meanBpm, steadyTempo, trackBars, unpinBar } from './audio/tempo-map';
 import { AlignClip, AlignDialogData, AlignTempoDialogComponent } from '../features/timeline/align-tempo-dialog.component';
 import { AlignContext, AlignOptions, alignTempo } from './montage/tempo-align';
 import { PlaybackService } from './audio/playback.service';
@@ -34,6 +36,7 @@ export class EditService {
   private readonly tempos = inject(TempoService);
   private readonly i18n = inject(I18nService);
   private readonly shell = inject(ShellPort);
+  private readonly barFiles = inject(BarFileService);
 
   private readonly length = (clip: Clip) => this.timeline.clipLength(clip);
 
@@ -46,7 +49,7 @@ export class EditService {
         const tempo = this.tempos.sourceTempo(clip.sourceId);
         if (!tempo) return;
         const label = track.clips.length > 1 ? `${track.name} #${index + 1}` : track.name;
-        clips.push({ id: clip.id, label, bpm: tempo.bpm * clipRate(clip), confidence: tempo.confidence });
+        clips.push({ id: clip.id, label, bpm: meanBpm(tempo) * clipRate(clip), confidence: tempo.confidence });
       });
     }
     return clips;
@@ -222,7 +225,9 @@ export class EditService {
       name: track.name,
       tempo: this.tempos.sourceTempo(clip.sourceId) ?? null,
       detected: state?.status === 'ready' ? state.tempo : null,
+      fromFile: state?.status === 'ready' && !!state.fromFile,
       manual: !!source?.tempo,
+      tracking: this.trackingSource() === clip.sourceId,
       playheadSourceTime: inside ? clip.offset + (position - clip.start) * rate : null,
       rate,
     };
@@ -233,6 +238,11 @@ export class EditService {
     const result = await firstValueFrom(ref.afterClosed());
     if (!result) return;
     if (result.mark) return this.startBeatMarking(clipId, result.mark.beatsPerBar, result.mark.bpm);
+    if (result.track) return void this.trackBars(clip.sourceId);
+    if (result.steady) return this.steadyTempo(clip.sourceId);
+    if (result.clear) return this.clearAnchors(clip.sourceId, result.clear === 'auto');
+    if (result.file === 'save') return void this.barFiles.save(clip.sourceId);
+    if (result.file === 'load') return void this.barFiles.load(clip.sourceId);
     this.montages.setSourceTempo(clip.sourceId, result.tempo);
     // the grid shows the result
     this.timeline.beatGrid.set(true);
@@ -323,17 +333,66 @@ export class EditService {
   confirmBeatMarking(): void {
     const marking = this.timeline.beatMarking();
     if (marking?.downbeat == null) return this.cancelBeatMarking();
-    const bar = (60 * marking.beatsPerBar) / marking.bpm;
+    const bpm = Math.round(marking.bpm * 100) / 100;
+    const bar = (60 * marking.beatsPerBar) / bpm;
     // earliest downbeat of the grid: the bars are numbered from the start of the source
     const offset = ((marking.downbeat % bar) + bar) % bar;
     this.timeline.beatMarking.set(null);
     this.montages.setSourceTempo(marking.sourceId, {
-      bpm: Math.round(marking.bpm * 100) / 100,
+      bpm,
       offset,
       confidence: 1,
       beatsPerBar: marking.beatsPerBar,
+      // the marked bar stays pinned: a stretch of the bar map starts from there
+      anchors: [{ bar: Math.round((marking.downbeat - offset) / bar), time: marking.downbeat }],
     });
     this.timeline.beatGrid.set(true);
+  }
+
+  /** Source whose bars are being tracked, if any. */
+  readonly trackingSource = signal<string | null>(null);
+
+  /**
+   * Follows the bars along the whole source (tempo not steady): an anchor on every bar, found on
+   * the attacks starting from the bars pinned by hand, which stay. Returns the share of beats
+   * found on an attack, null when the tempo or the audio is not known.
+   */
+  async trackBars(sourceId: string): Promise<number | null> {
+    const tempo = this.tempos.sourceTempo(sourceId);
+    const length = this.timeline.sourceLength({ sourceId });
+    if (!tempo || !length || this.trackingSource()) return null;
+    this.trackingSource.set(sourceId);
+    try {
+      const curve = await this.tempos.onsetCurve(sourceId);
+      if (!curve) return null;
+      const result = trackBars(tempo, curve, length);
+      this.montages.setSourceTempo(sourceId, result.tempo);
+      this.timeline.beatGrid.set(true);
+      return result.confidence;
+    } finally {
+      this.trackingSource.set(null);
+    }
+  }
+
+  /** Unpins a bar of the map of a source: it goes back between the anchors around it. */
+  unpinBar(sourceId: string, bar: number): void {
+    const tempo = this.montages.montage().sources.find((s) => s.id === sourceId)?.tempo;
+    if (tempo?.anchors?.some((a) => a.bar === bar)) this.montages.setSourceTempo(sourceId, unpinBar(tempo, bar));
+  }
+
+  /**
+   * Removes the anchors of the bar map of a source (only those of the bar tracking with
+   * `onlyAuto`): without anchors the grid is again the steady one the map started from.
+   */
+  clearAnchors(sourceId: string, onlyAuto = false): void {
+    const tempo = this.montages.montage().sources.find((s) => s.id === sourceId)?.tempo;
+    if (tempo?.anchors?.length) this.montages.setSourceTempo(sourceId, clearAnchors(tempo, onlyAuto));
+  }
+
+  /** Drops the bar map of a source: back to the steady tempo that best follows it. */
+  steadyTempo(sourceId: string): void {
+    const tempo = this.montages.montage().sources.find((s) => s.id === sourceId)?.tempo;
+    if (tempo?.anchors) this.montages.setSourceTempo(sourceId, steadyTempo(tempo));
   }
 
   clearSelection(): void {

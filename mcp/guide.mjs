@@ -14,6 +14,9 @@ stereo mix, which is rendered by \`export\`.
   paths returned by \`get_state\`, and \`save\`/\`export\` to a new path become a download in
   the browser. Export formats there: wav, mp3, ogg.
 - **source** — an original audio file (id, path, format, length, detected or manual tempo).
+  The tempo may be **variable**: a bar map pins the start of some bars (or of every bar) on the
+  audio, for songs recorded without a steady tempo; the grid, \`get_beats\` and the beat snap follow
+  it, and \`bpm\` is then the average. It belongs to the source, so every clip of the file shares it.
 - **track** — a horizontal lane: name, muted, solo, \`volumeDb\` (volume of the whole track), and clips.
   Tracks are mixed together; when any track is soloed only soloed tracks are heard.
 - **clip** — a portion of a source placed on a track:
@@ -21,7 +24,7 @@ stereo mix, which is rendered by \`export\`.
   - \`offset\`: where the portion begins inside the source (source seconds);
   - \`rate\`: speed factor (2 = twice as fast, half as long); \`pitch\`: semitones;
     \`mode\`: \`stretch\` (pitch kept, Rubber Band) or \`varispeed\` (pitch follows speed);
-  - \`bpm\`: tempo heard in the clip (source BPM × rate), when known;
+  - \`bpm\`: tempo heard in the clip (source BPM × rate, the average one when variable), when known;
   - \`envelope\`: its volume points (fades).
 - **envelope** — volume points of a **clip**, in **dB** (0 dB = unchanged, -100 dB or less =
   silence, max +6 dB), given and returned in timeline seconds. It belongs to the clip: moving,
@@ -55,6 +58,12 @@ without leading and trailing silences; null while some audio is not ready.
 - Show the user what you mean: \`select\` {clipIds, from, to} highlights clips and a range in the window.
 - Beat-match: \`align_tempo\` {referenceClipId, targetClipIds, alignBars: true}; check with \`get_beats\`.
 - Keep a portion only: \`crop\` {from, to}.
+- Grid drifting away from the music (tempo not steady): \`set_bar_map\` {clipId, action: "track"};
+  where it is still off, \`pin\` the bar on its hit {bar, time} (and \`track\` again: pins stay);
+  \`reset\` removes every pin (back to the starting steady grid), \`clearAuto\` only the tracked ones.
+  Keep the work for other montages: \`save\` writes the bar file next to the audio (\`song.mp3.edimusbars\`),
+  used by itself when the audio is opened again on the desktop; \`load\` reads it.
+  \`align_tempo\` changes the speed only, it cannot make a drifting song steady.
 
 ## Good practice
 - Never assume ids: read them from \`get_state\`.

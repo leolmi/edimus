@@ -1,4 +1,5 @@
 import { beatsPerBar, type Tempo } from '../audio/tempo';
+import { barLengthAt, gridPoints } from '../audio/tempo-map';
 import { Clip, Montage, clipRate } from '../montage/montage.model';
 import type { SnapStep } from '../settings.service';
 
@@ -14,26 +15,20 @@ export interface SnapContext {
 /** Seconds around the anchor where the grid points of the other clips are looked for. */
 const REACH = 4;
 
-/** Period of the grid of a tempo (source seconds) for a step; its phase is the downbeat `offset`. */
-function period(tempo: Tempo, step: SnapStep): number {
-  const beat = 60 / tempo.bpm;
-  return step === 'bar' ? beat * beatsPerBar(tempo) : step === 'half' ? beat / 2 : beat;
+/** Grid points per bar for a step: the bar, the beat or half a beat. */
+function perBar(tempo: Tempo, step: SnapStep): number {
+  const beats = beatsPerBar(tempo);
+  return step === 'bar' ? 1 : step === 'half' ? beats * 2 : beats;
 }
 
-/** Timeline times of the grid points of a clip (from its source tempo) in [from, to], inside the clip. */
+/** Timeline times of the grid points of a clip (from its source bar map) in [from, to], inside the clip. */
 function gridOf(clip: Clip, tempo: Tempo, step: SnapStep, start: number, length: number, from: number, to: number): number[] {
   const rate = clipRate(clip);
-  const unit = period(tempo, step);
-  const toTimeline = (source: number) => start + (source - clip.offset) / rate;
+  const toSource = (time: number) => clip.offset + (time - start) * rate;
   const lo = Math.max(from, start);
   const hi = Math.min(to, start + length);
-  const points: number[] = [];
-  for (let k = Math.ceil((clip.offset + (lo - start) * rate - tempo.offset) / unit); ; k++) {
-    const time = toTimeline(tempo.offset + k * unit);
-    if (time > hi) break;
-    points.push(time);
-  }
-  return points;
+  if (hi < lo) return [];
+  return gridPoints(tempo, perBar(tempo, step), toSource(lo), toSource(hi)).map((p) => start + (p.time - clip.offset) / rate);
 }
 
 /**
@@ -71,6 +66,7 @@ export function snapToBeats(montage: Montage, clipId: string, start: number, ori
 
   // no grid around: whole steps of the clip itself from where it was
   if (!tempo) return start;
-  const step = period(tempo, context.step) / clipRate(dragged);
+  // the steps of the bar under the clip start
+  const step = barLengthAt(tempo, dragged.offset) / perBar(tempo, context.step) / clipRate(dragged);
   return Math.max(0, originalStart + Math.round((start - originalStart) / step) * step);
 }

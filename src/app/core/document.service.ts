@@ -28,7 +28,7 @@ import { FileSystemPort } from './platform/file-system.port';
 import { ShellPort } from './platform/shell.port';
 import { SettingsService } from './settings.service';
 
-interface StatusMessage {
+export interface StatusMessage {
   key: TranslationKey;
   params?: Record<string, string | number>;
 }
@@ -59,6 +59,11 @@ export class DocumentService {
   private readonly message = signal<StatusMessage>({ key: 'app.ready' });
   readonly status = computed(() => this.i18n.t(this.message().key, this.message().params));
   readonly title = computed(() => this.montages.displayName() ?? this.i18n.t('montage.new'));
+  /** Shows a message in the status bar (outcome of a command run elsewhere). */
+  notify(message: StatusMessage): void {
+    this.message.set(message);
+  }
+
   /** Where dropped files are going, from the drop until they are on the montage (their tracks then show the decoding). */
   readonly pendingDrop = signal<DropTarget | null>(null);
 

@@ -83,16 +83,52 @@ EnvelopePoint { time: number /* s sorgente della clip */; gain: number /* linear
 ## Tempo
 
 ```ts
-Tempo { bpm: number; offset: number /* s sorgente */; confidence: number /* 0..1, 1 = manuale */; beatsPerBar?: number /* default 4 */ }
+Tempo { bpm: number; offset: number /* s sorgente */; confidence: number /* 0..1, 1 = manuale */; beatsPerBar?: number /* default 4 */; anchors?: BarAnchor[] }
+BarAnchor { bar: number /* intero */; time: number /* s sorgente */; auto?: true }
 ```
 
-- La griglia dei battiti è `offset + k · 60/bpm` in tempo **sorgente**; con `beatsPerBar` il
-  battito `offset` è un **1** (inizio battuta) e le battute sono ogni `beatsPerBar` battiti.
-- Il tempo è della **sorgente**; il tempo percepito in una clip è `bpm × rate`.
-- Si assume tempo **costante** per tutto il brano; il tempo variabile (warp marker) è in
-  [WISHLIST.md](../WISHLIST.md).
+- Senza `anchors` la griglia è **costante**: battute ogni `beatsPerBar · 60/bpm` a partire da
+  `offset`, in tempo **sorgente**; `offset` è un **1** (inizio battuta) ed è la battuta 0.
+- **Mappa delle battute** (tempo variabile, `core/audio/tempo-map.ts`): `anchors` fissa l'inizio di
+  alcune battute (numerate come sopra, ordinate per `bar`). Tra due ancore le battute hanno
+  durata uniforme; fuori dall'intervallo delle ancore proseguono con la durata del tratto più
+  vicino; con una sola ancora valgono la durata di `bpm` e la fase dell'ancora. Dentro una
+  battuta i battiti sono equidistanti. `barTime(k)` / `barAt(t)` convertono battuta ↔ tempo
+  (k frazionario = posizione dentro la battuta); `meanBpm` è il tempo medio tra prima e ultima
+  ancora.
+- Ancore a mano (senza `auto`) e ancore del tracciamento automatico (`auto: true`, una per
+  battuta, sostituite a ogni nuovo tracciamento; quelle a mano restano e lo vincolano).
+- `bpm` e `offset` restano quelli della griglia costante da cui la mappa è partita: tolte le
+  ancore (`clearAnchors`) la griglia torna quella.
+
+### File delle battute (`.edimusbars`)
+
+Tempo e mappa di un file audio, per riusarli in altri montaggi (`core/audio/bar-file.ts`,
+`bar-file.service.ts`). Si chiama come l'audio con in più l'estensione: `brano.mp3.edimusbars`
+(così `brano.mp3` e `brano.wav` nella stessa cartella non si sovrappongono). JSON:
+
+```ts
+{ kind: 'edimus-bars'; version: 1; audio: string /* nome del file */; fingerprint?: string;
+  tempo: { bpm; offset; beatsPerBar; anchors? } }
+```
+
+- `fingerprint` è l'impronta dell'audio (come `AudioSource.fingerprint`): un file delle battute
+  di un audio diverso con lo stesso nome viene ignorato all'apertura, e il caricamento a mano
+  chiede conferma.
+- Desktop (`PlatformInfo.filesBesideSources`): il file sta accanto all'audio. Quando la sorgente
+  non ha un tempo a mano nel montaggio, `TempoService` lo legge al posto del rilevamento (il
+  tempo resta "rilevato": non entra nel montaggio finché non lo si modifica). "Salva le battute"
+  scrive lì senza chiedere; con l'impostazione `autoSaveBars` il file si aggiorna da solo a ogni
+  cambio del tempo a mano di una sorgente (dopo 1 s di pausa, non all'apertura del montaggio).
+- Web: salvataggio e caricamento solo espliciti, con i dialoghi del browser; nessuna lettura
+  automatica.
+- Il file audio non viene mai modificato.
+- La mappa è della **sorgente**: tutte le clip dello stesso file la condividono e trim, split e
+  crop non la toccano. Il tempo percepito in una clip è `meanBpm × rate`.
+- La mappa fa seguire la griglia all'audio, che non viene modificato; rendere regolare l'audio
+  (warp marker) è in [WISHLIST.md](../WISHLIST.md).
 - `offset` manuale è normalizzato al primo 1 della sorgente (`downbeat mod battuta`), così le
-  battute sono numerate dall'inizio del file.
+  battute sono numerate dall'inizio del file; la battuta segnata a mano diventa un'ancora.
 
 ## Modifiche e annulla
 

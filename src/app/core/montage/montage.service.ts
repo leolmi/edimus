@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { AudioLibraryService } from '../audio/audio-library.service';
 import type { Tempo } from '../audio/tempo';
 import { FileSystemPort } from '../platform/file-system.port';
+import { withSourceTempo } from './edits';
 import { readMontage, writeMontage } from './montage-file';
 import {
   AudioSource,
@@ -156,10 +157,7 @@ export class MontageService {
 
   /** Sets (or, with null, removes) the tempo given by hand to a source. */
   setSourceTempo(sourceId: string, tempo: Tempo | null): void {
-    this.update((m) => ({
-      ...m,
-      sources: m.sources.map((s) => (s.id === sourceId ? { ...s, tempo: tempo ?? undefined } : s)),
-    }));
+    this.update((m) => withSourceTempo(m, sourceId, tempo));
   }
 
   /** Replaces a track with the result of `edit`. */

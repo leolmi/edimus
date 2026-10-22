@@ -49,6 +49,7 @@ un passo di annulla per trascinamento).
 | corpo clip | trascina | sposta la clip (anche su altre tracce; oltre l'ultima crea una traccia nuova); inizio e fine si agganciano a inizio e fine delle altre clip, con la griglia visibile a passi di battito, Alt per lo spostamento libero |
 | corpo di una clip selezionata | trascina | sposta insieme tutte le clip selezionate (`moveClips`): stesse distanze, cambio traccia solo se restano tutte su tracce esistenti, si ferma quando la prima arriva a 0; l'aggancio considera i bordi di tutte e ignora le clip del gruppo |
 | bordo clip (6 px) | trascina | trim dell'inizio o della fine |
+| linea di battuta, con la griglia | Maiusc+trascina / Maiusc+clic destro | fissa la battuta lì (stretch della mappa) / la libera |
 | corpo clip | doppio clic | dialogo velocità/pitch |
 | modalità inviluppo | clic / trascina su una clip | aggiunge un punto all'inviluppo della clip più in alto sotto il puntatore e lo sposta; su un punto lo sposta. Il punto resta dentro la clip e si aggancia (10 px) ai bordi di tutte le clip e ai punti degli inviluppi delle altre clip, in verticale a 0 dB (6 px); Alt per lo spostamento libero |
 | modalità inviluppo | trascina maniglia | piega il segmento (doppio clic: lo raddrizza) |
@@ -117,7 +118,32 @@ della clip. La lettura è **prima per battute, poi per movimenti**:
 - linea marcata e numero di battuta sull'1 (numero solo se la battuta è larga ≥ 28 px e non
   precede l'inizio della sorgente);
 - linee dei movimenti più leggere e corte, solo se distanti ≥ 6 px;
-- sotto 6 px per battuta la griglia non si disegna.
+- sotto 6 px per battuta (in media nella vista) la griglia non si disegna;
+- le battute seguono la mappa della sorgente (`barTime`), quindi possono avere durate diverse;
+  le battute fissate a mano hanno un triangolino in alto, quelle del tracciamento automatico un
+  quadratino in basso.
+
+### Stretch della mappa delle battute
+
+Con la griglia visibile, **Maiusc+trascina** una linea di battuta (entro 6 px; cursore
+`col-resize`) la sposta e la fissa (`pinBar`): le battute tra lei e l'ancora precedente (o la
+successiva) si allargano o stringono in modo uniforme, oltre l'ultima ancora prendono la nuova
+durata. Su una griglia senza ancore resta ferma la battuta 0 (`offset`). La linea si aggancia
+all'attacco più vicino (±50 ms, `snapToOnsets`), Alt la muove liberamente; nessuna battuta può
+scendere sotto un battito di 150 ms (400 BPM). Un gesto = un passo di annulla.
+**Maiusc+clic destro** su una battuta fissata la libera (`unpinBar`).
+
+### Tracciamento delle battute
+
+`trackBars()` (`tempo-map.ts`), dal dialogo Tempo ("Rileva le battute") o da `set_bar_map`:
+sulla curva degli attacchi di tutta la sorgente un anello ad aggancio di fase prevede ogni
+battito un battito dopo il precedente, lo attira verso l'attacco più forte vicino (±15 % del
+battito, pesato con la distanza) e aggiorna lentamente la durata del battito (entro 0,7–1,4×).
+Parte dalle ancore a mano: tra due ancore il numero di battute è fissato e l'errore all'arrivo
+è distribuito sui battiti; prima della prima e dopo l'ultima procede libero fino agli estremi
+del file. Senza ancore a mano parte dall'attacco più forte nel primo battito della griglia,
+segue i battiti nei due versi e sceglie come 1 il movimento con gli attacchi più forti in
+media (l'accento), perché la fase rilevata può essere sbagliata di qualche battito. Il risultato è un'ancora `auto` per battuta.
 
 ### Aggancio ai bordi delle clip
 
@@ -162,7 +188,16 @@ Dal dialogo, "Segna la battuta" chiude il dialogo e avvia la marcatura
 4. Conferma salva `bpm` e `offset` (normalizzato al primo 1 della sorgente) con
    `confidence: 1`.
 
-Il tempo è considerato fisso per tutto il brano; la definizione per tratti è prevista in futuro.
+La battuta segnata diventa un'ancora a mano: è il punto fermo dei successivi stretch e del
+tracciamento. Il dialogo mostra anche lo stato della mappa e "Rileva le battute"; con almeno
+un'ancora, "Rimuovi ancore" (`clearAnchors`: torna alla griglia costante di partenza, `bpm` e
+`offset`, che la mappa non modifica), "Rimuovi ancore automatiche" (con ancore di entrambi i
+tipi: tiene quelle a mano) e, con la mappa variabile, "Tempo costante" (`steadyTempo`: toglie
+la mappa e lascia il tempo medio). Applicare il dialogo senza
+cambiare BPM, primo battito o metro conserva la mappa; cambiandoli il tempo torna costante.
+"Salva le battute" e "Carica le battute" scrivono e leggono il file delle battute dell'audio
+(vedi [data-model.md](data-model.md#file-delle-battute-edimusbars)); con il tempo letto da quel
+file il dialogo e l'intestazione della traccia lo indicano.
 
 ## Allineamento del tempo
 

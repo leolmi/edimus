@@ -4,7 +4,10 @@ import { ExportOptions, ExportService } from '../audio/export.service';
 import { MixService } from '../audio/mix.service';
 import { PlaybackService } from '../audio/playback.service';
 import { ProcessedAudioService } from '../audio/processed-audio.service';
+import { BarFileService } from '../audio/bar-file.service';
 import { TempoService } from '../audio/tempo.service';
+import { beatsPerBar } from '../audio/tempo';
+import { anchorOf, gridPoints, isVariable, meanBpm, pinBar } from '../audio/tempo-map';
 import { applyCrossfade, findCrossfade } from '../montage/crossfade';
 import { cropToRange, deleteRange, setClipTiming, splitAt, trimClip } from '../montage/edits';
 import { EnvelopePoint, clipGainAt, withFade } from '../montage/envelope';
@@ -59,6 +62,7 @@ export class AiCommandsService {
   private readonly library = inject(AudioLibraryService);
   private readonly processed = inject(ProcessedAudioService);
   private readonly tempos = inject(TempoService);
+  private readonly barFiles = inject(BarFileService);
   private readonly playback = inject(PlaybackService);
   private readonly mixer = inject(MixService);
   private readonly exporter = inject(ExportService);
@@ -290,7 +294,7 @@ export class AiCommandsService {
         await this.waitTempo([clip.sourceId]);
         const tempo = this.tempos.sourceTempo(clip.sourceId);
         if (!tempo) throw new Error('The tempo of this clip is unknown: set it with set_tempo first');
-        rate = Number(p['bpm']) / tempo.bpm;
+        rate = Number(p['bpm']) / meanBpm(tempo);
       }
       rate = Math.min(4, Math.max(0.25, Math.round(rate * 10000) / 10000));
       const pitch = p['pitch'] !== undefined ? Number(p['pitch']) : (clip.pitch ?? 0);
@@ -398,19 +402,66 @@ export class AiCommandsService {
       const tempo = this.tempos.sourceTempo(clip.sourceId);
       if (!tempo) throw new Error('The tempo of this clip is unknown (not detected yet, or not rhythmic): use set_tempo');
       const rate = clipRate(clip);
-      const beat = 60 / tempo.bpm;
       const end = clip.start + this.length(clip);
       const from = Math.max(clip.start, Number(p['from'] ?? clip.start));
       const to = Math.min(end, Number(p['to'] ?? end));
-      const beats: { time: number; bar: boolean }[] = [];
-      let k = Math.ceil((clip.offset + (from - clip.start) * rate - tempo.offset) / beat);
-      for (; beats.length < 400; k++) {
-        const time = clip.start + (tempo.offset + k * beat - clip.offset) / rate;
-        if (time >= to) break;
-        const meter = tempo.beatsPerBar ?? 4;
-        beats.push({ time: round(time), bar: ((k % meter) + meter) % meter === 0 });
+      const beats: { time: number; bar?: number; anchor?: 'manual' | 'auto' }[] = [];
+      for (const point of gridPoints(tempo, beatsPerBar(tempo), toSource(clip, from), toSource(clip, to))) {
+        const time = toTimeline(clip, point.time);
+        if (time >= to || beats.length >= 400) break;
+        if (point.index) {
+          beats.push({ time: round(time) });
+          continue;
+        }
+        // downbeats carry the bar number shown on the grid (from 1) and whether they are pinned
+        const anchor = anchorOf(tempo, point.bar);
+        beats.push({ time: round(time), bar: point.bar + 1, ...(anchor ? { anchor: anchor.auto ? 'auto' : 'manual' } : {}) });
       }
-      return { bpm: round(tempo.bpm * rate, 2), beatLength: round(beat / rate, 4), beats };
+      return { bpm: round(meanBpm(tempo) * rate, 2), variable: isVariable(tempo), beats };
+    },
+    set_bar_map: async (p) => {
+      const { clip } = this.clip(String(p['clipId']));
+      await this.waitTempo([clip.sourceId]);
+      const tempo = this.tempos.sourceTempo(clip.sourceId);
+      if (!tempo) throw new Error('The tempo of this clip is unknown: set it with set_tempo first');
+      const bar = p['bar'] !== undefined ? Math.round(Number(p['bar'])) - 1 : undefined;
+      switch (p['action']) {
+        case 'track':
+          return { ...this.sourceState(clip.sourceId), beatsOnAttacks: round((await this.edits.trackBars(clip.sourceId)) ?? 0, 2) };
+        case 'pin': {
+          if (bar === undefined || p['time'] === undefined) throw new Error('pin needs bar and time');
+          const minBar = (60 / 400) * beatsPerBar(tempo);
+          this.montages.setSourceTempo(clip.sourceId, pinBar(tempo, bar, toSource(clip, Number(p['time'])), minBar));
+          break;
+        }
+        case 'unpin':
+          if (bar === undefined) throw new Error('unpin needs bar');
+          this.edits.unpinBar(clip.sourceId, bar);
+          break;
+        case 'steady':
+          this.edits.steadyTempo(clip.sourceId);
+          break;
+        case 'reset':
+          this.edits.clearAnchors(clip.sourceId);
+          break;
+        case 'clearAuto':
+          this.edits.clearAnchors(clip.sourceId, true);
+          break;
+        case 'save': {
+          const path = await this.barFiles.save(clip.sourceId);
+          if (!path) throw new Error('The bar file was not saved');
+          return { ...this.sourceState(clip.sourceId), barFile: path };
+        }
+        case 'load': {
+          const path = await this.barFiles.load(clip.sourceId);
+          if (!path) throw new Error('No bar file was loaded');
+          return { ...this.sourceState(clip.sourceId), barFile: path };
+        }
+        default:
+          throw new Error('action must be track, pin, unpin, reset, clearAuto, steady, save or load');
+      }
+      this.timeline.beatGrid.set(true);
+      return this.sourceState(clip.sourceId);
     },
     snapshot: async () => this.snapshot(),
   };
@@ -463,7 +514,15 @@ export class AiCommandsService {
         ? { codec: info.codec, sampleRate: info.sampleRate, channels: info.channels, length: round(info.duration) }
         : {}),
       tempo: tempo
-        ? { bpm: tempo.bpm, firstBeat: round(tempo.offset), confidence: tempo.confidence, manual: !!source.tempo }
+        ? {
+            bpm: round(meanBpm(tempo), 2),
+            firstBeat: round(tempo.offset),
+            confidence: tempo.confidence,
+            manual: !!source.tempo,
+            ...(tempo.anchors?.length
+              ? { pinnedBars: tempo.anchors.length, pinnedByHand: tempo.anchors.filter((a) => !a.auto).length, variable: isVariable(tempo) }
+              : {}),
+          }
         : this.tempos.isDetecting(id)
           ? 'detecting'
           : null,
@@ -510,7 +569,7 @@ export class AiCommandsService {
       rate: clipRate(clip),
       pitch: clip.pitch ?? 0,
       mode: clip.varispeed ? 'varispeed' : 'stretch',
-      bpm: tempo ? round(tempo.bpm * clipRate(clip), 2) : null,
+      bpm: tempo ? round(meanBpm(tempo) * clipRate(clip), 2) : null,
       status: render ? render.status : (source?.status ?? 'unknown'),
       // timeline seconds; points outside [start, end] are hidden by a trim but still shape the gain
       envelope: (clip.envelope ?? []).map((p) => ({ time: round(toTimeline(clip, p.time)), gainDb: toDb(p.gain), ...(p.curve ? { curve: p.curve } : {}) })),

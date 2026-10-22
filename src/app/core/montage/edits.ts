@@ -1,3 +1,4 @@
+import type { Tempo } from '../audio/tempo';
 import { Clip, Montage, clipRate } from './montage.model';
 
 /** Length of a clip on the timeline (resolves `duration: 0` with the source length). */
@@ -136,4 +137,9 @@ export function setClipTiming(
       },
     ];
   });
+}
+
+/** Sets (or, with null, removes) the tempo given by hand to a source. */
+export function withSourceTempo(montage: Montage, sourceId: string, tempo: Tempo | null): Montage {
+  return { ...montage, sources: montage.sources.map((s) => (s.id === sourceId ? { ...s, tempo: tempo ?? undefined } : s)) };
 }

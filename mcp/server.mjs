@@ -3,14 +3,16 @@
 //
 //   Claude ──stdio──▶ this server ──WebSocket 127.0.0.1──▶ edimus (connects by itself)
 //
-// The server listens on 127.0.0.1 only and writes port and token to %APPDATA%/edimus/mcp.json
-// (~/.config/edimus/mcp.json elsewhere): the app reads that file and connects; every edit made
-// through the tools is an ordinary, undoable edit of the montage shown in the app.
+// The server listens on 127.0.0.1 only and writes port and token to ~/.edimus/mcp-<pid>.json
+// (not %APPDATA%: a client packaged as MSIX, like Claude Desktop, would redirect it into its own
+// package folder, hidden from the app): the app reads those files and connects to every server, so each
+// AI session running one sees the app; every edit made through the tools is an ordinary, undoable
+// edit of the montage shown in the app.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { isSea } from 'node:sea';
@@ -26,8 +28,8 @@ const packaged = isSea();
 const here = packaged ? dirname(process.execPath) : dirname(fileURLToPath(import.meta.url));
 const appExe = process.platform === 'win32' ? 'edimus.exe' : 'edimus';
 const defaultExe = packaged ? join(here, appExe) : join(here, '..', 'release', 'edimus', appExe);
-const configDir = process.env.APPDATA ? join(process.env.APPDATA, 'edimus') : join(homedir(), '.config', 'edimus');
-const configFile = join(configDir, 'mcp.json');
+const configDir = join(homedir(), '.edimus');
+const configFile = join(configDir, `mcp-${process.pid}.json`);
 const token = randomBytes(24).toString('hex');
 const log = (...args) => console.error('[edimus-mcp]', ...args);
 
@@ -41,14 +43,53 @@ const pending = new Map();
 let selected = null;
 let nextId = 1;
 
-const wss = new WebSocketServer({ host: '127.0.0.1', port: PORT });
-wss.on('listening', () => {
-  mkdirSync(configDir, { recursive: true });
-  writeFileSync(configFile, JSON.stringify({ port: PORT, token, pid: process.pid }, null, 2));
-  log(`listening on 127.0.0.1:${PORT}, config in ${configFile}`);
-});
-wss.on('error', (err) => log('bridge error:', err.message));
-wss.on('connection', (ws, request) => {
+/** Set once this server has written its config: only then it removes it on exit. */
+let configWritten = false;
+
+/** Removes the config files of servers that are no longer running (killed without cleanup). */
+function removeStaleConfigs() {
+  let names = [];
+  try {
+    names = readdirSync(configDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    const pid = Number(/^mcp-(\d+)\.json$/.exec(name)?.[1]);
+    if (name !== 'mcp.json' && !pid) continue;
+    let alive = false;
+    try {
+      // signal 0 only checks that the process exists
+      alive = !!pid && process.kill(pid, 0);
+    } catch (err) {
+      alive = err.code === 'EPERM';
+    }
+    if (!alive) rmSync(join(configDir, name), { force: true });
+  }
+}
+
+// the preferred port (fixed, so the web version can be told once) when free, otherwise any free
+// port: every server opens its own bridge
+listen(PORT);
+function listen(port) {
+  const server = new WebSocketServer({ host: '127.0.0.1', port });
+  server.on('listening', () => {
+    const actual = server.address().port;
+    removeStaleConfigs();
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(configFile, JSON.stringify({ port: actual, token, pid: process.pid }, null, 2));
+    configWritten = true;
+    log(`listening on 127.0.0.1:${actual}, config in ${configFile}`);
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && port !== 0) listen(0);
+    else log('bridge error:', err.message);
+  });
+  server.on('connection', onConnection);
+  return server;
+}
+
+function onConnection(ws, request) {
   const url = new URL(request.url ?? '/', 'http://localhost');
   if (url.searchParams.get('token') !== token) {
     ws.close(4001, 'invalid token');
@@ -84,9 +125,10 @@ wss.on('connection', (ws, request) => {
     if (selected === instanceId) selected = [...instances.keys()].pop() ?? null;
     log(`instance disconnected: ${instanceId}`);
   });
-});
+}
 
 function cleanup() {
+  if (!configWritten) return;
   try {
     rmSync(configFile, { force: true });
   } catch {
@@ -96,8 +138,8 @@ function cleanup() {
 process.on('exit', cleanup);
 process.on('SIGINT', () => process.exit(0));
 process.on('SIGTERM', () => process.exit(0));
-// the client closing stdio ends the server (a stale mcp.json left by a hard kill is harmless:
-// the app simply fails to connect and retries)
+// the client closing stdio ends the server (a config left by a hard kill is harmless: the app
+// fails to connect to it, and the next server to start removes it)
 process.stdin.on('close', () => process.exit(0));
 
 function target(instance) {
@@ -131,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.3.0' },
+  { name: 'edimus', version: '1.4.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -418,12 +460,30 @@ appTool(
 appTool(
   'set_tempo',
   'Set source tempo',
-  'Sets by hand the tempo of the source of a clip (BPM and time of a downbeat in source seconds), or with reset true goes back to the detected one.',
+  'Sets by hand a steady tempo for the source of a clip (BPM and time of a downbeat in source seconds; any bar map is dropped), or with reset true goes back to the detected one.',
   {
     clipId: z.string(),
     bpm: z.number().min(20).max(400).optional(),
     firstBeat: z.number().min(0).optional(),
     reset: z.boolean().optional(),
+  },
+);
+appTool(
+  'set_bar_map',
+  'Bar map',
+  'For sources whose tempo is not steady (badly recorded, no click): the bar grid follows a map of pinned bars. ' +
+    'action track: finds the start of every bar along the whole source from the bars pinned by hand (which stay); ' +
+    'pin: puts the start of bar `bar` (number as on the grid, from 1) at timeline second `time`, the bars between it and the pinned ones around stretch evenly; ' +
+    'unpin: takes the pin away from bar `bar`; reset: removes all the pins, back to the steady grid the map started from; ' +
+    'clearAuto: removes only the pins of the tracking, keeps those set by hand; steady: drops the map leaving a steady tempo equal to its average; ' +
+    'save: writes tempo and map to the bar file next to the audio (song.mp3.edimusbars; in the browser the user chooses where); ' +
+    'load: reads them back from there (on the desktop such a file is also used by itself when the audio is opened). ' +
+    'The map belongs to the source: every clip of the same file follows it.',
+  {
+    clipId: z.string(),
+    action: z.enum(['track', 'pin', 'unpin', 'reset', 'clearAuto', 'steady', 'save', 'load']),
+    bar: z.number().int().optional(),
+    time: z.number().min(0).optional(),
   },
 );
 appTool(
@@ -470,7 +530,8 @@ appTool(
 appTool(
   'get_beats',
   'Beats',
-  'Beat and bar times (timeline seconds) of a clip with a known tempo, in [from, to) (default: the whole clip, at most 400 beats).',
+  'Beat times (timeline seconds) of a clip with a known tempo, in [from, to) (default: the whole clip, at most 400 beats); ' +
+    'downbeats carry their bar number (as on the grid) and, when pinned in the bar map, anchor manual/auto.',
   { clipId: z.string(), from: z.number().min(0).optional(), to: z.number().min(0).optional() },
   { readOnlyHint: true },
 );

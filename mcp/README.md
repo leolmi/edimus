@@ -62,21 +62,22 @@ Con più finestre aperte l'AI le vede con `list_instances` e sceglie con `select
 | Trasporto e storia | `play`, `stop`, `seek`, `select`, `undo`, `redo` |
 | Clip e tracce | `move_clip`, `trim_clip`, `split`, `delete_clip`, `delete_range`, `crop`, `set_track`, `delete_track` |
 | Volume | `set_envelope`, `fade`, `crossfade` |
-| Velocità e tempo | `set_clip_timing`, `set_tempo`, `align_tempo` |
+| Velocità e tempo | `set_clip_timing`, `set_tempo`, `set_bar_map`, `align_tempo` |
 | Analisi | `analyze_levels`, `find_silence`, `get_beats`, `snapshot` |
 
 La guida per l'AI (modello dati, unità, ricette) è in [guide.mjs](guide.mjs), esposta come risorsa `edimus://guide`.
 
 ## Sicurezza
 
-- Il server ascolta solo su `127.0.0.1`; l'app si autentica con un token casuale che il server scrive in `%APPDATA%/edimus/mcp.json` (cancellato all'uscita).
+- Il server ascolta solo su `127.0.0.1`; l'app si autentica con un token casuale che il server scrive in `%USERPROFILE%/.edimus/mcp-<pid>.json` (cancellato all'uscita; non in `%APPDATA%`, che i client impacchettati MSIX come Claude Desktop reindirizzano nella cartella del pacchetto).
+- Ogni client AI avvia il proprio server: il primo prende la porta `EDIMUS_MCP_PORT`, gli altri una porta libera; l'app si collega a tutti quelli che trova, quindi ogni sessione vede le finestre aperte.
 - Le operazioni che perdono dati (`new_montage` o `open` di un montaggio con modifiche non salvate, sovrascrittura di file) sono rifiutate se l'AI non passa esplicitamente `discard` / `overwrite`.
 
 ## Variabili d'ambiente
 
 | Variabile | Default | Uso |
 |---|---|---|
-| `EDIMUS_MCP_PORT` | `47816` | porta del bridge WebSocket |
+| `EDIMUS_MCP_PORT` | `47816` | porta preferita del bridge WebSocket (se occupata, una libera) |
 | `EDIMUS_EXE` | `edimus.exe` accanto all'exe del server; da sorgenti `../release/edimus/edimus.exe` | eseguibile avviato da `launch_edimus` |
 
 ## Collaudo

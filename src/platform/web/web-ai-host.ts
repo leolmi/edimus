@@ -17,8 +17,9 @@ export class WebAiHost extends AiHostPort {
 
   readonly pid = undefined;
 
-  async bridgeConfig(): Promise<BridgeConfig | null> {
-    return this.settings.aiBridge();
+  async bridgeConfigs(): Promise<BridgeConfig[]> {
+    const config = this.settings.aiBridge();
+    return config ? [config] : [];
   }
 
   async serverCommand(): Promise<ServerCommand | null> {
