@@ -4,8 +4,10 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import type { ExportFormat, ExportOptions } from '../../core/audio/export.service';
+import { parseTime } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { AudioEnginePort } from '../../core/platform/audio-engine.port';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
@@ -36,6 +38,7 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
     MatCheckboxModule,
     MatDialogModule,
     MatFormFieldModule,
+    MatInputModule,
     MatSelectModule,
     ScaleSliderComponent,
     TranslatePipe,
@@ -115,10 +118,20 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
       <mat-checkbox [checked]="normalize()" (change)="normalize.set($event.checked)">
         {{ 'export.normalize' | t }}
       </mat-checkbox>
+
+      <mat-form-field class="silence">
+        <mat-label>{{ 'export.trailingSilence' | t }}</mat-label>
+        <input matInput placeholder="0,000" [value]="silenceText()" (input)="silenceText.set($any($event.target).value)" />
+        @if (trailingSilence() === null) {
+          <mat-hint class="error">{{ 'export.trailingSilenceInvalid' | t }}</mat-hint>
+        } @else {
+          <mat-hint>{{ 'export.trailingSilenceHint' | t }}</mat-hint>
+        }
+      </mat-form-field>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>{{ 'common.cancel' | t }}</button>
-      <button mat-flat-button (click)="confirm()">{{ 'export.confirm' | t }}</button>
+      <button mat-flat-button [disabled]="trailingSilence() === null" (click)="confirm()">{{ 'export.confirm' | t }}</button>
     </mat-dialog-actions>
   `,
   styles: `
@@ -140,6 +153,12 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
     .quality {
       flex: 1 1 auto;
     }
+    .silence {
+      margin-top: 8px;
+    }
+    .error {
+      color: var(--mat-sys-error);
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -158,6 +177,15 @@ export class ExportDialogComponent {
   protected readonly bitrate = signal(this.initial.bitrate);
   protected readonly quality = signal(this.initial.quality);
   protected readonly normalize = signal(this.initial.normalize);
+  protected readonly silenceText = signal(this.initial.trailingSilence ? this.initial.trailingSilence.toFixed(3).replace('.', ',') : '');
+
+  /** Seconds of the typed trailing silence (0 when empty), null when not a valid time. */
+  protected readonly trailingSilence = computed(() => {
+    const text = this.silenceText().trim();
+    if (!text) return 0;
+    const seconds = parseTime(text);
+    return seconds !== null && seconds >= 0 ? seconds : null;
+  });
 
   protected readonly bitrates = computed(() => BITRATES[this.format()] ?? null);
 
@@ -177,6 +205,7 @@ export class ExportDialogComponent {
       bitrate: this.bitrate(),
       quality: this.quality(),
       normalize: this.normalize(),
+      trailingSilence: this.trailingSilence() || undefined,
     });
   }
 }

@@ -83,6 +83,7 @@ const IT: HelpContent = {
           keys: ['Ctrl+E'],
           text: [
             'Produce un unico file mono o stereo con tutte le tracce udibili, i volumi e le modifiche di velocità: wav, mp3, flac, ogg, opus o m4a, con qualità, frequenza di campionamento e normalizzazione a scelta.',
+            'Il file parte sempre dall’inizio della linea temporale e arriva alla fine dell’ultima clip; il silenzio finale (es. 2,450 = 2 secondi e 450 millesimi) aggiunge altro silenzio in fondo.',
           ],
         },
         {
@@ -393,6 +394,18 @@ const IT: HelpContent = {
       note: 'Si esportano solo le tracce udibili: controlla muto e solo prima di esportare.',
     },
     {
+      title: 'Aggiungere silenzio all’inizio del file esportato',
+      steps: [
+        'Seleziona tutte le clip (Ctrl+A).',
+        'Trascinale verso destra della durata voluta: l’export parte sempre da 0, quindi lo spazio vuoto iniziale diventa silenzio.',
+      ],
+      note: 'Il silenzio vale per tutto il mix solo se si spostano le clip di tutte le tracce udibili.',
+    },
+    {
+      title: 'Aggiungere silenzio alla fine del file esportato',
+      steps: ['Premi Ctrl+E.', 'In Silenzio finale scrivi i secondi da aggiungere, es. 2,450 (2 secondi e 450 millesimi), poi esporta.'],
+    },
+    {
       title: 'Condividere un montaggio con i suoi file audio',
       steps: ['Premi Ctrl+Shift+S (salva con nome).', 'Come tipo di file scegli Pacchetto edimus (.edimuspack) e salva.', 'Invia il file .edimuspack: si apre con edimus, desktop o web.'],
       note: 'Chi riceve solo il file .edimus può trascinare i propri file audio: quelli mancanti vengono ricollegati da soli.',
@@ -457,6 +470,7 @@ const EN: HelpContent = {
           keys: ['Ctrl+E'],
           text: [
             'Produces a single mono or stereo file with all the audible tracks, volumes and speed changes: wav, mp3, flac, ogg, opus or m4a, with the quality, sample rate and normalization you choose.',
+            'The file always starts at the beginning of the timeline and ends with the last clip; the trailing silence (e.g. 2.450 = 2 seconds and 450 thousandths) adds more silence at the end.',
           ],
         },
         {
@@ -756,6 +770,18 @@ const EN: HelpContent = {
       title: 'Export the result',
       steps: ['Press Ctrl+E (or the export button).', 'Choose format, quality and channels, then the destination file.'],
       note: 'Only the audible tracks are exported: check mute and solo before exporting.',
+    },
+    {
+      title: 'Add silence at the start of the exported file',
+      steps: [
+        'Select all the clips (Ctrl+A).',
+        'Drag them right by the length you want: the export always starts at 0, so the empty space at the start becomes silence.',
+      ],
+      note: 'The silence applies to the whole mix only if the clips of all the audible tracks are moved.',
+    },
+    {
+      title: 'Add silence at the end of the exported file',
+      steps: ['Press Ctrl+E.', 'In Trailing silence type the seconds to add, e.g. 2.450 (2 seconds and 450 thousandths), then export.'],
     },
     {
       title: 'Share a montage with its audio files',

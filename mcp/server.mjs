@@ -173,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.4.0' },
+  { name: 'edimus', version: '1.5.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -336,6 +336,7 @@ appTool(
     bitrate: z.number().int().optional().describe('kbps, mp3/opus/m4a'),
     quality: z.number().min(0).max(10).optional().describe('ogg vorbis 0–10'),
     normalize: z.boolean().optional().describe('Peak at -1 dBFS'),
+    trailingSilence: z.number().min(0).optional().describe('Seconds of silence appended after the end of the montage'),
     overwrite: z.boolean().optional(),
   },
 );

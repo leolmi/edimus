@@ -161,7 +161,7 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
     // inside the content (as the last element it would make the dialog scroll)
     mat-slide-toggle {
       display: block;
-      padding: 4px 0;
+      padding: 8px 0;
     }
     .symbol {
       font-size: 18px;

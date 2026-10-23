@@ -58,6 +58,8 @@ without leading and trailing silences; null while some audio is not ready.
 - Show the user what you mean: \`select\` {clipIds, from, to} highlights clips and a range in the window.
 - Beat-match: \`align_tempo\` {referenceClipId, targetClipIds, alignBars: true}; check with \`get_beats\`.
 - Keep a portion only: \`crop\` {from, to}.
+- Silence before the mix: \`move_clip\` everything later (the export always starts at 0).
+  Silence after it: \`export\` {trailingSilence: seconds}.
 - Grid drifting away from the music (tempo not steady): \`set_bar_map\` {clipId, action: "track"};
   where it is still off, \`pin\` the bar on its hit {bar, time} (and \`track\` again: pins stay);
   \`reset\` removes every pin (back to the starting steady grid), \`clearAuto\` only the tracked ones.

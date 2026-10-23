@@ -8,6 +8,8 @@ export type { ExportFormat } from '../platform/audio-engine.port';
 export interface ExportOptions extends EncodeOptions {
   /** Scales the mix so that its peak is at -1 dBFS. */
   normalize: boolean;
+  /** Seconds of silence appended after the end of the montage. */
+  trailingSilence?: number;
 }
 
 export interface ExportProgress {
@@ -31,8 +33,8 @@ export class ExportService {
 
   async export(path: string, options: ExportOptions): Promise<void> {
     if (this.progress()) throw new Error('An export is already running');
-    const duration = this.timeline.duration();
-    if (duration <= 0) throw new Error('The montage is empty');
+    if (this.timeline.duration() <= 0) throw new Error('The montage is empty');
+    const duration = this.timeline.duration() + Math.max(0, options.trailingSilence ?? 0);
     if (!this.mixer.isComplete()) throw new Error('Some clips are still being decoded or processed');
     try {
       this.progress.set({ stage: 'render', progress: 0 });

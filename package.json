@@ -1,6 +1,6 @@
 {
   "name": "edimus",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "scripts": {
     "ng": "ng",
     "setup": "neu update --latest && npm run licenses",

@@ -126,9 +126,10 @@ export class AiCommandsService {
         bitrate: (p['bitrate'] as number) ?? 192,
         quality: (p['quality'] as number) ?? 6,
         normalize: !!p['normalize'],
+        trailingSilence: (p['trailingSilence'] as number | undefined) || undefined,
       };
       await this.exporter.export(path, options);
-      return { exported: path, duration: round(this.timeline.duration()), options };
+      return { exported: path, duration: round(this.timeline.duration() + (options.trailingSilence ?? 0)), options };
     },
 
     // --- transport and history

@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { parseTime } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
 
@@ -35,13 +36,6 @@ function formatTime(seconds: number): string {
   const abs = Math.abs(seconds);
   const m = Math.floor(abs / 60);
   return `${sign}${m}:${(abs - m * 60).toFixed(3).padStart(6, '0')}`;
-}
-
-/** Parses `m:ss.mmm`, `h:mm:ss.mmm` or plain seconds (comma or dot as decimal separator). */
-function parseTime(text: string): number | null {
-  const parts = text.trim().replace(',', '.').split(':');
-  if (parts.some((p) => p === '' || isNaN(Number(p)))) return null;
-  return parts.reduce((total, part) => total * 60 + Number(part), 0);
 }
 
 /** Speed and pitch of a clip with their real values: lengths, difference from the original, ratios. */

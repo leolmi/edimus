@@ -106,7 +106,8 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   `clipEnvelopeOnTimeline`). Lo stesso grafo serve riproduzione ed export, quindi suonano uguali.
   `audibleRange` dà il tratto udibile del mix (dal primo all'ultimo blocco di 10 ms sopra −60 dBFS
   delle tracce udibili, inviluppi e volumi compresi): barra di stato e `get_state`.
-- **Export** (`ExportService`): render offline e normalizzazione opzionale; l'encoding è del
+- **Export** (`ExportService`): render offline da 0 alla fine dell'ultima clip più il silenzio
+  finale opzionale (`trailingSilence`), normalizzazione opzionale; l'encoding è del
   motore audio (su desktop: scrittura PCM a blocchi, ffmpeg con progresso letto da `-progress pipe:1`).
 
 ## Stato e servizi

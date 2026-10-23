@@ -4,6 +4,16 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.5.0 — 2026-10-23
+
+### Export
+- Silenzio finale: nel dialogo di export si può aggiungere silenzio in fondo al file (es. 2,450 =
+  2 secondi e 450 millesimi); vuoto per default. Anche dall'assistente AI (`export`
+  `trailingSilence`).
+
+### Aiuto
+- Come fare: aggiungere silenzio all'inizio e alla fine del file esportato.
+
 ## 1.4.0 — 2026-10-22
 
 ### Tempo
