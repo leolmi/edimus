@@ -1,3 +1,4 @@
+@use 'sass:map';
 @use '@angular/material' as mat;
 
 html {
@@ -17,6 +18,10 @@ html {
       density: -2,
     )
   );
+
+  // green container from the Material palette (no system token for it): the play button
+  --app-success-container: light-dark(#{map.get(mat.$green-palette, 90)}, #{map.get(mat.$green-palette, 30)});
+  --app-on-success-container: light-dark(#{map.get(mat.$green-palette, 10)}, #{map.get(mat.$green-palette, 90)});
 
   &.theme-light {
     color-scheme: light;

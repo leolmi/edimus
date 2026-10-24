@@ -8,7 +8,7 @@
   </span>
 
   <button mat-icon-button (click)="documents.reset()" [disabled]="montages.pristine()" [matTooltip]="'action.reset' | t">
-    <mat-icon>restart_alt</mat-icon>
+    <mat-icon>file_export</mat-icon>
   </button>
   <button mat-icon-button (click)="documents.openDialog()" [matTooltip]="'action.open' | t">
     <mat-icon>folder_open</mat-icon>
@@ -20,7 +20,7 @@
     <mat-icon>save_as</mat-icon>
   </button>
   <button mat-icon-button (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
-    <mat-icon>file_export</mat-icon>
+    <mat-icon>audio_file</mat-icon>
   </button>
   <span class="divider"></span>
   <button mat-icon-button (click)="montages.undo()" [disabled]="!montages.canUndo()" [matTooltip]="'action.undo' | t">
@@ -89,11 +89,11 @@
   <span class="spacer"></span>
 
   @if (!montages.isEmpty()) {
-    <button mat-icon-button (click)="timeline.zoomBy(1.5)" [matTooltip]="'zoom.in' | t">
-      <mat-icon>zoom_in</mat-icon>
-    </button>
     <button mat-icon-button (click)="timeline.zoomBy(1 / 1.5)" [matTooltip]="'zoom.out' | t">
       <mat-icon>zoom_out</mat-icon>
+    </button>
+    <button mat-icon-button (click)="timeline.zoomBy(1.5)" [matTooltip]="'zoom.in' | t">
+      <mat-icon>zoom_in</mat-icon>
     </button>
     <button mat-icon-button (click)="timeline.fit()" [matTooltip]="'zoom.fit' | t">
       <mat-icon>fit_screen</mat-icon>
@@ -139,10 +139,10 @@
       >
         <mat-icon>repeat</mat-icon>
       </button>
-      <button mat-icon-button (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
+      <button mat-icon-button class="square stop" (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
         <mat-icon>stop</mat-icon>
       </button>
-      <button mat-icon-button (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
+      <button mat-icon-button class="square" [class.play]="!playback.playing()" [class.pause]="playback.playing()" (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
         <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
       </button>
       @if (audible(); as audible) {

@@ -218,14 +218,14 @@ export class TimelineComponent {
         untracked(() => this.timeline.fit());
       }
     });
-    // while playing, the view follows the playhead page by page
+    // while playing, the playhead stops in the middle of the view and the tracks scroll under it
+    // (at the ends of the montage the scroll stops and the playhead moves on)
     effect(() => {
       const position = this.playback.position();
       if (!this.playback.playing()) return;
       untracked(() => {
         const x = this.timeline.timeToX(position);
-        const width = this.timeline.viewWidth();
-        if (x > width * 0.95 || x < 0) this.timeline.setScroll(position - (width * 0.05) / this.timeline.pxPerSec());
+        if (x > this.timeline.viewWidth() / 2 || x < 0) this.timeline.centerOn(position);
       });
     });
     // native scrollbar <-> timeline scroll

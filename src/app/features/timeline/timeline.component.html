@@ -93,7 +93,7 @@
         } @else {
           <mat-icon>library_add</mat-icon>
           <span>{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}</span>
-          <a class="link" href="#" (click)="$event.preventDefault(); documents.openDialog()">{{ 'slots.browse' | t }}</a>
+          <a class="link" href="#" (click)="$event.preventDefault(); documents.browse()">{{ 'slots.browse' | t }}</a>
         }
       </div>
     </div>

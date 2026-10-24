@@ -10,6 +10,7 @@ import { TempoService } from '../../core/audio/tempo.service';
 import { sourceColors } from '../../core/source-colors';
 import { CanvasColors, ThemeColorsService } from '../../core/theme-colors.service';
 import { MontageService } from '../../core/montage/montage.service';
+import { envelopeAnchors } from '../../core/timeline/edge-snap';
 import { TimelineService } from '../../core/timeline/timeline.service';
 import { observeSize, prepareCanvas } from './canvas';
 
@@ -309,6 +310,7 @@ export class TrackLaneComponent {
       // the clip being marked shows only the grid of its marking
       for (const clip of this.track().clips) if (clip.id !== markingId) this.drawBeats(ctx, colors, clip, size.width, size.height);
     }
+    this.drawEnvelopeGuides(ctx, colors, size.width, size.height);
     this.drawMarkedBar(ctx, colors, size.width, size.height);
     this.drawEnvelope(ctx, colors, size.width);
   }
@@ -398,6 +400,31 @@ export class TrackLaneComponent {
     }
     ctx.lineWidth = 1;
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * A vertical line on the envelope points of every clip of the montage, across all the lanes:
+   * they are snap anchors for the clips moved on the other tracks.
+   */
+  private drawEnvelopeGuides(ctx: CanvasRenderingContext2D, colors: CanvasColors, width: number, height: number): void {
+    const xs = this.montages
+      .montage()
+      .tracks.flatMap((t) => t.clips)
+      .flatMap((clip) => envelopeAnchors(clip, this.timeline.clipLength(clip)))
+      .map((time) => Math.round(this.timeline.timeToX(time)) + 0.5)
+      .filter((x) => x >= 0 && x <= width);
+    if (!xs.length) return;
+    ctx.save();
+    ctx.strokeStyle = colors.envelope;
+    ctx.globalAlpha = 0.6;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    for (const x of xs) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** Bar grid of a clip, from the tempo of its source. */

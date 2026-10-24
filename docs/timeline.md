@@ -31,8 +31,10 @@ Nell'ordine:
    polilinea; le clip in render mostrano l'avanzamento; le clip senza audio (file mancante o in
    caricamento) sono un riquadro tratteggiato con il nome del file, rosso se il file manca;
 3. griglia delle battute (se attiva), esclusa la clip in marcatura;
-4. battuta in marcatura (vedi sotto);
-5. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
+4. linee verticali tratteggiate sui punti d'inviluppo di tutte le clip del montaggio, su tutte le
+   tracce (`envelopeAnchors`): sono punti di aggancio per le clip spostate;
+5. battuta in marcatura (vedi sotto);
+6. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
    inviluppo anche senza, con punti e maniglie; i punti nascosti da un trim non si vedono).
 
 L'intestazione della traccia ha il cursore del volume della traccia (−30…+6 dB, passo 0,5;
@@ -46,7 +48,7 @@ un passo di annulla per trascinamento).
 | fuori dalle clip | trascina | seleziona un intervallo di tempo |
 | corpo clip | clic | seleziona solo quella clip (anche se era in una selezione multipla) |
 | clip | Ctrl+clic | aggiunge la clip alla selezione o la toglie (`TimelineService.toggleClip`) |
-| corpo clip | trascina | sposta la clip (anche su altre tracce; oltre l'ultima crea una traccia nuova); inizio e fine si agganciano a inizio e fine delle altre clip, con la griglia visibile a passi di battito, Alt per lo spostamento libero |
+| corpo clip | trascina | sposta la clip (anche su altre tracce; oltre l'ultima crea una traccia nuova); inizio, fine e punti d'inviluppo si agganciano a bordi e punti d'inviluppo delle altre clip, con la griglia visibile a passi di battito, Alt per lo spostamento libero |
 | corpo di una clip selezionata | trascina | sposta insieme tutte le clip selezionate (`moveClips`): stesse distanze, cambio traccia solo se restano tutte su tracce esistenti, si ferma quando la prima arriva a 0; l'aggancio considera i bordi di tutte e ignora le clip del gruppo |
 | bordo clip (6 px) | trascina | trim dell'inizio o della fine |
 | linea di battuta, con la griglia | Maiusc+trascina / Maiusc+clic destro | fissa la battuta lì (stretch della mappa) / la libera |
@@ -62,7 +64,9 @@ un passo di annulla per trascinamento).
 I gesti trascinati usano `preview` + `commit` (un passo di annulla per gesto). Durante un gesto
 l'estensione della timeline resta quella di partenza (`holdExtent`): accorciando o spostando
 l'ultima clip la vista non scorre sotto il puntatore; si adegua al rilascio.
-Durante la riproduzione la vista segue il playhead pagina per pagina; all'apertura di un
+Durante la riproduzione, quando il playhead arriva a metà della vista si ferma lì e le tracce
+scorrono sotto (alla fine del montaggio la vista si ferma e il playhead prosegue; se il playhead
+finisce fuori a sinistra, per esempio col ciclo, la vista si centra su di lui); all'apertura di un
 montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono decodificate.
 
 ## Scorciatoie (`app.ts`)
@@ -76,7 +80,7 @@ montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono 
 | S | divide al playhead (le clip selezionate, o tutte se nessuna) |
 | Canc / Backspace | elimina la selezione (intervallo, altrimenti le clip selezionate; se svuota tracce, chiede conferma) |
 | ← / → | sposta le clip selezionate di un pixel allo zoom corrente; tasto tenuto o pressioni a meno di 0,8 s l'una dall'altra = un passo di annulla (`EditService.nudge` / `endNudge`) |
-| Shift+← / → | sposta le clip selezionate al punto di aggancio successivo: bordi e punti d'inviluppo delle altre clip, playhead (`nextAnchorShift`) |
+| Shift+← / → | sposta le clip selezionate al punto di aggancio successivo: bordi e punti d'inviluppo delle altre clip, playhead, raggiunti da bordi o punti d'inviluppo delle clip spostate (`nextAnchorShift`) |
 | E | modalità inviluppo |
 | B | griglia delle battute |
 | Ctrl+A | seleziona tutte le clip |
@@ -148,10 +152,9 @@ media (l'accento), perché la fase rilevata può essere sbagliata di qualche bat
 ### Aggancio ai bordi delle clip
 
 Sempre attivo durante lo spostamento: `snapToEdges()` (`core/timeline/edge-snap.ts`, funzione
-pura) porta l'inizio o la fine della clip trascinata (o di una delle clip del gruppo) sui
-punti di aggancio delle altre clip (`snapAnchors`: inizio, fine e punti visibili del loro
-inviluppo) sull'inizio o sulla fine più vicini delle
-altre clip, su qualsiasi traccia, se distano meno di 10 px. Ha la precedenza sull'aggancio ai
+pura) porta l'inizio, la fine o un punto visibile dell'inviluppo della clip trascinata (o di
+una delle clip del gruppo) sul punto di aggancio più vicino delle altre clip (`snapAnchors`:
+inizio, fine e punti visibili del loro inviluppo), su qualsiasi traccia, se distano meno di 10 px. Ha la precedenza sull'aggancio ai
 battiti; Alt li disattiva entrambi.
 
 ### Aggancio ai battiti

@@ -4,6 +4,23 @@ Versioni secondo [Semantic Versioning](https://semver.org/lang/it/): correzioni 
 funzioni nuove in 1.x. Dalla 1.0.0 il formato dei file `.edimus` è un impegno: le versioni
 successive devono aprire i montaggi già salvati (migrazione in `readMontage`).
 
+## 1.6.0 — 2026-10-25
+
+### File
+- Apri (Ctrl+O) mostra i montaggi aperti o salvati di recente: gli ultimi 20, il più recente in
+  cima e senza doppioni, più quelli bloccati con la puntina, che non escono mai dall'elenco.
+  Sfoglia… apre la scelta dei file; un file non più trovato esce dall'elenco, se non è bloccato.
+
+### Timeline
+- Linee verticali tratteggiate sui punti dell'inviluppo di tutte le clip, su tutte le tracce.
+- Spostando una clip si agganciano anche i suoi punti dell'inviluppo (non solo inizio e fine), ai
+  bordi e ai punti delle altre clip; con la griglia visibile hanno la precedenza sui battiti.
+- Durante la riproduzione il playhead si ferma a metà della vista e le tracce scorrono sotto.
+
+### Interfaccia
+- Stop, pausa e play come quadrati colorati (rosso, arancio, verde) alti quanto la barra di stato.
+- Zoom − prima di zoom +; nuove icone per Nuovo montaggio ed Esporta.
+
 ## 1.5.0 — 2026-10-23
 
 ### Export

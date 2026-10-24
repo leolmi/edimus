@@ -70,6 +70,10 @@
   temporanei; le impostazioni (tema, lingua, volume d’ascolto, uscita audio, passo di aggancio, salvataggio automatico delle battute)
   si cambiano dal dialog Impostazioni (`features/settings`, Ctrl+,; il volume dalla toolbar) e stanno nello storage di
   Neutralino (`SettingsService` tramite `SettingsPort`).
+- **Montaggi recenti** (`RecentFilesService`, mostrati dal dialog di Apri `RecentFilesDialogComponent`): file `.edimus`/`.edimuspack` aperti o salvati, nella
+  stessa archiviazione delle impostazioni (chiave `recentFiles`), condivisa dalle istanze: ogni modifica
+  rilegge l'elenco salvato prima di scriverlo. Al massimo 20 file non bloccati; quelli bloccati non
+  contano. Nella versione web i percorsi sono gli identificativi del registro dei file.
 - **ffmpeg/ffprobe** sono cercati accanto all'exe, in `ffmpeg/` o in `tools/ffmpeg/bin/`
   (`platform/neutralino/ffmpeg.service.ts`) e lanciati come processi figli; lo scambio di audio avviene tramite file
   PCM `f32le` in `.cache/`.

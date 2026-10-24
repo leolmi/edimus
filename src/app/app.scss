@@ -85,7 +85,7 @@
 
   flex: 0 0 auto;
   // fixed height: the transport buttons fit, the bar does not jump when they appear
-  min-height: 40px;
+  height: 40px;
   padding: 0 4px 0 12px;
   background: var(--mat-sys-surface-container);
   border-top: 1px solid var(--mat-sys-outline-variant);
@@ -101,6 +101,29 @@
   --mat-icon-button-state-layer-size: 34px;
   --mat-icon-button-icon-size: 22px;
   --mat-icon-button-icon-color: var(--mat-sys-on-surface);
+
+  // stop and play: coloured squares as tall as the status bar (inside its top border)
+  .square {
+    --mat-icon-button-state-layer-size: 39px;
+    --mat-icon-button-container-shape: 0;
+    border-radius: 0;
+  }
+
+  .stop {
+    --mat-icon-button-icon-color: var(--mat-sys-on-error-container);
+    background: var(--mat-sys-error-container);
+  }
+
+  // tertiary is the orange palette of the theme
+  .pause {
+    --mat-icon-button-icon-color: var(--mat-sys-on-tertiary-container);
+    background: var(--mat-sys-tertiary-container);
+  }
+
+  .play {
+    --mat-icon-button-icon-color: var(--app-on-success-container);
+    background: var(--app-success-container);
+  }
 
   .audible {
     white-space: nowrap;

@@ -2,6 +2,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ExportDialogComponent, FORMATS } from '../features/export/export-dialog.component';
+import { RecentFilesChoice, RecentFilesDialogComponent } from '../features/recent/recent-files-dialog.component';
 import { RenameDialogComponent, RenameDialogData } from '../features/rename/rename-dialog.component';
 import { SourceFilesDialogComponent } from '../features/sources/source-files-dialog.component';
 import { ExportOptions, ExportService } from './audio/export.service';
@@ -21,6 +22,7 @@ import {
   isMontageFile,
 } from './montage/montage.model';
 import { MontageService } from './montage/montage.service';
+import { RecentFilesService } from './recent-files.service';
 import { SourceFilesService } from './montage/source-files.service';
 import { AudioEnginePort } from './platform/audio-engine.port';
 import { DevToolsPort } from './platform/dev-tools.port';
@@ -53,6 +55,7 @@ export class DocumentService {
   private readonly files = inject(FileSystemPort);
   private readonly sourceFiles = inject(SourceFilesService);
   private readonly shell = inject(ShellPort);
+  private readonly recent = inject(RecentFilesService);
   /** Options of the last export, proposed again by the next one. */
   private exportOptions?: ExportOptions;
 
@@ -91,7 +94,18 @@ export class DocumentService {
     this.message.set({ key: 'montage.reset' });
   }
 
+  /** Open command: the recent montages to reopen, and the button to choose other files. */
   async openDialog(): Promise<void> {
+    await this.recent.load();
+    if (this.dialogs.openDialogs.some((d) => d.componentInstance instanceof RecentFilesDialogComponent)) return;
+    const ref = this.dialogs.open<RecentFilesDialogComponent, void, RecentFilesChoice>(RecentFilesDialogComponent, { autoFocus: 'dialog' });
+    const choice = await firstValueFrom(ref.afterClosed());
+    if (choice === 'browse') return this.browse();
+    if (choice) return this.openRecent(choice.path);
+  }
+
+  /** System dialog to choose audio files or a montage. */
+  async browse(): Promise<void> {
     const paths = await this.files.showOpenDialog(this.i18n.t('dialog.open.title'), [
       { name: this.i18n.t('filter.supported'), extensions: [...AUDIO_EXTENSIONS, MONTAGE_EXTENSION, BUNDLE_EXTENSION] },
       { name: this.i18n.t('filter.audio'), extensions: AUDIO_EXTENSIONS },
@@ -114,6 +128,7 @@ export class DocumentService {
       try {
         await this.montages.openMontage(montagePath);
         this.message.set({ key: 'open.montage', params: { path: montagePath } });
+        void this.recent.touch(montagePath);
         // files moved, deleted or (in the browser) to allow again: asked at once
         const files = await this.sourceFiles.check();
         if (files.some((f) => f.access !== 'ready')) this.showSourceFiles();
@@ -138,7 +153,6 @@ export class DocumentService {
     this.message.set(count ? { key: 'add.done', params: { n: count } } : { key: 'open.unsupported' });
   }
 
-  /** Saves over the montage file, or asks where when it was never saved. Returns false if not saved. */
   /**
    * Saves over the montage file, renaming it first when a new name was chosen. The first save
    * asks the name (unless already chosen) and then where to save.
@@ -167,7 +181,17 @@ export class DocumentService {
       this.message.set({ key: 'save.error', params: { message: errorMessage(err) } });
       return false;
     }
+    void this.recent.rename(path, renamed);
     return this.write(renamed);
+  }
+
+  /** Reopens a file of the recent list; one that is gone leaves the list, unless pinned. */
+  private async openRecent(path: string): Promise<void> {
+    let access = await this.files.access(path);
+    if (access === 'permission') access = (await this.files.requestAccess([path])).length ? 'ready' : 'permission';
+    if (access === 'ready') return this.open([path]);
+    if (access === 'missing' && !this.recent.files().find((f) => f.path === path)?.pinned) void this.recent.remove(path);
+    this.message.set({ key: access === 'missing' ? 'recent.missing' : 'recent.denied', params: { path } });
   }
 
   /** Dialog of the audio files of the montage that cannot be read (see SourceFilesService). */
@@ -267,6 +291,7 @@ export class DocumentService {
     try {
       const saved = await this.montages.saveAs(path);
       this.message.set({ key: 'save.done', params: { path: saved } });
+      void this.recent.touch(saved);
       return true;
     } catch (err) {
       this.message.set({ key: 'save.error', params: { message: errorMessage(err) } });

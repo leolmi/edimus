@@ -56,6 +56,13 @@ const IT: HelpContent = {
           ],
         },
         {
+          title: 'Montaggi recenti',
+          text: [
+            'Apri (Ctrl+O) mostra gli ultimi montaggi aperti o salvati, il più recente in cima: clicca su uno per riaprirlo (torna al primo posto, senza doppioni) o su Sfoglia… per scegliere altri file.',
+            'L’elenco tiene gli ultimi 20 file. Con la puntina blocchi un file: resta in elenco anche aprendone molti altri. La X lo toglie; un file non più trovato esce dall’elenco quando provi a riaprirlo, se non è bloccato.',
+          ],
+        },
+        {
           title: 'Nuovo, salva, salva con nome, rinomina',
           keys: ['Ctrl+N', 'Ctrl+S', 'Ctrl+Shift+S'],
           text: [
@@ -101,7 +108,7 @@ const IT: HelpContent = {
           title: 'Play, pausa e stop',
           keys: ['Spazio', 'Home', 'End'],
           text: [
-            'I comandi di ascolto sono in basso a destra, con il tempo corrente e la durata. Spazio avvia e mette in pausa; Home e End portano il cursore all’inizio e alla fine.',
+            'I comandi di ascolto sono in basso a destra, con il tempo corrente e la durata. Spazio avvia e mette in pausa; Home e End portano il cursore all’inizio e alla fine. Durante l’ascolto il cursore si ferma a metà della vista e le tracce scorrono sotto.',
           ],
         },
         {
@@ -170,7 +177,7 @@ const IT: HelpContent = {
           keys: ['←', '→', 'Shift+← →'],
           text: [
             'Una clip è una porzione di un file audio posata su una traccia. Clic per selezionarla, trascina per spostarla nel tempo o su un’altra traccia; trascinandola sotto l’ultima traccia ne crea una nuova.',
-            'Inizio e fine della clip si agganciano all’inizio o alla fine delle altre clip, su qualsiasi traccia, quando ci passano vicino. Con la griglia delle battute visibile la clip si sposta a passi (battuta, semiminima o croma, da scegliere nelle Impostazioni): il punto della griglia della clip sotto il puntatore si aggancia al più vicino delle altre clip. Tieni premuto Alt per spostarla liberamente.',
+            'Inizio, fine e punti dell’inviluppo della clip si agganciano all’inizio, alla fine e ai punti dell’inviluppo delle altre clip, su qualsiasi traccia, quando ci passano vicino (anche con la griglia visibile). Con la griglia delle battute visibile la clip si sposta a passi (battuta, semiminima o croma, da scegliere nelle Impostazioni): il punto della griglia della clip sotto il puntatore si aggancia al più vicino delle altre clip. Tieni premuto Alt per spostarla liberamente.',
             'Con la tastiera, le frecce ← → spostano le clip selezionate di un pixel (più ingrandisci, più il passo è fine); con Shift saltano al punto di aggancio successivo: inizio, fine o punto d’inviluppo di un’altra clip, oppure il cursore. Tenendo premuta la freccia, o premendola più volte di seguito, lo spostamento è un solo passo di annulla.',
           ],
         },
@@ -226,7 +233,7 @@ const IT: HelpContent = {
           text: [
             'Ogni clip ha il suo inviluppo di volume, per sfumature e dissolvenze: segue la clip quando la sposti, la dividi, la accorci o ne cambi la velocità.',
             'Con la modalità inviluppo attiva (pulsante o tasto E) il clic su una clip aggiunge un punto di volume; i punti si trascinano dentro la clip, il clic destro li elimina.',
-            'Trascinando, il punto si aggancia ai bordi delle clip, ai punti degli inviluppi delle altre clip e, in verticale, a 0 dB; Alt lo sposta liberamente. Anche le clip trascinate si agganciano ai punti degli inviluppi delle altre clip.',
+            'Trascinando, il punto si aggancia ai bordi delle clip, ai punti degli inviluppi delle altre clip e, in verticale, a 0 dB; Alt lo sposta liberamente. Anche le clip trascinate si agganciano ai punti degli inviluppi delle altre clip: ogni punto è segnato da una linea verticale tratteggiata su tutte le tracce.',
             'Il pallino a metà di un segmento lo curva (per dissolvenze naturali); doppio clic lo raddrizza. Prima del primo punto e dopo l’ultimo il volume resta costante.',
           ],
         },
@@ -443,6 +450,13 @@ const EN: HelpContent = {
           ],
         },
         {
+          title: 'Recent montages',
+          text: [
+            'Open (Ctrl+O) shows the montages opened or saved lately, the most recent at the top: click one to reopen it (it goes back to the top, without duplicates) or Browse… to choose other files.',
+            'The list keeps the last 20 files. The pin keeps a file in the list however many others are opened. The X removes it; a file no longer found leaves the list when you try to reopen it, unless pinned.',
+          ],
+        },
+        {
           title: 'New, save, save as, rename',
           keys: ['Ctrl+N', 'Ctrl+S', 'Ctrl+Shift+S'],
           text: [
@@ -488,7 +502,7 @@ const EN: HelpContent = {
           title: 'Play, pause and stop',
           keys: ['Space', 'Home', 'End'],
           text: [
-            'The transport is at the bottom right, with the current time and the length. Space plays and pauses; Home and End move the playhead to the start and the end.',
+            'The transport is at the bottom right, with the current time and the length. Space plays and pauses; Home and End move the playhead to the start and the end. While playing, the playhead stops in the middle of the view and the tracks scroll under it.',
           ],
         },
         {
@@ -555,7 +569,7 @@ const EN: HelpContent = {
           keys: ['←', '→', 'Shift+← →'],
           text: [
             'A clip is a portion of an audio file placed on a track. Click to select it, drag to move it in time or to another track; dragging it below the last track creates a new one.',
-            'The start and end of the clip snap to the start or end of the other clips, on any track, when they pass close by. With the bar grid shown the clip moves by steps (bar, quarter or eighth note, chosen in the Settings): the grid point of the clip under the pointer snaps to the nearest one of the other clips. Hold Alt to move it freely.',
+            'The start, end and envelope points of the clip snap to the start, end and envelope points of the other clips, on any track, when they pass close by (also with the grid shown). With the bar grid shown the clip moves by steps (bar, quarter or eighth note, chosen in the Settings): the grid point of the clip under the pointer snaps to the nearest one of the other clips. Hold Alt to move it freely.',
             'With the keyboard, the arrows ← → move the selected clips by one pixel (the more you zoom in, the finer the step); with Shift they jump to the next snap point: start, end or envelope point of another clip, or the playhead. Holding the arrow down, or pressing it several times in a row, makes the move a single undo step.',
           ],
         },
@@ -609,7 +623,7 @@ const EN: HelpContent = {
           text: [
             'Each clip has its own volume envelope, for fades and crossfades: it follows the clip when you move it, split it, trim it or change its speed.',
             'With the envelope mode on (button or E key) a click on a clip adds a volume point; points can be dragged inside the clip, a right click removes them.',
-            'While dragging, the point snaps to the clip edges, to the envelope points of the other clips and, vertically, to 0 dB; Alt moves it freely. Dragged clips also snap to the envelope points of the other clips.',
+            'While dragging, the point snaps to the clip edges, to the envelope points of the other clips and, vertically, to 0 dB; Alt moves it freely. Dragged clips also snap to the envelope points of the other clips: each point is marked by a dashed vertical line across all the tracks.',
             'The dot in the middle of a segment bends it (for natural fades); a double click straightens it. Before the first point and after the last one the volume stays constant.',
           ],
         },
