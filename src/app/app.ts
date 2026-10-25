@@ -17,6 +17,7 @@ import { TranslatePipe } from './core/i18n/translate.pipe';
 import { MontageService } from './core/montage/montage.service';
 import { SettingsService } from './core/settings.service';
 import { TimelineService } from './core/timeline/timeline.service';
+import { UpdateService } from './core/update.service';
 import { ClipBarComponent } from './features/timeline/clip-bar.component';
 import { HelpDialogComponent, HelpTab } from './features/help/help-dialog.component';
 import { SettingsDialogComponent } from './features/settings/settings-dialog.component';
@@ -53,6 +54,10 @@ export class App {
   /** Started with the app: connects this window to the MCP server when it runs. */
   private readonly ai = inject(AiBridgeService);
   private readonly dialogs = inject(MatDialog);
+
+  constructor() {
+    void inject(UpdateService).startup();
+  }
 
   protected readonly percentLabel = (value: number) => `${Math.round(value)}%`;
 

@@ -280,7 +280,7 @@ export class DocumentService {
   }
 
   /** With unsaved changes asks whether to save them; false when the user cancels (or saving fails). */
-  private async confirmDiscard(): Promise<boolean> {
+  async confirmDiscard(): Promise<boolean> {
     if (!this.montages.dirty()) return true;
     const choice = await this.shell.ask(this.title(), this.i18n.t('montage.unsaved'), true);
     if (choice === 'cancel') return false;

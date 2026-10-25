@@ -16,4 +16,6 @@ export abstract class PlatformInfo {
   abstract readonly filesBesideSources: boolean;
   /** The developer tools of the window can be turned on and off. */
   abstract readonly hasDevTools: boolean;
+  /** The app can update itself from the releases published on GitHub (`UpdaterPort`). */
+  abstract readonly canUpdate: boolean;
 }

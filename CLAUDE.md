@@ -32,7 +32,8 @@ e vanno lette prima di toccare l'area corrispondente:
 | `npm run dev:web` | versione web nel browser (`ng serve`, porta 47817, header COOP/COEP; la 47816 è del bridge MCP) |
 | `npm run build:web` | build web in `dist/web/` |
 | `npm run typecheck` | `tsc --noEmit` dell'app: il controllo da lanciare dopo ogni insieme di modifiche |
-| `npm run package` | build release + `mcp:build` + cartella portabile `release/edimus/` |
+| `npm run package` | build release + `mcp:build` + cartella portabile `release/edimus/` + pacchetto di aggiornamento (zip + `manifest.json`) |
+| `npm run release` | pubblica il pacchetto di aggiornamento come release GitHub `v<versione>` (GitHub CLI) |
 | `npm run mcp:build` | `mcp/dist/edimus-mcp.exe`: server MCP come eseguibile autonomo (Node SEA) |
 | `npm run licenses` | rigenera `public/licenses.json` e `THIRD_PARTY_LICENSES.md` |
 | `npm run mcp:test` | collaudo del server MCP (con l'app aperta) |

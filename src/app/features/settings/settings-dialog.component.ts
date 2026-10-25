@@ -4,6 +4,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AudioOutputsService } from '../../core/audio/audio-outputs.service';
@@ -12,7 +13,8 @@ import type { TranslationKey } from '../../core/i18n/it';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { DevToolsPort } from '../../core/platform/dev-tools.port';
 import { PlatformInfo } from '../../core/platform/platform-info';
-import { Language, SettingsService, SnapStep, ThemeMode } from '../../core/settings.service';
+import { DEFAULT_UPDATE_REPO, Language, SettingsService, SnapStep, ThemeMode } from '../../core/settings.service';
+import { UpdateService } from '../../core/update.service';
 
 const THEMES: { mode: ThemeMode; icon: string; label: TranslationKey }[] = [
   { mode: 'light', icon: 'light_mode', label: 'settings.theme.light' },
@@ -37,7 +39,7 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
  */
 @Component({
   selector: 'app-settings-dialog',
-  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatSelectModule, MatSlideToggleModule, TranslatePipe],
+  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, MatSlideToggleModule, TranslatePipe],
   template: `
     <h2 mat-dialog-title>{{ 'settings.title' | t }}</h2>
     <mat-dialog-content class="content">
@@ -98,6 +100,24 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
         <p class="hint">{{ 'settings.autoSaveBarsHint' | t }}</p>
       }
 
+      @if (platform.canUpdate) {
+        <h3>{{ 'settings.updates' | t }}</h3>
+        <mat-slide-toggle [checked]="settings.checkUpdates()" (change)="settings.setCheckUpdates($event.checked)">
+          {{ 'settings.checkUpdates' | t }}
+        </mat-slide-toggle>
+        <div class="row">
+          <mat-form-field class="repo" subscriptSizing="dynamic">
+            <mat-label>{{ 'settings.updateRepo' | t }}</mat-label>
+            <input #repo matInput [value]="settings.updateRepo()" (change)="settings.setUpdateRepo(repo.value)" />
+          </mat-form-field>
+          <button mat-stroked-button [disabled]="updates.busy()" (click)="updates.check(true)">
+            <mat-icon>update</mat-icon>
+            {{ 'settings.checkNow' | t }}
+          </button>
+        </div>
+        <p class="hint">{{ 'settings.updateRepoHint' | t: { repo: defaultRepo } }}</p>
+      }
+
       @if (platform.hasDevTools) {
         <h3>{{ 'settings.advanced' | t }}</h3>
         <mat-slide-toggle [checked]="settings.devTools()" (change)="settings.setDevTools($event.checked)">
@@ -140,7 +160,8 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
     .label {
       min-width: 140px;
     }
-    .output {
+    .output,
+    .repo {
       flex: 1 1 260px;
     }
     .hint {
@@ -175,8 +196,10 @@ export class SettingsDialogComponent {
   protected readonly platform = inject(PlatformInfo);
   protected readonly devTools = inject(DevToolsPort);
   protected readonly documents = inject(DocumentService);
+  protected readonly updates = inject(UpdateService);
   private readonly outputs = inject(AudioOutputsService);
 
+  protected readonly defaultRepo = DEFAULT_UPDATE_REPO;
   protected readonly themes = THEMES;
   protected readonly languages = LANGUAGES;
   protected readonly snapSteps = SNAP_STEPS;

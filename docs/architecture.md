@@ -15,6 +15,7 @@
 
   | `DevToolsPort` | strumenti per sviluppatori della finestra (solo desktop) |
   | `AiHostPort` | indirizzo del server MCP e configurazione dei client AI installati |
+  | `UpdaterPort` | aggiornamento dell'app dalle release GitHub (solo desktop Windows) |
 
   Le implementazioni stanno in `src/platform/<piattaforma>/`; `src/platform/platform.providers.ts`
   sceglie quella della build (`neutralino`) e fornisce `initPlatform()`, chiamata da `main.ts`
@@ -172,10 +173,42 @@ Dettagli d'uso: [mcp/README.md](../mcp/README.md).
   `ng build` in `build/web/`).
 - `npm run package` → build, `npm run mcp:build`, poi `scripts/package.mjs` assembla
   `release/edimus/`: `edimus.exe`, `edimus-mcp.exe`, ffmpeg, ffprobe, licenze. Cartella
-  portabile, nessuna installazione (serve solo il WebView2 Runtime di Windows).
+  portabile, nessuna installazione (serve solo il WebView2 Runtime di Windows). Produce anche il
+  pacchetto di aggiornamento (vedi *Aggiornamento automatico*); `npm run release` lo pubblica.
 - `scripts/licenses.mjs` raccoglie le licenze di pacchetti npm (frontend e server MCP),
   runtime Neutralino, Node.js incluso in `edimus-mcp.exe` e ffmpeg in `public/licenses.json`
   (scheda *Info e licenze* dell'Aiuto) e `THIRD_PARTY_LICENSES.md`.
+
+## Aggiornamento automatico
+
+Solo app desktop su Windows (`PlatformInfo.canUpdate`); in sviluppo (`isDevMode`) il controllo
+funziona ma l'installazione è bloccata.
+
+- **Pubblicazione**: `npm run package` produce anche `release/edimus-<versione>-win-x64.zip`
+  (`edimus.exe`, `edimus-mcp.exe`, licenze; **senza ffmpeg**, installato una volta con l'app) e
+  `release/manifest.json` (`version`, `minFfmpeg` da `config.minFfmpeg` di `package.json`,
+  nome, dimensione e SHA-256 dello zip). `npm run release` (GitHub CLI, `gh auth login`) li
+  pubblica come release `v<versione>` del repository. Le release stanno fuori dalla storia git.
+- **Controllo** (`UpdateService`): all'avvio, dopo 3 s e con l'impostazione attiva, o con
+  *Verifica ora* nelle Impostazioni. `NeutralinoUpdater.latest` legge
+  `api.github.com/repos/<repo>/releases/latest` (repository nelle impostazioni, predefinito
+  `leolmi/edimus`) e il manifest con `curl.exe` (i download di GitHub non ammettono CORS). Una
+  versione saltata non viene riproposta all'avvio. Blocchi (`UpdateBlocker`): avvio dai
+  sorgenti, cartella dell'app non scrivibile, ffmpeg installato più vecchio di `minFfmpeg`.
+- **Installazione**: dopo la conferma e il controllo delle modifiche non salvate l'app scarica
+  lo zip in `%TEMP%\edimus-update`, vi scrive `update.ps1` (`update-script.ts`) e `update.json`
+  (percorsi, PID, hash, testi tradotti), avvia PowerShell nascosto ed esce. Lo script verifica
+  lo SHA-256, aspetta l'uscita del processo e delle altre finestre dell'app (chiede se
+  riprovare, chiuderle a forza o rinunciare), rinomina i file da sostituire in `*.<data>.old`
+  (un exe in uso si può rinominare: il server MCP può essere ancora aperto da un client AI),
+  copia i nuovi, scrive il marcatore `edimus-update.json` e avvia la nuova versione.
+- **Conferma e ripristino**: all'avvio `UpdaterPort.finish` toglie il marcatore (per lo script è
+  il segnale di avvio riuscito), cancella i `.old` (quelli ancora in uso al prossimo avvio) e
+  mostra la versione installata. Se la nuova versione esce senza togliere il marcatore, o un
+  passo fallisce, lo script rimette i file precedenti e riavvia la versione di prima. Log in
+  `%TEMP%\edimus-update\update.log`.
+- La prima versione con l'aggiornamento va installata a mano; un ffmpeg nuovo si copia a mano
+  nella cartella dell'app (alzando `minFfmpeg` quando una versione lo richiede).
 
 ## Aiuto
 

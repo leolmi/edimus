@@ -1,6 +1,6 @@
 {
   "name": "edimus",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "scripts": {
     "ng": "ng",
     "setup": "neu update --latest && npm run licenses",
@@ -13,9 +13,13 @@
     "package": "npm run build && npm run mcp:build && node scripts/package.mjs",
     "mcp:install": "npm --prefix mcp install",
     "mcp:test": "node mcp/test-client.mjs",
-    "mcp:build": "npm --prefix mcp run build"
+    "mcp:build": "npm --prefix mcp run build",
+    "release": "node scripts/release.mjs"
   },
   "private": true,
+  "config": {
+    "minFfmpeg": "6.0"
+  },
   "packageManager": "npm@11.19.0",
   "dependencies": {
     "@angular/cdk": "^22.2.3",

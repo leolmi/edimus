@@ -23,10 +23,32 @@ interface Settings {
   autoSaveBars: boolean;
   /** Address of the MCP server set by hand (web app: the page cannot read it from the PC). */
   aiBridge: BridgeConfig | null;
+  /** Looks for a newer version at startup (where the app can update itself). */
+  checkUpdates: boolean;
+  /** GitHub repository ("owner/name") whose releases update the app. */
+  updateRepo: string;
+  /** Version the user chose not to install: not offered again at startup. */
+  skippedVersion: string | null;
 }
 
+/** Repository of the app, where its releases are published. */
+export const DEFAULT_UPDATE_REPO = 'leolmi/edimus';
+
 const STORAGE_KEY = 'settings';
-const DEFAULTS: Settings = { theme: 'system', language: 'it', volume: 1, muted: false, audioOutput: null, snapStep: 'beat', autoSaveBars: false, devTools: false, aiBridge: null };
+const DEFAULTS: Settings = {
+  theme: 'system',
+  language: 'it',
+  volume: 1,
+  muted: false,
+  audioOutput: null,
+  snapStep: 'beat',
+  autoSaveBars: false,
+  devTools: false,
+  aiBridge: null,
+  checkUpdates: true,
+  updateRepo: DEFAULT_UPDATE_REPO,
+  skippedVersion: null,
+};
 
 /** User preferences (theme, language, listening volume and output), persisted by the platform (`SettingsPort`). */
 @Injectable({ providedIn: 'root' })
@@ -43,6 +65,9 @@ export class SettingsService {
   readonly autoSaveBars = signal(DEFAULTS.autoSaveBars);
   readonly devTools = signal(DEFAULTS.devTools);
   readonly aiBridge = signal<BridgeConfig | null>(DEFAULTS.aiBridge);
+  readonly checkUpdates = signal(DEFAULTS.checkUpdates);
+  readonly updateRepo = signal(DEFAULTS.updateRepo);
+  readonly skippedVersion = signal<string | null>(DEFAULTS.skippedVersion);
 
   constructor() {
     effect(() => {
@@ -67,6 +92,9 @@ export class SettingsService {
       if (typeof saved.autoSaveBars === 'boolean') this.autoSaveBars.set(saved.autoSaveBars);
       if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
       if (saved.aiBridge?.port && saved.aiBridge.token) this.aiBridge.set(saved.aiBridge);
+      if (typeof saved.checkUpdates === 'boolean') this.checkUpdates.set(saved.checkUpdates);
+      if (typeof saved.updateRepo === 'string' && saved.updateRepo) this.updateRepo.set(saved.updateRepo);
+      if (typeof saved.skippedVersion === 'string') this.skippedVersion.set(saved.skippedVersion);
     } catch {
       // no saved settings yet (or storage unavailable): keep defaults
     }
@@ -119,6 +147,22 @@ export class SettingsService {
     void this.save();
   }
 
+  setCheckUpdates(on: boolean): void {
+    this.checkUpdates.set(on);
+    void this.save();
+  }
+
+  /** Sets the update repository ("owner/name"); empty goes back to the default one. */
+  setUpdateRepo(repo: string): void {
+    this.updateRepo.set(repo.trim() || DEFAULT_UPDATE_REPO);
+    void this.save();
+  }
+
+  setSkippedVersion(version: string | null): void {
+    this.skippedVersion.set(version);
+    void this.save();
+  }
+
   private async save(): Promise<void> {
     const data: Settings = {
       theme: this.theme(),
@@ -130,6 +174,9 @@ export class SettingsService {
       autoSaveBars: this.autoSaveBars(),
       devTools: this.devTools(),
       aiBridge: this.aiBridge(),
+      checkUpdates: this.checkUpdates(),
+      updateRepo: this.updateRepo(),
+      skippedVersion: this.skippedVersion(),
     };
     try {
       await this.store.write(STORAGE_KEY, JSON.stringify(data));

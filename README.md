@@ -56,6 +56,18 @@ Produce `release/edimus/`: cartella portabile (nessuna installazione) con `edimu
 licenze. Per usarla su un altro PC basta copiare la cartella; serve il WebView2 Runtime di
 Windows, già presente su Windows 11 e sui Windows 10 aggiornati.
 
+Produce anche il pacchetto di aggiornamento `release/edimus-<versione>-win-x64.zip` (senza
+ffmpeg) con `release/manifest.json`. Per pubblicarlo come release GitHub, da cui le app
+installate si aggiornano da sole (con conferma dell'utente):
+
+```bash
+npm run release
+```
+
+Richiede la [GitHub CLI](https://cli.github.com/) (`winget install GitHub.cli`, poi
+`gh auth login`); le note della release sono l'argomento (`npm run release -- "testo"`) o
+l'oggetto dell'ultimo commit. Dettagli in [docs/architecture.md](docs/architecture.md).
+
 ## Licenze
 
 Progetto personale non distribuito. Le licenze di tutti i componenti usati sono in

@@ -287,6 +287,32 @@ export const it = {
   'settings.restartNow': 'Riavvia ora',
   'settings.snapHint':
     'Con la griglia delle battute visibile, le clip trascinate si spostano a questo passo agganciandosi alle altre clip (la battuta segue il metro del tempo). Alt durante il trascinamento: spostamento libero.',
+  'settings.updates': 'Aggiornamenti',
+  'settings.checkUpdates': 'Cerca una nuova versione all’avvio',
+  'settings.updateRepo': 'Repository GitHub',
+  'settings.updateRepoHint': 'Proprietario/nome del repository le cui release aggiornano l’app (vuoto: {repo}).',
+  'settings.checkNow': 'Verifica ora',
+  'update.title': 'Aggiornamento di edimus',
+  'update.available': 'È disponibile edimus {version} (installata: {current}).',
+  'update.how':
+    'L’aggiornamento scarica {size} MB, chiude edimus, sostituisce l’app e il server MCP (ffmpeg resta quello installato) e riavvia la nuova versione; se qualcosa va storto torna la versione attuale.',
+  'update.page': 'Pagina della release',
+  'update.others': 'Altre finestre di edimus aperte: {n}. Salva i loro montaggi e chiudile: l’aggiornamento attende che siano chiuse.',
+  'update.mcp': 'Se un assistente AI sta usando edimus, riavvialo dopo l’aggiornamento per usare il nuovo server MCP.',
+  'update.blocked.dev': 'L’app è avviata dai sorgenti: l’aggiornamento si installa solo nella cartella portabile.',
+  'update.blocked.readonly': 'La cartella dell’app non è scrivibile ({dir}): scarica la nuova versione dalla pagina della release e sostituisci i file a mano.',
+  'update.blocked.ffmpeg': 'Questa versione richiede ffmpeg {min} o successivo (installato: {installed}): aggiorna prima ffmpeg nella cartella dell’app.',
+  'update.skip': 'Salta questa versione',
+  'update.later': 'Più tardi',
+  'update.install': 'Aggiorna e riavvia',
+  'update.downloading': 'Scaricamento di edimus {version}…',
+  'update.installed': 'edimus aggiornato alla versione {version}',
+  'update.none': 'Nessun aggiornamento: edimus {version} è la versione più recente',
+  'update.error': 'Verifica degli aggiornamenti non riuscita: {message}',
+  'update.installError': 'Aggiornamento non riuscito: {message}',
+  'update.waitOthers':
+    'Per completare l’aggiornamento vanno chiuse le altre finestre di edimus.\n\nSì: le ho chiuse, riprova.\nNo: chiudile adesso (le modifiche non salvate vanno perse).\nAnnulla: rinuncia all’aggiornamento.',
+  'update.failed': 'Aggiornamento non riuscito, resta la versione precedente.\n\n{message}',
 } as const;
 
 export type TranslationKey = keyof typeof it;

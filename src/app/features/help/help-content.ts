@@ -295,7 +295,14 @@ const IT: HelpContent = {
           title: 'Impostazioni',
           keys: ['Ctrl+,'],
           text: [
-            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita audio; passo di aggancio delle clip alla griglia; apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
+            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita audio; passo di aggancio delle clip alla griglia; aggiornamenti (vedi Aggiornamenti); apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
+          ],
+        },
+        {
+          title: 'Aggiornamenti',
+          text: [
+            'All’avvio l’app desktop cerca una versione più recente tra le release del suo repository GitHub (impostabile nelle Impostazioni, dove si può anche spegnere il controllo o lanciarlo con “Verifica ora”). Se c’è, mostra cosa cambia e chiede se aggiornare: “Salta questa versione” non la propone più all’avvio.',
+            'Con “Aggiorna e riavvia” scarica il pacchetto, chiede di salvare le modifiche, chiude edimus, sostituisce l’app e il server MCP e avvia la nuova versione; ffmpeg resta quello installato. Le altre finestre di edimus vanno chiuse prima che i file vengano sostituiti. Se qualcosa va storto torna la versione precedente.',
           ],
         },
         {
@@ -416,6 +423,15 @@ const IT: HelpContent = {
       title: 'Condividere un montaggio con i suoi file audio',
       steps: ['Premi Ctrl+Shift+S (salva con nome).', 'Come tipo di file scegli Pacchetto edimus (.edimuspack) e salva.', 'Invia il file .edimuspack: si apre con edimus, desktop o web.'],
       note: 'Chi riceve solo il file .edimus può trascinare i propri file audio: quelli mancanti vengono ricollegati da soli.',
+    },
+    {
+      title: 'Aggiornare edimus',
+      steps: [
+        'Apri le Impostazioni (Ctrl+,) e premi Verifica ora (all’avvio il controllo è automatico).',
+        'Se c’è una nuova versione, salva i montaggi aperti nelle altre finestre e chiudile.',
+        'Premi Aggiorna e riavvia: edimus si chiude e si riapre nella nuova versione.',
+      ],
+      note: 'Se un assistente AI sta usando edimus, riavvialo per usare il nuovo server MCP.',
     },
     {
       title: 'Far lavorare un assistente AI sul montaggio',
@@ -683,7 +699,14 @@ const EN: HelpContent = {
           title: 'Settings',
           keys: ['Ctrl+,'],
           text: [
-            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output; snap step of the clips on the grid; opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
+            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output; snap step of the clips on the grid; updates (see Updates); opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
+          ],
+        },
+        {
+          title: 'Updates',
+          text: [
+            'At startup the desktop app looks for a newer version among the releases of its GitHub repository (set in the Settings, where the check can also be turned off or run with “Check now”). If there is one, it shows what changes and asks whether to update: “Skip this version” no longer offers it at startup.',
+            '“Update and restart” downloads the package, asks to save the changes, closes edimus, replaces the app and the MCP server and starts the new version; ffmpeg stays the installed one. The other edimus windows must be closed before the files are replaced. If anything goes wrong the previous version comes back.',
           ],
         },
         {
@@ -801,6 +824,15 @@ const EN: HelpContent = {
       title: 'Share a montage with its audio files',
       steps: ['Press Ctrl+Shift+S (save as).', 'As file type choose edimus bundle (.edimuspack) and save.', 'Send the .edimuspack file: it opens with edimus, desktop or web.'],
       note: 'Whoever gets just the .edimus file can drop their own audio files: the missing ones are relinked by themselves.',
+    },
+    {
+      title: 'Update edimus',
+      steps: [
+        'Open the Settings (Ctrl+,) and press Check now (at startup the check is automatic).',
+        'If there is a new version, save the montages open in the other windows and close them.',
+        'Press Update and restart: edimus closes and opens again in the new version.',
+      ],
+      note: 'If an AI assistant is using edimus, restart it to use the new MCP server.',
     },
     {
       title: 'Let an AI assistant work on the montage',
