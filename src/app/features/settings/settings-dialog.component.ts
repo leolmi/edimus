@@ -110,7 +110,7 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
             <mat-label>{{ 'settings.updateRepo' | t }}</mat-label>
             <input #repo matInput [value]="settings.updateRepo()" (change)="settings.setUpdateRepo(repo.value)" />
           </mat-form-field>
-          <button mat-stroked-button [disabled]="updates.busy()" (click)="updates.check(true)">
+          <button mat-stroked-button (click)="updates.check(true)">
             <mat-icon>update</mat-icon>
             {{ 'settings.checkNow' | t }}
           </button>

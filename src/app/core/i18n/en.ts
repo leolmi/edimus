@@ -308,6 +308,7 @@ export const en: Record<TranslationKey, string> = {
   'update.install': 'Update and restart',
   'update.downloading': 'Downloading edimus {version}…',
   'update.installed': 'edimus updated to version {version}',
+  'update.checking': 'Checking for updates…',
   'update.none': 'No update: edimus {version} is the latest version',
   'update.error': 'Update check failed: {message}',
   'update.installError': 'Update failed: {message}',

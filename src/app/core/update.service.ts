@@ -29,6 +29,8 @@ export class UpdateService {
 
   /** Looking for a release or downloading one. */
   readonly busy = signal(false);
+  /** The user asked for the running check (possibly started at startup): told its outcome. */
+  private asked = false;
 
   /** At startup: completes the last update and, with the setting on, looks for a newer version. */
   async startup(): Promise<void> {
@@ -39,19 +41,24 @@ export class UpdateService {
   }
 
   /**
-   * Looks for a newer version and offers it. `manual`: asked by the user, who is told the
-   * outcome even when there is nothing new, and is offered a version skipped before.
+   * Looks for a newer version and offers it. `manual`: asked by the user, who sees the check
+   * running and its outcome even when there is nothing new, and is offered a version skipped before.
    */
   async check(manual: boolean): Promise<void> {
+    if (manual) {
+      this.asked = true;
+      this.documents.notify({ key: 'update.checking' });
+    }
+    // a check already running (e.g. the one at startup) answers this request too
     if (this.busy()) return;
     this.busy.set(true);
     try {
       const release = await this.updater.latest(this.settings.updateRepo());
       if (!release || compareVersions(release.version, this.platform.version) <= 0) {
-        if (manual) this.documents.notify({ key: 'update.none', params: { version: this.platform.version } });
+        if (this.asked) this.documents.notify({ key: 'update.none', params: { version: this.platform.version } });
         return;
       }
-      if (!manual && this.settings.skippedVersion() === release.version) return;
+      if (!this.asked && this.settings.skippedVersion() === release.version) return;
       const [blocker, others] = await Promise.all([this.updater.blocker(release), this.updater.otherInstances().catch(() => 0)]);
       this.busy.set(false);
       const data: UpdateDialogData = { release, current: this.platform.version, blocker, others };
@@ -62,10 +69,11 @@ export class UpdateService {
       if (choice === 'install') await this.install(release);
     } catch (err) {
       // at startup a failure (e.g. offline) is not worth a message
-      if (manual) this.documents.notify({ key: 'update.error', params: { message: errorMessage(err) } });
+      if (this.asked) this.documents.notify({ key: 'update.error', params: { message: errorMessage(err) } });
       else console.warn('Update check failed', err);
     } finally {
       this.busy.set(false);
+      this.asked = false;
     }
   }
 

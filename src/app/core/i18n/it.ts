@@ -307,6 +307,7 @@ export const it = {
   'update.install': 'Aggiorna e riavvia',
   'update.downloading': 'Scaricamento di edimus {version}…',
   'update.installed': 'edimus aggiornato alla versione {version}',
+  'update.checking': 'Verifica degli aggiornamenti in corso…',
   'update.none': 'Nessun aggiornamento: edimus {version} è la versione più recente',
   'update.error': 'Verifica degli aggiornamenti non riuscita: {message}',
   'update.installError': 'Aggiornamento non riuscito: {message}',
