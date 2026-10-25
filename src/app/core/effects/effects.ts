@@ -56,6 +56,8 @@ export interface EffectPreset {
 export interface EffectDescriptor {
   type: EffectType;
   label: TranslationKey;
+  /** One or two letters shown in the chain of the track header. */
+  short: TranslationKey;
   params: readonly EffectParam[];
   presets: readonly EffectPreset[];
   /** Shows how much the effect is reducing the level, while playing (compressor). */
@@ -103,6 +105,7 @@ export const EFFECTS: readonly EffectDescriptor[] = [
   {
     type: 'eq',
     label: 'fx.eq',
+    short: 'fx.short.eq',
     params: [
       hz('lowCut', 'fx.lowCut', 20, 1000, 20),
       db('low', 'fx.low', -15, 15, 0),
@@ -120,6 +123,7 @@ export const EFFECTS: readonly EffectDescriptor[] = [
   {
     type: 'compressor',
     label: 'fx.compressor',
+    short: 'fx.short.compressor',
     meter: 'reduction',
     graph: 'compressor',
     params: [
@@ -139,6 +143,7 @@ export const EFFECTS: readonly EffectDescriptor[] = [
   {
     type: 'echo',
     label: 'fx.echo',
+    short: 'fx.short.echo',
     params: [
       { kind: 'choice', id: 'time', label: 'fx.time', options: Object.keys(ECHO_DIVISIONS), default: '1/8' },
       pct('feedback', 'fx.feedback', 35, 90),
@@ -155,6 +160,7 @@ export const EFFECTS: readonly EffectDescriptor[] = [
   {
     type: 'reverb',
     label: 'fx.reverb',
+    short: 'fx.short.reverb',
     params: [pct('size', 'fx.size', 40), pct('damping', 'fx.damping', 50), ms('predelay', 'fx.predelay', 0, 150, 10, false), pct('mix', 'fx.mix', 20)],
     presets: [
       { name: 'fx.preset.room', params: { size: 25, damping: 60, predelay: 5, mix: 20 } },
@@ -166,6 +172,7 @@ export const EFFECTS: readonly EffectDescriptor[] = [
   {
     type: 'saturation',
     label: 'fx.saturation',
+    short: 'fx.short.saturation',
     params: [db('drive', 'fx.drive', 0, 30, 6), hz('tone', 'fx.tone', 1000, 20000, 12000), pct('mix', 'fx.mix', 100), db('output', 'fx.output', -24, 6, 0, true)],
     presets: [
       { name: 'fx.preset.warm', params: { drive: 6, tone: 9000, mix: 60, output: -1 } },

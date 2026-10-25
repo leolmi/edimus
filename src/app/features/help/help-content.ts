@@ -239,7 +239,7 @@ const IT: HelpContent = {
         },
         {
           title: 'Volume della traccia',
-          text: ['Il cursore nell’intestazione della traccia regola il volume di tutta la traccia (da −30 a +6 dB); doppio clic lo riporta a 0 dB.'],
+          text: ['Il fader verticale sul lato destro dell’intestazione della traccia regola il volume di tutta la traccia (da −30 a +6 dB): trascinalo o clicca lungo la guida, usa la rotellina o le frecce; doppio clic lo riporta a 0 dB.'],
         },
       ],
     },
@@ -250,7 +250,8 @@ const IT: HelpContent = {
         {
           title: 'Effetti della traccia',
           text: [
-            'Il pulsante con i cursori nell’intestazione della traccia apre a destra il pannello dei suoi effetti (Esc lo chiude); il pulsante è colorato quando la traccia ha effetti attivi.',
+            'Il pulsante con i cursori nell’intestazione della traccia apre a destra il pannello dei suoi effetti (Esc lo chiude); il pulsante è colorato quando la traccia ha effetti attivi. A pannello aperto, selezionando una clip di un’altra traccia il pannello mostra gli effetti di quella traccia.',
+            'In fondo all’intestazione la catena degli effetti li mostra in ordine: un quadratino colorato per effetto con la sua sigla (EQ, C compressore, E eco, R riverbero, S saturazione), vuoto se escluso; il tooltip dà nome e valori, un clic apre il pannello.',
             'Gli effetti disponibili sono equalizzatore, compressore, eco, riverbero e saturazione. Agiscono in ordine, dall’alto in basso, sul suono di tutte le clip della traccia e prima del suo volume; l’ordine si cambia trascinando la maniglia. Il menu dei preset offre impostazioni pronte e i valori iniziali; l’interruttore esclude l’effetto senza perderne le impostazioni.',
             'Durante l’ascolto le regolazioni si sentono subito, e un’intera regolazione è un solo passo di annulla. L’esportazione tiene le code di eco e riverbero dopo la fine dell’ultima clip. L’eco va a tempo con la prima clip della traccia (divisioni da 1/2 a 1/16).',
             'Il compressore mostra un grafico che segue i valori: a sinistra la curva di compressione (ingresso → uscita, con la soglia), a destra come la riduzione arriva con l’attacco e se ne va con il rilascio su un colpo forte.',
@@ -415,7 +416,7 @@ const IT: HelpContent = {
     },
     {
       title: 'Abbassare il volume di una traccia',
-      steps: ['Trascina verso sinistra il cursore del volume nell’intestazione della traccia (doppio clic: torna a 0 dB).'],
+      steps: ['Trascina verso il basso il fader del volume sul lato destro dell’intestazione della traccia (doppio clic: torna a 0 dB).'],
     },
     {
       title: 'Aggiungere riverbero o eco a una voce',
@@ -685,7 +686,7 @@ const EN: HelpContent = {
         },
         {
           title: 'Track volume',
-          text: ['The slider in the track header sets the volume of the whole track (from −30 to +6 dB); a double click brings it back to 0 dB.'],
+          text: ['The vertical fader on the right of the track header sets the volume of the whole track (from −30 to +6 dB): drag it or click along the rail, use the wheel or the arrow keys; a double click brings it back to 0 dB.'],
         },
       ],
     },
@@ -696,7 +697,8 @@ const EN: HelpContent = {
         {
           title: 'Track effects',
           text: [
-            'The button with the sliders in the track header opens the panel of its effects on the right (Esc closes it); the button is coloured when the track has effects switched on.',
+            'The button with the sliders in the track header opens the panel of its effects on the right (Esc closes it); the button is coloured when the track has effects switched on. While the panel is open, selecting a clip of another track shows the effects of that track.',
+            'At the bottom of the header the effect chain shows them in order: a coloured square per effect with its letters (EQ, C compressor, E echo, R reverb, S saturation), hollow when bypassed; the tooltip gives name and values, a click opens the panel.',
             'The effects available are equalizer, compressor, echo, reverb and saturation. They act in order, top to bottom, on the sound of all the clips of the track and before its volume; drag the handle to change the order. The presets menu offers ready settings and the default values; the switch bypasses the effect keeping its settings.',
             'While playing, changes are heard at once, and a whole adjustment is one undo step. The export keeps the tails of echoes and reverbs after the end of the last clip. The echo follows the tempo of the first clip of the track (divisions from 1/2 to 1/16).',
             'The compressor shows a graph that follows its values: on the left the compression curve (input → output, with the threshold), on the right how the reduction comes in with the attack and goes away with the release on a loud hit.',
@@ -856,7 +858,7 @@ const EN: HelpContent = {
     },
     {
       title: 'Lower the volume of a track',
-      steps: ['Drag left the volume slider in the track header (double click: back to 0 dB).'],
+      steps: ['Drag down the volume fader on the right of the track header (double click: back to 0 dB).'],
     },
     {
       title: 'Add reverb or echo to a voice',

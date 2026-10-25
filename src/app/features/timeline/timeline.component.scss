@@ -120,10 +120,10 @@
 
 .header {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: stretch;
   gap: 4px;
-  padding: 8px 12px;
+  /* room for the effect chain at the bottom */
+  padding: 4px 4px 4px 12px;
   overflow: hidden;
   background: var(--mat-sys-surface-container-low);
   border-right: 1px solid var(--mat-sys-outline-variant);
@@ -247,11 +247,6 @@
   flex: 1 1 auto;
 }
 
-.track-volume {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 /* compact icon buttons: sized through the Material tokens, so icon and state layer stay aligned */
 .small {
   --mat-icon-button-state-layer-size: 30px;
@@ -262,10 +257,32 @@
     --mat-icon-button-icon-color: var(--mat-sys-primary);
   }
 
+  &.danger {
+    --mat-icon-button-icon-color: var(--mat-sys-error);
+  }
+
   /* the track has effects switched on: shown also when its panel is closed */
   &.has-effects {
     --mat-icon-button-icon-color: var(--mat-sys-tertiary);
   }
+}
+
+.header-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* the track volume: a fader as tall as the track, on the right of the header */
+.track-fader {
+  flex: none;
+}
+
+.effect-chain {
+  align-self: flex-start;
 }
 
 .header.selected {

@@ -47,7 +47,7 @@ function transfer(input: number, threshold: number, ratio: number): number {
   styles: `
     :host {
       display: block;
-      padding: 8px 10px 0;
+      padding: 0;
     }
     svg {
       display: block;

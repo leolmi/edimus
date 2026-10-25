@@ -5,7 +5,14 @@ suono di tutte le sue clip, prima del volume della traccia. Sono non distruttivi
 montaggio: sono parametri salvati nel file `.edimus`, i file audio non vengono toccati.
 
 - Il pulsante con i cursori nell'intestazione della traccia apre il **pannello degli effetti** a
-  destra (Esc lo chiude). Il pulsante è colorato quando la traccia ha effetti attivi.
+  destra (Esc lo chiude). Il pulsante è colorato quando la traccia ha effetti attivi. A pannello
+  aperto, selezionando una clip di un'altra traccia il pannello passa agli effetti di quella traccia.
+- In fondo all'intestazione la **catena** mostra gli effetti della traccia in ordine: un quadratino
+  per effetto con colore e sigla del tipo (**EQ** equalizzatore, **C** compressore, **E** eco,
+  **R** riverbero, **S** saturazione), vuoto se l'effetto è escluso. Passandoci sopra il tooltip dà
+  il nome e i valori; un clic apre il pannello. Lo stesso colore segna l'effetto nel pannello.
+
+  ![Intestazione di una traccia con la catena degli effetti](images/effects/chain.png)
 - **Aggiungi effetto** in fondo al pannello; la maniglia trascina un effetto più su o più giù
   nella catena; la × lo toglie.
 - L'**interruttore** esclude l'effetto (bypass) senza perderne le impostazioni: utile per
@@ -64,7 +71,7 @@ Riduce la differenza tra parti forti e deboli: una voce più uniforme e presente
 | Rilascio | `release` | 20 – 1000 ms | 200 ms | rapidità nel tornare |
 | Guadagno | `makeup` | 0 – +24 dB | 0 dB | fader: recupera il volume perso |
 
-Il **grafico** sopra i controlli segue i valori mentre li regoli:
+Il **grafico** in alto, accanto all'indicatore di riduzione (con il fader del guadagno sotto), segue i valori mentre li regoli:
 
 - a sinistra la **curva di compressione**: livello in ingresso (orizzontale) contro livello in
   uscita (verticale), con la soglia tratteggiata, la pendenza del rapporto, il ginocchio morbido

@@ -8,63 +8,76 @@
     @let source = sourceOf(track);
     <div class="track" [attr.data-drop-track]="track.id">
       <div class="header" [class.selected]="timeline.selectedTrackId() === track.id">
-        <div class="name" role="button" tabindex="0" (click)="showInfo(track)" (keydown.enter)="showInfo(track)">
-          <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{ source?.status === 'error' ? 'error' : 'audio_file' }}</mat-icon>
-          <span>{{ track.name }}</span>
-        </div>
-        <div class="track-actions">
-          <button mat-icon-button class="small" [class.active]="track.muted" (click)="toggleMute(track)" [matTooltip]="'track.mute' | t">
-            <mat-icon>{{ track.muted ? 'volume_off' : 'volume_up' }}</mat-icon>
-          </button>
-          <button mat-icon-button class="small" [class.active]="track.solo" (click)="toggleSolo(track)" [matTooltip]="'track.solo' | t">
-            <mat-icon>headphones</mat-icon>
-          </button>
-          <app-scale-slider
-            class="track-volume"
-            compact
-            [min]="-30"
-            [max]="6"
-            [step]="0.5"
-            [origin]="0"
-            [majorTicks]="6"
-            [minorTicks]="2"
-            [format]="dbLabel"
-            [ariaLabel]="'track.volume' | t"
-            [value]="volumeDb(track)"
-            (valueChange)="previewVolume(track, $event)"
-            (committed)="commitVolume(track, $event)"
-          />
-          <button
-            mat-icon-button
-            class="small"
-            [class.active]="timeline.selectedTrackId() === track.id"
-            [class.has-effects]="hasEffects(track)"
-            (click)="edits.toggleEffectsPanel(track.id)"
-            [matTooltip]="'fx.open' | t"
-          >
-            <mat-icon>tune</mat-icon>
-          </button>
-          <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
-            <mat-icon>info</mat-icon>
-          </button>
-          <button mat-icon-button class="small" (click)="removeTrack(track)" [matTooltip]="'track.remove' | t">
-            <mat-icon>delete</mat-icon>
-          </button>
-        </div>
-        @if (source?.status === 'probing') {
-          <span class="info">{{ 'source.probing' | t }}</span>
-        } @else if (source?.status === 'decoding') {
-          <mat-progress-bar mode="determinate" [value]="source.progress * 100" />
-          <span class="info">{{ 'source.decoding' | t: { p: (source.progress * 100).toFixed(0) } }}</span>
-        } @else if (source?.status === 'ready') {
-          <span class="info">{{ describe(source.info) }}</span>
-          @if (tempoLabel(track); as tempo) {
-            <span class="info">{{ tempo }}</span>
+        <div class="header-main">
+          <div class="name" role="button" tabindex="0" (click)="showInfo(track)" (keydown.enter)="showInfo(track)">
+            <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{ source?.status === 'error' ? 'error' : 'audio_file' }}</mat-icon>
+            <!-- the whole name in a tooltip, only when it is cut (checked as the pointer enters, before the tooltip opens) -->
+            <span
+              #nameText
+              #nameTip="matTooltip"
+              [matTooltip]="track.name"
+              [matTooltipDisabled]="true"
+              (pointerenter)="nameTip.disabled = nameText.scrollWidth <= nameText.clientWidth"
+              >{{ track.name }}</span
+            >
+          </div>
+          <div class="track-actions">
+            <button mat-icon-button class="small" [class.active]="track.muted" (click)="toggleMute(track)" [matTooltip]="'track.mute' | t">
+              <mat-icon>{{ track.muted ? 'volume_off' : 'volume_up' }}</mat-icon>
+            </button>
+            <button mat-icon-button class="small" [class.active]="track.solo" (click)="toggleSolo(track)" [matTooltip]="'track.solo' | t">
+              <mat-icon>headphones</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              class="small"
+              [class.active]="timeline.selectedTrackId() === track.id"
+              [class.has-effects]="hasEffects(track)"
+              (click)="edits.toggleEffectsPanel(track.id)"
+              [matTooltip]="'fx.open' | t"
+            >
+              <mat-icon>tune</mat-icon>
+            </button>
+            <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
+              <mat-icon>info</mat-icon>
+            </button>
+            <button mat-icon-button class="small danger" (click)="removeTrack(track)" [matTooltip]="'track.remove' | t">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+          @if (source?.status === 'probing') {
+            <span class="info">{{ 'source.probing' | t }}</span>
+          } @else if (source?.status === 'decoding') {
+            <mat-progress-bar mode="determinate" [value]="source.progress * 100" />
+            <span class="info">{{ 'source.decoding' | t: { p: (source.progress * 100).toFixed(0) } }}</span>
+          } @else if (source?.status === 'ready') {
+            <span class="info">{{ describe(source.info) }}</span>
+            @if (tempoLabel(track); as tempo) {
+              <span class="info">{{ tempo }}</span>
+            }
+          } @else if (source?.status === 'error') {
+            <span class="info error" [title]="source.error">{{ 'source.error' | t: { message: source.error } }}</span>
+            <a href="#" class="info find" (click)="$event.preventDefault(); documents.showSourceFiles()">{{ 'sourceFiles.open' | t }}</a>
           }
-        } @else if (source?.status === 'error') {
-          <span class="info error" [title]="source.error">{{ 'source.error' | t: { message: source.error } }}</span>
-          <a href="#" class="info find" (click)="$event.preventDefault(); documents.showSourceFiles()">{{ 'sourceFiles.open' | t }}</a>
-        }
+          @if (track.effects?.length) {
+            <app-effect-chain class="effect-chain" [effects]="track.effects ?? []" (click)="edits.toggleEffectsPanel(track.id)" />
+          }
+        </div>
+        <app-fader
+          slim
+          class="track-fader"
+          [label]="'track.volume' | t"
+          [min]="-30"
+          [max]="6"
+          [default]="0"
+          [origin]="0"
+          [marks]="volumeMarks"
+          [format]="dbLabel"
+          [round]="halfDb"
+          [value]="volumeDb(track)"
+          (valueChange)="previewVolume(track, $event)"
+          (committed)="commitVolume(track, $event)"
+        />
       </div>
       <app-track-lane
         #lane

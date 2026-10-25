@@ -37,11 +37,15 @@ Nell'ordine:
 6. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
    inviluppo anche senza, con punti e maniglie; i punti nascosti da un trim non si vedono).
 
-L'intestazione della traccia ha il cursore del volume della traccia (−30…+6 dB, passo 0,5;
+L'intestazione della traccia ha sul lato destro il fader verticale del volume della traccia
+(`FaderComponent` in versione `slim`, alto quanto la traccia; −30…+6 dB, passo 0,5;
 un passo di annulla per trascinamento) e il pulsante degli effetti: apre a destra
 `EffectsPanelComponent` per quella traccia (`TimelineService.selectedTrackId`; Esc o di nuovo il
-pulsante lo chiude), con l'intestazione evidenziata; il pulsante è colorato se la traccia ha
-effetti attivi. Vedi [effects.md](effects.md).
+pulsante lo chiude; a pannello aperto segue la traccia dell'ultima clip selezionata), con
+l'intestazione evidenziata; il pulsante è colorato se la traccia ha
+effetti attivi. Sotto le informazioni della sorgente `EffectChainComponent` mostra la catena
+degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello). Vedi
+[effects.md](effects.md).
 
 ## Gesti
 

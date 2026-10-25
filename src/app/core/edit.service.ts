@@ -78,6 +78,16 @@ export class EditService {
         this.timeline.selectClip(null);
       });
     });
+    // the open effects panel follows the track of the clip selected last
+    effect(() => {
+      const ids = this.timeline.selectedClipIds();
+      untracked(() => {
+        const last = ids[ids.length - 1];
+        if (!last || !this.timeline.selectedTrackId()) return;
+        const track = this.montages.montage().tracks.find((t) => t.clips.some((c) => c.id === last));
+        if (track) this.timeline.selectedTrackId.set(track.id);
+      });
+    });
     // clips removed (undo, delete, crop...) leave the selection
     effect(() => {
       const ids = new Set(this.montages.montage().tracks.flatMap((t) => t.clips.map((c) => c.id)));

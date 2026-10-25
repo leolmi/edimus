@@ -31,7 +31,7 @@ import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { moveClips, trimClip, withSourceTempo } from '../../core/montage/edits';
 import { ShellPort } from '../../core/platform/shell.port';
 import { EnvelopePoint, MAX_GAIN, curveThroughMidpoint, insertPoint, movePoint, setCurve } from '../../core/montage/envelope';
-import { ScaleSliderComponent } from '../../shared/scale-slider.component';
+import { FaderComponent } from '../../shared/controls/fader.component';
 import { Clip, Montage, Track, audibleTracks, copyName, fileName, toSource, trackVolume } from '../../core/montage/montage.model';
 import { MontageService } from '../../core/montage/montage.service';
 import { SettingsService } from '../../core/settings.service';
@@ -40,6 +40,7 @@ import { snapAnchors, snapTime, snapToEdges } from '../../core/timeline/edge-sna
 import { BarMarking, TimelineService } from '../../core/timeline/timeline.service';
 import { sourceColors } from '../../core/source-colors';
 import { ThemeColorsService } from '../../core/theme-colors.service';
+import { EffectChainComponent } from '../effects/effect-chain.component';
 import { RulerComponent } from './ruler.component';
 import { TrackInfoData, TrackInfoDialogComponent, TrackInfoResult, TrackInfoSource } from './track-info-dialog.component';
 import { ClipHit, TrackLaneComponent } from './track-lane.component';
@@ -95,8 +96,9 @@ const MIN_BEAT = 60 / 400;
     MatTooltipModule,
     TranslatePipe,
     RulerComponent,
-    ScaleSliderComponent,
+    FaderComponent,
     TrackLaneComponent,
+    EffectChainComponent,
   ],
   templateUrl: './timeline.component.html',
   styleUrl: './timeline.component.scss',
@@ -501,6 +503,10 @@ export class TimelineComponent {
   private volumeFrom?: Montage;
 
   protected readonly dbLabel = (db: number) => `${db > 0 ? '+' : ''}${db.toFixed(1)} dB`;
+  /** Scale of the track volume fader (dB). */
+  protected readonly volumeMarks = [-24, -18, -12, -6, 6];
+  /** Steps of the track volume (0.5 dB). */
+  protected readonly halfDb = (db: number) => Math.round(db * 2) / 2;
 
   protected volumeDb(track: Track): number {
     return Math.round(20 * Math.log10(trackVolume(track)) * 2) / 2;

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input, output } from '@angular/core';
 import { ControlScale, fromPosition, keyPosition, toPosition } from './control-scale';
 
 /** Pause after the last wheel or key step before it counts as done (one undo step). */
@@ -6,10 +6,13 @@ const SETTLE = 500;
 
 /**
  * Vertical fader for levels: drag the thumb or click along the rail, wheel, arrows/PageUp/
- * PageDown/Home/End, double click back to the default. Same events as the knob.
+ * PageDown/Home/End, double click back to the default. Same events as the knob. `slim`: as tall
+ * as its container, no label (e.g. the track volume in the track header). Optional scale: ticks
+ * at `marks` and the `origin` across the rail.
  */
 @Component({
   selector: 'app-fader',
+  host: { '[class.slim]': 'slim()' },
   template: `
     <div
       class="rail"
@@ -29,12 +32,20 @@ const SETTLE = 500;
       (keydown)="onKey($event)"
       (dblclick)="reset()"
     >
+      @for (mark of markPositions(); track mark) {
+        <div class="mark" [style.bottom.%]="mark * 100"></div>
+      }
+      @if (originPosition() !== null) {
+        <div class="mark origin" [style.bottom.%]="originPosition()! * 100"></div>
+      }
       <div class="groove"></div>
       <div class="lit" [style.height.%]="position() * 100"></div>
       <div class="thumb" [style.bottom.%]="position() * 100"></div>
     </div>
     <span class="value">{{ text() }}</span>
-    <span class="label">{{ label() }}</span>
+    @if (!slim()) {
+      <span class="label">{{ label() }}</span>
+    }
   `,
   styles: `
     :host {
@@ -69,7 +80,24 @@ const SETTLE = 500;
     }
     .groove {
       top: 0;
-      background: var(--mat-sys-outline-variant);
+      background: var(--mat-sys-outline);
+    }
+    /* scale: short ticks on both sides of the groove, the origin (e.g. 0 dB) across it */
+    .mark {
+      position: absolute;
+      left: 3px;
+      right: 3px;
+      height: 1px;
+      margin-bottom: -0.5px;
+      background: linear-gradient(to right, var(--mat-sys-on-surface-variant) 30%, transparent 30% 70%, var(--mat-sys-on-surface-variant) 70%);
+      /* wider than the thumb: visible also when the value is on it */
+      &.origin {
+        left: -5px;
+        right: -5px;
+        height: 2px;
+        margin-bottom: -1px;
+        background: var(--mat-sys-on-surface);
+      }
     }
     .lit {
       background: var(--mat-sys-primary);
@@ -83,6 +111,15 @@ const SETTLE = 500;
       border-radius: 2px;
       background: var(--mat-sys-surface-container-highest);
       border: 1px solid var(--mat-sys-outline);
+    }
+    :host(.slim) {
+      width: 40px;
+      height: 100%;
+      .rail {
+        flex: 1 1 auto;
+        height: auto;
+        min-height: 40px;
+      }
     }
     .value {
       font: var(--mat-sys-label-small);
@@ -105,6 +142,11 @@ export class FaderComponent {
   readonly log = input(false);
   readonly default = input<number>();
   readonly label = input('');
+  readonly slim = input(false, { transform: booleanAttribute });
+  /** Values marked on the scale. */
+  readonly marks = input<readonly number[]>([]);
+  /** Neutral value marked across the rail (e.g. 0 dB). */
+  readonly origin = input<number>();
   readonly format = input<(value: number) => string>((v) => String(v));
   readonly round = input<(value: number) => number>((v) => v);
 
@@ -114,6 +156,11 @@ export class FaderComponent {
   private readonly scale = computed<ControlScale>(() => ({ min: this.min(), max: this.max(), log: this.log() }));
   protected readonly position = computed(() => toPosition(this.scale(), this.value()));
   protected readonly text = computed(() => this.format()(this.value()));
+  protected readonly markPositions = computed(() => this.marks().map((m) => toPosition(this.scale(), m)));
+  protected readonly originPosition = computed(() => {
+    const origin = this.origin();
+    return origin === undefined ? null : toPosition(this.scale(), origin);
+  });
 
   private dragging = false;
   private settle = 0;
