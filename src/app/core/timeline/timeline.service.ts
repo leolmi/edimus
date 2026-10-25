@@ -40,6 +40,8 @@ export class TimelineService {
   });
   /** Selected clips as a set, for lookups. */
   readonly selectedClips = computed(() => new Set(this.selectedClipIds()));
+  /** Track whose effects are shown in the side panel, null when the panel is closed. */
+  readonly selectedTrackId = signal<string | null>(null);
   /** Bar marking in progress, to set the tempo of the clip's source by hand. */
   readonly beatMarking = signal<BarMarking | null>(null);
   /** Shows the beat grid of the clips with a known tempo. */

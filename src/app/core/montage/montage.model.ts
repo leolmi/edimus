@@ -1,12 +1,13 @@
 import type { Tempo } from '../audio/tempo';
+import type { TrackEffect } from '../effects/effects';
 import type { EnvelopePoint } from './envelope';
 
 /** Extension of the montage project files. */
 export const MONTAGE_EXTENSION = 'edimus';
 /** Montage and copies of its sources in one zip file. */
 export const BUNDLE_EXTENSION = 'edimuspack';
-/** 2: volume envelopes on the clips (in source time) and a single volume per track. */
-export const MONTAGE_VERSION = 2;
+/** 2: volume envelopes on the clips (in source time) and a single volume per track; 3: effects per track. */
+export const MONTAGE_VERSION = 3;
 
 export const AUDIO_EXTENSIONS = ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aif', 'aiff', 'wma'];
 
@@ -72,6 +73,8 @@ export interface Track {
   solo?: boolean;
   /** Volume of the whole track (linear gain, up to MAX_GAIN); default 1. */
   volume?: number;
+  /** Effects applied in order to the sum of the clips, before the volume (see effects.ts). */
+  effects?: TrackEffect[];
 }
 
 /** Volume of a track (linear gain). */

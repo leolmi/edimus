@@ -8,6 +8,7 @@ import { BarFileService } from '../audio/bar-file.service';
 import { TempoService } from '../audio/tempo.service';
 import { beatsPerBar } from '../audio/tempo';
 import { anchorOf, gridPoints, isVariable, meanBpm, pinBar } from '../audio/tempo-map';
+import { EFFECTS, TrackEffect, sanitizeEffects, setTrackEffects } from '../effects/effects';
 import { applyCrossfade, findCrossfade } from '../montage/crossfade';
 import { cropToRange, deleteRange, setClipTiming, splitAt, trimClip } from '../montage/edits';
 import { EnvelopePoint, clipGainAt, withFade } from '../montage/envelope';
@@ -129,7 +130,7 @@ export class AiCommandsService {
         trailingSilence: (p['trailingSilence'] as number | undefined) || undefined,
       };
       await this.exporter.export(path, options);
-      return { exported: path, duration: round(this.timeline.duration() + (options.trailingSilence ?? 0)), options };
+      return { exported: path, duration: round(this.timeline.duration() + this.mixer.tail() + (options.trailingSilence ?? 0)), options };
     },
 
     // --- transport and history
@@ -237,6 +238,27 @@ export class AiCommandsService {
       }));
       return this.trackState(this.track(track.id));
     },
+    set_effects: async (p) => {
+      const track = this.track(String(p['trackId']));
+      // ids kept for the effects of the same type in the same position (their values merge)
+      const current = track.effects ?? [];
+      const given = ((p['effects'] as Partial<TrackEffect>[]) ?? []).map((e, i) => {
+        const same = current[i]?.type === e.type ? current[i] : undefined;
+        return { ...e, id: same?.id, params: { ...(same?.params ?? {}), ...(e.params ?? {}) } };
+      });
+      this.montages.update((m) => setTrackEffects(m, track.id, sanitizeEffects(given) ?? []));
+      return this.trackState(this.track(track.id));
+    },
+    list_effects: async () =>
+      EFFECTS.map((d) => ({
+        type: d.type,
+        params: d.params.map((p) =>
+          p.kind === 'choice'
+            ? { id: p.id, options: p.options, default: p.default }
+            : { id: p.id, unit: p.unit, min: p.min, max: p.max, default: p.default },
+        ),
+        presets: d.presets.map((p) => ({ name: p.name.replace('fx.preset.', ''), params: p.params })),
+      })),
     delete_track: async (p) => {
       const track = this.track(String(p['trackId']));
       this.montages.removeTrack(track.id);
@@ -537,6 +559,7 @@ export class AiCommandsService {
       muted: !!track.muted,
       solo: !!track.solo,
       volumeDb: toDb(trackVolume(track)),
+      effects: (track.effects ?? []).map((e) => ({ type: e.type, ...(e.bypass ? { bypass: true } : {}), params: e.params })),
       clips: track.clips.map((c) => this.clipState(c.id)),
     };
   }

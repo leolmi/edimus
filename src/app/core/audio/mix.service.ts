@@ -1,10 +1,13 @@
 import { Injectable, computed, inject } from '@angular/core';
+import { EffectChain } from '../effects/effect-nodes';
+import { TrackEffect, effectsTail } from '../effects/effects';
 import { automate, clipEnvelopeOnTimeline, clipGainAt } from '../montage/envelope';
-import { Clip, audibleTracks, clipRate, isProcessed, trackVolume } from '../montage/montage.model';
+import { Clip, Montage, Track, audibleTracks, clipRate, isProcessed, trackVolume } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { AudioLibraryService } from './audio-library.service';
 import { ProcessedAudioService } from './processed-audio.service';
+import { TempoService } from './tempo.service';
 
 /** Level under which the mix counts as silence (-60 dBFS). */
 const SILENCE = 0.001;
@@ -17,16 +20,41 @@ export interface AudibleRange {
   end: number;
 }
 
+/** Tempo the echoes follow when the track has none. */
+const DEFAULT_BPM = 120;
+
+/** Nodes of a track in a scheduled mix, changed live (volume, effect values). */
+interface ScheduledTrack {
+  volume: GainNode;
+  effects: EffectChain;
+}
+
 /** Nodes of a scheduled mix, to stop and release them. */
 export interface ScheduledMix {
   sources: AudioBufferSourceNode[];
   gains: GainNode[];
+  tracks: Map<string, ScheduledTrack>;
+}
+
+const sameChain = (a: readonly TrackEffect[] = [], b: readonly TrackEffect[] = []) =>
+  a.length === b.length && a.every((e, i) => e.id === b[i].id && e.type === b[i].type);
+
+/**
+ * True when `b` differs from `a` only in what a scheduled mix changes live (track volumes,
+ * values and bypass of the effects): no need to schedule it again.
+ */
+export function differsOnlyLive(a: Montage, b: Montage): boolean {
+  if (a.sources !== b.sources || a.channels !== b.channels || a.tracks.length !== b.tracks.length) return false;
+  return a.tracks.every((t, i) => {
+    const u = b.tracks[i];
+    return t.id === u.id && t.clips === u.clips && !!t.muted === !!u.muted && !!t.solo === !!u.solo && sameChain(t.effects, u.effects);
+  });
 }
 
 /**
- * Builds the audio graph of the montage on a context: one gain node per audible track (its
- * volume) fed by one buffer source per clip, through a gain automated by the clip's envelope
- * when it has one. Used by both the live
+ * Builds the audio graph of the montage on a context: for each audible track, one buffer source
+ * per clip (through a gain automated by the clip's envelope when it has one) into the chain of
+ * its effects, then a gain node with its volume. Used by both the live
  * playback and the offline render of the export, so they sound the same.
  */
 @Injectable({ providedIn: 'root' })
@@ -35,18 +63,23 @@ export class MixService {
   private readonly library = inject(AudioLibraryService);
   private readonly timeline = inject(TimelineService);
   private readonly processed = inject(ProcessedAudioService);
+  private readonly tempos = inject(TempoService);
 
   /**
    * Schedules the montage from montage time `from` (up to `until`, default the end), played at
    * context time `when`.
    */
   schedule(ctx: BaseAudioContext, destination: AudioNode, from: number, when: number, until = Infinity): ScheduledMix {
-    const mix: ScheduledMix = { sources: [], gains: [] };
+    const mix: ScheduledMix = { sources: [], gains: [], tracks: new Map() };
     for (const track of audibleTracks(this.montages.montage())) {
-      const gain = ctx.createGain();
-      gain.connect(destination);
-      gain.gain.value = trackVolume(track);
-      mix.gains.push(gain);
+      const volume = ctx.createGain();
+      volume.connect(destination);
+      volume.gain.value = trackVolume(track);
+      mix.gains.push(volume);
+      const effects = new EffectChain(ctx, track.effects ?? [], this.trackBpm(track));
+      effects.output.connect(volume);
+      mix.tracks.set(track.id, { volume, effects });
+      const input = effects.input;
       for (const clip of track.clips) {
         const buffer = this.bufferOf(clip);
         const length = this.timeline.clipLength(clip);
@@ -57,11 +90,11 @@ export class MixService {
           // the fades of the clip, on its own gain
           const fades = ctx.createGain();
           automate(fades.gain, clipEnvelopeOnTimeline(clip), from, when);
-          fades.connect(gain);
+          fades.connect(input);
           mix.gains.push(fades);
           node.connect(fades);
         } else {
-          node.connect(gain);
+          node.connect(input);
         }
         const delay = Math.max(0, clip.start - from);
         const skip = Math.max(0, from - clip.start);
@@ -72,6 +105,27 @@ export class MixService {
       }
     }
     return mix;
+  }
+
+  /** Applies to a scheduled mix the live changes of `montage` (see `differsOnlyLive`). */
+  update(mix: ScheduledMix, montage: Montage): void {
+    for (const track of audibleTracks(montage)) {
+      const scheduled = mix.tracks.get(track.id);
+      if (!scheduled) continue;
+      scheduled.volume.gain.setTargetAtTime(trackVolume(track), scheduled.volume.context.currentTime, 0.015);
+      scheduled.effects.update(track.effects ?? [], this.trackBpm(track));
+    }
+  }
+
+  /** Seconds the effects of the audible tracks keep sounding after the end of the montage. */
+  tail(): number {
+    return Math.max(0, ...audibleTracks(this.montages.montage()).map((t) => effectsTail(t.effects, this.trackBpm(t))));
+  }
+
+  /** Tempo the echoes of a track follow: the one heard in its first clip. */
+  trackBpm(track: Track): number {
+    const first = track.clips.reduce<Clip | undefined>((a, c) => (!a || c.start < a.start ? c : a), undefined);
+    return (first && this.tempos.clipBpm(first)) || DEFAULT_BPM;
   }
 
   /**
@@ -153,5 +207,6 @@ export function releaseMix(mix: ScheduledMix): void {
     node.disconnect();
   }
   for (const gain of mix.gains) gain.disconnect();
+  for (const track of mix.tracks.values()) track.effects.disconnect();
 }
 

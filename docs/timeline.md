@@ -5,7 +5,7 @@ Componenti in `src/app/features/timeline/`; stato di vista in `TimelineService`.
 ## Struttura
 
 - `TimelineComponent`: righello, intestazioni delle tracce (nome → dettagli, mute, solo,
-  info, elimina), una `TrackLaneComponent` per traccia, scrollbar nativa, area di drop.
+  effetti, info, elimina), una `TrackLaneComponent` per traccia, scrollbar nativa, area di drop.
   Gestisce tutti i gesti del puntatore sulle lane (`onLaneDown/Move/Up`).
   Caricamento dei file trascinati: dal rilascio (`DocumentService.pendingDrop`, che copre la
   risoluzione dei percorsi e il probe) alla fine della decodifica delle sorgenti della traccia,
@@ -38,7 +38,10 @@ Nell'ordine:
    inviluppo anche senza, con punti e maniglie; i punti nascosti da un trim non si vedono).
 
 L'intestazione della traccia ha il cursore del volume della traccia (−30…+6 dB, passo 0,5;
-un passo di annulla per trascinamento).
+un passo di annulla per trascinamento) e il pulsante degli effetti: apre a destra
+`EffectsPanelComponent` per quella traccia (`TimelineService.selectedTrackId`; Esc o di nuovo il
+pulsante lo chiude), con l'intestazione evidenziata; il pulsante è colorato se la traccia ha
+effetti attivi. Vedi [effects.md](effects.md).
 
 ## Gesti
 

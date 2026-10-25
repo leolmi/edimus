@@ -3,7 +3,7 @@ import { MontageService } from '../montage/montage.service';
 import { SettingsService } from '../settings.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { AudioLibraryService } from './audio-library.service';
-import { MixService, ScheduledMix, releaseMix } from './mix.service';
+import { MixService, ScheduledMix, differsOnlyLive, releaseMix } from './mix.service';
 import { ProcessedAudioService } from './processed-audio.service';
 
 /** Distance (s) from the start point within which the playhead counts as on it. */
@@ -40,13 +40,21 @@ export class PlaybackService {
   private frame = 0;
 
   constructor() {
-    // edits or sources decoded while playing: reschedule
+    // edits or sources decoded while playing: reschedule; volumes and effect values change live
+    let previous = this.montages.montage();
     effect(() => {
-      this.montages.montage();
+      const montage = this.montages.montage();
       this.library.sources();
       this.processed.renders();
       untracked(() => {
-        if (this.playing()) this.play(this.currentPosition());
+        const before = previous;
+        previous = montage;
+        if (!this.playing()) return;
+        if (montage !== before && differsOnlyLive(before, montage)) {
+          for (const mix of this.mixes) this.mixer.update(mix, montage);
+        } else {
+          this.play(this.currentPosition());
+        }
       });
     });
     // loop switched or range changed while playing: reschedule
@@ -148,6 +156,11 @@ export class PlaybackService {
     const position = Math.max(0, Math.min(this.timeline.duration(), time));
     if (this.playing()) this.play(position);
     else this.position.set(position);
+  }
+
+  /** Gain reduction (dB, ≤ 0) of an effect of a track at this moment of the playback; 0 when stopped. */
+  reduction(trackId: string, effectId: string): number {
+    return this.playing() ? (this.mixes[0]?.tracks.get(trackId)?.effects.reduction(effectId) ?? 0) : 0;
   }
 
   /** Selected range the playback repeats, when the loop is on and the range is long enough. */

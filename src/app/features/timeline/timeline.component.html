@@ -7,7 +7,7 @@
   @for (track of montages.montage().tracks; track track.id; let index = $index) {
     @let source = sourceOf(track);
     <div class="track" [attr.data-drop-track]="track.id">
-      <div class="header">
+      <div class="header" [class.selected]="timeline.selectedTrackId() === track.id">
         <div class="name" role="button" tabindex="0" (click)="showInfo(track)" (keydown.enter)="showInfo(track)">
           <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{ source?.status === 'error' ? 'error' : 'audio_file' }}</mat-icon>
           <span>{{ track.name }}</span>
@@ -34,6 +34,16 @@
             (valueChange)="previewVolume(track, $event)"
             (committed)="commitVolume(track, $event)"
           />
+          <button
+            mat-icon-button
+            class="small"
+            [class.active]="timeline.selectedTrackId() === track.id"
+            [class.has-effects]="hasEffects(track)"
+            (click)="edits.toggleEffectsPanel(track.id)"
+            [matTooltip]="'fx.open' | t"
+          >
+            <mat-icon>tune</mat-icon>
+          </button>
           <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
             <mat-icon>info</mat-icon>
           </button>

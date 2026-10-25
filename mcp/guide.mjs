@@ -17,8 +17,13 @@ stereo mix, which is rendered by \`export\`.
   The tempo may be **variable**: a bar map pins the start of some bars (or of every bar) on the
   audio, for songs recorded without a steady tempo; the grid, \`get_beats\` and the beat snap follow
   it, and \`bpm\` is then the average. It belongs to the source, so every clip of the file shares it.
-- **track** — a horizontal lane: name, muted, solo, \`volumeDb\` (volume of the whole track), and clips.
-  Tracks are mixed together; when any track is soloed only soloed tracks are heard.
+- **track** — a horizontal lane: name, muted, solo, \`volumeDb\` (volume of the whole track), \`effects\`
+  and clips. Tracks are mixed together; when any track is soloed only soloed tracks are heard.
+- **effects** — a chain per track (eq, compressor, echo, reverb, saturation), applied in order to the
+  sum of its clips, before the track volume; heard live and in the export (which keeps the tails of
+  echoes and reverbs). Each has \`params\` in human units (dB, Hz, %, ms, ratio; the echo time is a
+  note division following the tempo of the track's first clip) and may be \`bypass\`ed.
+  \`list_effects\` gives ids, ranges, defaults and presets; \`set_effects\` replaces the chain.
 - **clip** — a portion of a source placed on a track:
   - \`start\` / \`end\`: position on the **timeline** (seconds);
   - \`offset\`: where the portion begins inside the source (source seconds);
@@ -53,6 +58,9 @@ without leading and trailing silences; null while some audio is not ready.
   the first silence (or \`delete_range\` to shift everything back).
 - Fade out the last 5 s of a clip: \`fade\` {clipId, type: "out", length: 5}.
 - Lower a track by 6 dB: \`set_track\` {trackId, volumeDb: -6}.
+- Warm up a voice: \`set_effects\` {trackId, effects: [{type: "eq", params: {lowCut: 100, high: 3}},
+  {type: "compressor"}, {type: "reverb", params: {size: 35, mix: 15}}]}. To process only part of a
+  clip, move that part to a new track (\`split\`, then \`move_clip\` with newTrack) and set effects there.
 - Join two songs: \`open\` both (two tracks), \`move_clip\` the second to start where the first ends
   minus the crossfade, then \`crossfade\` {clipIds: [first, second]} over their whole overlap.
 - Show the user what you mean: \`select\` {clipIds, from, to} highlights clips and a range in the window.

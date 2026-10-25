@@ -12,6 +12,7 @@ e vanno lette prima di toccare l'area corrispondente:
 | [docs/architecture.md](docs/architecture.md) | runtime Neutralino, servizi, flusso audio (decodifica, render, mix, export), bridge MCP |
 | [docs/data-model.md](docs/data-model.md) | montaggio, sorgenti, clip, tracce, inviluppo, tempo: campi, unità, invarianti, formato file |
 | [docs/timeline.md](docs/timeline.md) | vista multitraccia: disegno su canvas, gesti, scorciatoie, griglia delle battute e marcatura |
+| [docs/effects.md](docs/effects.md) | effetti di traccia: pannello, controlli, elenco degli effetti con parametri e preset (va aggiornato con `EFFECTS`) |
 | [mcp/README.md](mcp/README.md) | server MCP che permette a un'AI di pilotare l'app aperta |
 | [WISHLIST.md](WISHLIST.md) | idee valutate e rimandate (non implementarle senza richiesta) |
 
@@ -55,6 +56,7 @@ src/app/
       tempo-align.ts      allineamento del tempo tra clip
       montage-file.ts     lettura/scrittura .edimus (percorsi relativi)
     audio/              libreria buffer, picchi, tempo, render processato, mix, playback, export
+    effects/            effetti di traccia: schede descrittive e operazioni pure (effects.ts), nodi Web Audio (effect-nodes.ts)
     platform/           porte verso la piattaforma: file system, motore audio, impostazioni, shell, capacità
     timeline/           TimelineService: zoom, scroll, selezione, modalità (inviluppo, griglia, marcatura)
     edit.service.ts     comandi di editing per UI e AI (selezione, playhead, dialoghi tempo/velocità)
@@ -62,9 +64,9 @@ src/app/
     ai/                 bridge WebSocket verso mcp/server.mjs ed esecuzione dei comandi
     i18n/               it.ts / en.ts + pipe `t`
     settings, theme-colors, instance, drop-target, ...
-  features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi), export, rename, settings,
+  features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi), effects (pannello laterale), export, rename, settings,
                         help (Aiuto: guida, come fare, assistente AI, info e licenze)
-  shared/               componenti riusabili (scale-slider)
+  shared/               componenti riusabili (scale-slider; controls/: manopola, fader, interruttore, selettore, indicatore)
 src/platform/           implementazioni delle porte: neutralino/ (ffmpeg, dialoghi, drop, reveal);
                         web/ (File System Access API, Rubber Band e encoder wasm); platform.providers.ts sceglie la piattaforma della build,
                         sostituito da platform.providers.web.ts nella configurazione `web`

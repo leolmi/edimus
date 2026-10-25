@@ -12,6 +12,7 @@ import { AlignContext, AlignOptions, alignTempo } from './montage/tempo-align';
 import { PlaybackService } from './audio/playback.service';
 import { applyCrossfade, findCrossfade } from './montage/crossfade';
 import { cropToRange, deleteRange, moveClips, setClipTiming, splitAt } from './montage/edits';
+import { EffectPreset, EffectType, EffectValue, addEffect, applyPreset, moveEffect, newEffect, removeEffect, setEffectBypass, setEffectParams } from './effects/effects';
 import { Clip, Montage, clipRate } from './montage/montage.model';
 import { nextAnchorShift } from './timeline/edge-snap';
 import { MontageService } from './montage/montage.service';
@@ -398,5 +399,51 @@ export class EditService {
   clearSelection(): void {
     this.timeline.range.set(null);
     this.timeline.selectClip(null);
+    this.timeline.selectedTrackId.set(null);
+  }
+
+  // --- effects of a track ---------------------------------------------------------------------
+
+  /** State before the effect value being dragged, for one undo step per gesture. */
+  private effectFrom?: Montage;
+
+  /** Opens the effects panel of a track, or closes it when it already shows that track. */
+  toggleEffectsPanel(trackId: string): void {
+    this.timeline.selectedTrackId.update((id) => (id === trackId ? null : trackId));
+  }
+
+  addEffect(trackId: string, type: EffectType): void {
+    this.montages.update((m) => addEffect(m, trackId, newEffect(type)));
+  }
+
+  removeEffect(trackId: string, effectId: string): void {
+    this.montages.update((m) => removeEffect(m, trackId, effectId));
+  }
+
+  moveEffect(trackId: string, effectId: string, index: number): void {
+    this.montages.update((m) => moveEffect(m, trackId, effectId, index));
+  }
+
+  setEffectBypass(trackId: string, effectId: string, bypass: boolean): void {
+    this.montages.update((m) => setEffectBypass(m, trackId, effectId, bypass));
+  }
+
+  /** Sets the effect to a preset, or to its default values with null. */
+  applyEffectPreset(trackId: string, effectId: string, preset: EffectPreset | null): void {
+    this.montages.update((m) => applyPreset(m, trackId, effectId, preset));
+  }
+
+  /** Changes a value of an effect while a control moves: heard at once, not yet an undo step. */
+  previewEffectParam(trackId: string, effectId: string, param: string, value: EffectValue): void {
+    this.effectFrom ??= this.montages.montage();
+    this.montages.preview(setEffectParams(this.montages.montage(), trackId, effectId, { [param]: value }));
+  }
+
+  /** Ends the gesture on a control: one undo step from where it started. */
+  commitEffectParam(trackId: string, effectId: string, param: string, value: EffectValue): void {
+    const from = this.effectFrom ?? this.montages.montage();
+    this.effectFrom = undefined;
+    this.montages.preview(setEffectParams(this.montages.montage(), trackId, effectId, { [param]: value }));
+    this.montages.commit(from);
   }
 }

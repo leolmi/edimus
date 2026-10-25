@@ -261,6 +261,15 @@
   &.active {
     --mat-icon-button-icon-color: var(--mat-sys-primary);
   }
+
+  /* the track has effects switched on: shown also when its panel is closed */
+  &.has-effects {
+    --mat-icon-button-icon-color: var(--mat-sys-tertiary);
+  }
+}
+
+.header.selected {
+  background: var(--mat-sys-secondary-container);
 }
 
 .range {

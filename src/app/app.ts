@@ -19,6 +19,7 @@ import { SettingsService } from './core/settings.service';
 import { TimelineService } from './core/timeline/timeline.service';
 import { UpdateService } from './core/update.service';
 import { ClipBarComponent } from './features/timeline/clip-bar.component';
+import { EffectsPanelComponent } from './features/effects/effects-panel.component';
 import { HelpDialogComponent, HelpTab } from './features/help/help-dialog.component';
 import { SettingsDialogComponent } from './features/settings/settings-dialog.component';
 import { TimelineComponent } from './features/timeline/timeline.component';
@@ -37,6 +38,7 @@ import { ScaleSliderComponent } from './shared/scale-slider.component';
     TranslatePipe,
     TimelineComponent,
     ClipBarComponent,
+    EffectsPanelComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',

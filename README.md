@@ -23,6 +23,9 @@ Monta, taglia, metti a tempo e mixa i tuoi brani senza mai toccare i file origin
   l'intonazione) oppure varispeed come un nastro, clip per clip.
 - **Volume preciso**: inviluppo per clip con curve, fade e dissolvenze incrociate che seguono la
   clip, più il volume per traccia.
+- **Effetti per traccia**: equalizzatore, compressore, eco a tempo, riverbero e saturazione, con
+  preset e controlli in stile studio; si sentono mentre li regoli. Dettagli in
+  [docs/effects.md](docs/effects.md).
 - **Portabile e sempre aggiornato**: è una cartella da copiare, senza installazione. All'avvio
   propone le nuove versioni e, con la tua conferma, si aggiorna da solo.
 - **Anche nel browser**: la versione web lavora tutta sul tuo computer, e i file audio non vengono

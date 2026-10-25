@@ -5,7 +5,7 @@ Tipi in `src/app/core/montage/montage.model.ts`, `envelope.ts`, `src/app/core/au
 ## Montage
 
 ```ts
-Montage { version: 2; channels: 1 | 2; sources: AudioSource[]; tracks: Track[] }
+Montage { version: 3; channels: 1 | 2; sources: AudioSource[]; tracks: Track[] }
 ```
 
 - `channels`: canali del mix esportato.
@@ -32,6 +32,28 @@ Formato, durata, canali e tempo rilevato **non** sono nel file: vengono ricavati
 | `clips` | clip della traccia (possono sovrapporsi; la selezionata è disegnata sopra) |
 | `muted?`, `solo?` | udibili = non mute e, se qualche traccia è in solo, in solo (`audibleTracks`) |
 | `volume?` | volume di tutta la traccia, gain lineare (0..`MAX_GAIN`); assente = 1 (`trackVolume`) |
+| `effects?` | catena di effetti applicata in ordine alla somma delle clip, prima del volume; assente = nessun effetto (vedi *Effetti*) |
+
+## Effetti
+
+Tipi e logica in `core/effects/effects.ts`, nodi audio in `core/effects/effect-nodes.ts`.
+
+```ts
+TrackEffect { id: string /* unico nella traccia */; type: 'eq' | 'compressor' | 'echo' | 'reverb' | 'saturation';
+              bypass?: boolean; params: Record<string, number | string> }
+```
+
+- Ogni tipo ha un `EffectDescriptor` (`EFFECTS`): parametri con id, etichetta, minimo, massimo,
+  valore iniziale, unità (`dB`, `Hz`, `%`, `ms`, `ratio`), scala logaritmica, fader al posto della
+  manopola; oppure scelta tra valori fissi (`choice`, es. la divisione dell'eco). Più i preset. Il
+  pannello costruisce i controlli dalla scheda, la lettura del file e l'MCP ne validano i valori
+  (`sanitizeEffects`: tipi sconosciuti scartati, valori riportati nell'intervallo, mancanti = iniziale).
+- I valori sono nelle unità umane della scheda (dB, Hz…), come in UI e MCP; la conversione per i
+  nodi audio è in `effect-nodes.ts`.
+- L'eco va a tempo: divisione di nota (`ECHO_DIVISIONS`, in battiti) al tempo della prima clip della
+  traccia (`MixService.trackBpm`, 120 se sconosciuto).
+- Operazioni pure: `addEffect`, `removeEffect`, `moveEffect`, `setEffectParams`, `setEffectBypass`,
+  `applyPreset`, `setTrackEffects`; `effectsTail` dà quanto eco e riverbero suonano dopo la fine.
 
 ## Clip
 
@@ -160,3 +182,5 @@ Migrazioni:
   l'inviluppo di ognuna delle sue clip, convertito in secondi sorgente. Il suono non cambia (la
   conversione è lineare, curve comprese); la traccia resta a volume 1. Il file viene riscritto
   in versione 2 al primo salvataggio.
+- **2 → 3**: aggiunge solo gli effetti di traccia, nulla da convertire. Le versioni dell'app che
+  non conoscono gli effetti rifiutano i file in versione 3 invece di perderli al salvataggio.

@@ -173,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.7.2' },
+  { name: 'edimus', version: '1.8.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -404,6 +404,25 @@ appTool('set_track', 'Track properties', 'Renames, mutes or solos a track, or se
   solo: z.boolean().optional(),
   volumeDb: z.number().max(6).optional().describe('Volume of the whole track in dB (0 = unchanged, max +6)'),
 });
+appTool(
+  'set_effects',
+  'Set track effects',
+  'Replaces the effect chain of a track (applied in order to the sum of its clips, before the track volume; empty list = no effects). ' +
+    'Types: eq, compressor, echo, reverb, saturation; parameter ids, units and ranges from list_effects (missing parameters keep ' +
+    'their current value when the effect stays in the same position with the same type, otherwise their default). ' +
+    'bypass: true keeps the effect but lets the audio through unchanged. The export keeps the tails of echoes and reverbs.',
+  {
+    trackId: z.string(),
+    effects: z.array(
+      z.object({
+        type: z.enum(['eq', 'compressor', 'echo', 'reverb', 'saturation']),
+        bypass: z.boolean().optional(),
+        params: z.record(z.string(), z.union([z.number(), z.string()])).optional().describe('Values by parameter id, in the units of list_effects'),
+      }),
+    ),
+  },
+);
+appTool('list_effects', 'List effects', 'Effect types with their parameters (id, unit, range, default) and presets, for set_effects.', {}, { readOnlyHint: true });
 appTool('delete_track', 'Delete track', 'Removes a track with its clips.', { trackId: z.string() }, { destructiveHint: true });
 
 // --- volume ----------------------------------------------------------------------------------

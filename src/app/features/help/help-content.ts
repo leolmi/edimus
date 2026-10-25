@@ -244,6 +244,28 @@ const IT: HelpContent = {
       ],
     },
     {
+      title: 'Effetti',
+      icon: 'tune',
+      topics: [
+        {
+          title: 'Effetti della traccia',
+          text: [
+            'Il pulsante con i cursori nell’intestazione della traccia apre a destra il pannello dei suoi effetti (Esc lo chiude); il pulsante è colorato quando la traccia ha effetti attivi.',
+            'Gli effetti disponibili sono equalizzatore, compressore, eco, riverbero e saturazione. Agiscono in ordine, dall’alto in basso, sul suono di tutte le clip della traccia e prima del suo volume; l’ordine si cambia trascinando la maniglia. Il menu dei preset offre impostazioni pronte e i valori iniziali; l’interruttore esclude l’effetto senza perderne le impostazioni.',
+            'Durante l’ascolto le regolazioni si sentono subito, e un’intera regolazione è un solo passo di annulla. L’esportazione tiene le code di eco e riverbero dopo la fine dell’ultima clip. L’eco va a tempo con la prima clip della traccia (divisioni da 1/2 a 1/16).',
+            'Il compressore mostra un grafico che segue i valori: a sinistra la curva di compressione (ingresso → uscita, con la soglia), a destra come la riduzione arriva con l’attacco e se ne va con il rilascio su un colpo forte.',
+            'Per mettere un effetto solo su un pezzo, dividi la clip e sposta quel pezzo su una traccia a parte con i suoi effetti.',
+          ],
+        },
+        {
+          title: 'Manopole e fader',
+          text: [
+            'Si regolano trascinando in verticale (con Maiusc più finemente), con la rotellina o con le frecce dopo averli selezionati; doppio clic torna al valore iniziale. Un clic sul valore sotto la manopola permette di scriverlo (es. 1,5k per 1500 Hz).',
+          ],
+        },
+      ],
+    },
+    {
       title: 'Velocità, intonazione e tempo',
       icon: 'speed',
       topics: [
@@ -394,6 +416,23 @@ const IT: HelpContent = {
     {
       title: 'Abbassare il volume di una traccia',
       steps: ['Trascina verso sinistra il cursore del volume nell’intestazione della traccia (doppio clic: torna a 0 dB).'],
+    },
+    {
+      title: 'Aggiungere riverbero o eco a una voce',
+      steps: [
+        'Premi il pulsante con i cursori nell’intestazione della traccia.',
+        'Nel pannello a destra premi Aggiungi effetto e scegli Riverbero (o Eco).',
+        'Scegli un preset dal menu dell’effetto, poi regola il Mix ascoltando.',
+      ],
+      note: 'Per una voce più presente aggiungi prima un Equalizzatore e un Compressore con il preset Voce: gli effetti agiscono dall’alto in basso.',
+    },
+    {
+      title: 'Mettere un effetto solo su un pezzo di traccia',
+      steps: [
+        'Dividi la clip all’inizio e alla fine del pezzo (S).',
+        'Trascina il pezzo su una traccia vuota (le strisce in fondo): diventa una traccia nuova.',
+        'Aggiungi gli effetti a quella traccia.',
+      ],
     },
     {
       title: 'Ascoltare in loop un passaggio',
@@ -651,6 +690,28 @@ const EN: HelpContent = {
       ],
     },
     {
+      title: 'Effects',
+      icon: 'tune',
+      topics: [
+        {
+          title: 'Track effects',
+          text: [
+            'The button with the sliders in the track header opens the panel of its effects on the right (Esc closes it); the button is coloured when the track has effects switched on.',
+            'The effects available are equalizer, compressor, echo, reverb and saturation. They act in order, top to bottom, on the sound of all the clips of the track and before its volume; drag the handle to change the order. The presets menu offers ready settings and the default values; the switch bypasses the effect keeping its settings.',
+            'While playing, changes are heard at once, and a whole adjustment is one undo step. The export keeps the tails of echoes and reverbs after the end of the last clip. The echo follows the tempo of the first clip of the track (divisions from 1/2 to 1/16).',
+            'The compressor shows a graph that follows its values: on the left the compression curve (input → output, with the threshold), on the right how the reduction comes in with the attack and goes away with the release on a loud hit.',
+            'To put an effect on a part only, split the clip and move that part to a track of its own with its effects.',
+          ],
+        },
+        {
+          title: 'Knobs and faders',
+          text: [
+            'Drag them vertically (finer with Shift), use the wheel, or the arrow keys once selected; a double click goes back to the default value. A click on the value under a knob lets you type it (e.g. 1.5k for 1500 Hz).',
+          ],
+        },
+      ],
+    },
+    {
       title: 'Speed, pitch and tempo',
       icon: 'speed',
       topics: [
@@ -796,6 +857,23 @@ const EN: HelpContent = {
     {
       title: 'Lower the volume of a track',
       steps: ['Drag left the volume slider in the track header (double click: back to 0 dB).'],
+    },
+    {
+      title: 'Add reverb or echo to a voice',
+      steps: [
+        'Press the button with the sliders in the track header.',
+        'In the panel on the right press Add effect and choose Reverb (or Echo).',
+        'Choose a preset from the menu of the effect, then set the Mix while listening.',
+      ],
+      note: 'For a more present voice add an Equalizer and a Compressor with the Voice preset first: effects act top to bottom.',
+    },
+    {
+      title: 'Put an effect on part of a track only',
+      steps: [
+        'Split the clip at the start and at the end of the part (S).',
+        'Drag the part onto an empty track (the strips at the bottom): it becomes a new track.',
+        'Add the effects to that track.',
+      ],
     },
     {
       title: 'Loop a passage',

@@ -107,7 +107,7 @@ export class TimelineComponent {
   protected readonly timeline = inject(TimelineService);
   protected readonly playback = inject(PlaybackService);
   protected readonly documents = inject(DocumentService);
-  private readonly edits = inject(EditService);
+  protected readonly edits = inject(EditService);
   private readonly library = inject(AudioLibraryService);
   private readonly tempos = inject(TempoService);
   private readonly dialogs = inject(MatDialog);
@@ -521,6 +521,11 @@ export class TimelineComponent {
     this.volumeFrom = undefined;
     this.montages.preview(this.withVolume(from, track.id, db));
     this.montages.commit(from);
+  }
+
+  /** The track has effects switched on. */
+  protected hasEffects(track: Track): boolean {
+    return !!track.effects?.some((e) => !e.bypass);
   }
 
   /** Details of the track and of its files, with its name editable. */

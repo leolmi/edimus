@@ -49,8 +49,15 @@
   min-height: 0;
   overflow: hidden;
 
+  .work-area {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   app-timeline {
     flex: 1 1 auto;
+    min-width: 0;
     min-height: 0;
   }
 }

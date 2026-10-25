@@ -87,6 +87,7 @@ file originale ──ffprobe──▶ AudioInfo
                                                ├─▶ peaks.ts (piramide min/max per il disegno)
                                                └─▶ TempoService (rilevamento BPM, curva degli attacchi)
 clip con rate/pitch ≠ neutri ──ffmpeg rubberband / asetrate──▶ ProcessedAudioService (buffer renderizzato)
+clip ──▶ catena di effetti della traccia ──▶ volume della traccia ──▶ uscita
 MixService.schedule(ctx) ──▶ AudioContext (PlaybackService)  |  OfflineAudioContext (ExportService)
 ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/ogg/opus/m4a)
 ```
@@ -105,14 +106,25 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   `rubberband=tempo:pitch`; varispeed: `asetrate`+`aresample`, più rubberband per il pitch
   aggiuntivo). Il render è riusato da trim, split, undo/redo e clip con le stesse impostazioni.
   Il buffer renderizzato è in tempo *timeline*: offset nel buffer = `clip.offset / rate`.
-- **Mix** (`MixService`): un `GainNode` per traccia udibile (il volume della traccia) e un
-  `AudioBufferSourceNode` per clip; una clip con inviluppo passa da un suo `GainNode`
-  automatizzato (`automate` con i punti convertiti in tempo di timeline,
+- **Mix** (`MixService`): per traccia udibile un `AudioBufferSourceNode` per clip, la catena degli
+  effetti (`EffectChain`) e un `GainNode` con il volume della traccia; una clip con inviluppo passa da
+  un suo `GainNode` automatizzato (`automate` con i punti convertiti in tempo di timeline,
   `clipEnvelopeOnTimeline`). Lo stesso grafo serve riproduzione ed export, quindi suonano uguali.
+- **Effetti** (`core/effects/`): ogni effetto è costruito con i nodi nativi di Web Audio (EQ:
+  `BiquadFilter`; compressore: `DynamicsCompressor`; eco: `Delay` con ritorno filtrato; riverbero:
+  `Convolver` con risposta d'ambiente generata con rumore a seme fisso, uguale in ascolto ed export;
+  saturazione: `WaveShaper` con curva tanh), con un percorso di bypass a dissolvenza. Durante
+  l'ascolto, se il montaggio cambia solo in volumi e valori o bypass degli effetti
+  (`differsOnlyLive`), `PlaybackService` li applica al mix in corso (`MixService.update`, rampe
+  brevi) senza riprogrammarlo; aggiungere, togliere o riordinare effetti riprogramma il mix.
+  `PlaybackService.reduction` dà la riduzione del compressore per l'indicatore del pannello;
+  `CompressorGraphComponent` disegna curva di trasferimento e risposta attacco/rilascio dai valori
+  (scelto con `EffectDescriptor.graph`).
   `audibleRange` dà il tratto udibile del mix (dal primo all'ultimo blocco di 10 ms sopra −60 dBFS
   delle tracce udibili, inviluppi e volumi compresi): barra di stato e `get_state`.
-- **Export** (`ExportService`): render offline da 0 alla fine dell'ultima clip più il silenzio
-  finale opzionale (`trailingSilence`), normalizzazione opzionale; l'encoding è del
+- **Export** (`ExportService`): render offline da 0 alla fine dell'ultima clip, più la coda degli
+  effetti attivi (`MixService.tail`: ripetizioni dell'eco fino a −60 dB, decadimento del riverbero; max
+  15 s) e il silenzio finale opzionale (`trailingSilence`), normalizzazione opzionale; l'encoding è del
   motore audio (su desktop: scrittura PCM a blocchi, ffmpeg con progresso letto da `-progress pipe:1`).
 
 ## Stato e servizi

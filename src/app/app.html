@@ -110,7 +110,12 @@
 </mat-toolbar>
 
 <main class="workspace">
-  <app-timeline />
+  <div class="work-area">
+    <app-timeline />
+    @if (timeline.selectedTrackId()) {
+      <app-effects-panel />
+    }
+  </div>
   @if (!montages.isEmpty()) {
     <!-- always present (fixed height): selecting a clip does not move the tracks -->
     <app-clip-bar />
