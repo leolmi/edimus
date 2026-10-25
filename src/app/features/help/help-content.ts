@@ -303,6 +303,7 @@ const IT: HelpContent = {
           text: [
             'All’avvio l’app desktop cerca una versione più recente tra le release del suo repository GitHub (impostabile nelle Impostazioni, dove si può anche spegnere il controllo o lanciarlo con “Verifica ora”). Se c’è, mostra cosa cambia e chiede se aggiornare: “Salta questa versione” non la propone più all’avvio.',
             'Con “Aggiorna e riavvia” scarica il pacchetto, chiede di salvare le modifiche, chiude edimus, sostituisce l’app e il server MCP e avvia la nuova versione; ffmpeg resta quello installato. Le altre finestre di edimus vanno chiuse prima che i file vengano sostituiti. Se qualcosa va storto torna la versione precedente.',
+            'ffmpeg, che edimus usa per leggere ed esportare l’audio, non fa parte dell’app: se all’avvio manca nella cartella, edimus propone di scaricarlo dalla sua distribuzione (build “essentials” di gyan.dev, licenza GPL), alla versione legata a quella di edimus. Se una nuova versione richiede un ffmpeg più recente, il dialogo di aggiornamento offre prima di aggiornare ffmpeg.',
           ],
         },
         {
@@ -707,6 +708,7 @@ const EN: HelpContent = {
           text: [
             'At startup the desktop app looks for a newer version among the releases of its GitHub repository (set in the Settings, where the check can also be turned off or run with “Check now”). If there is one, it shows what changes and asks whether to update: “Skip this version” no longer offers it at startup.',
             '“Update and restart” downloads the package, asks to save the changes, closes edimus, replaces the app and the MCP server and starts the new version; ffmpeg stays the installed one. The other edimus windows must be closed before the files are replaced. If anything goes wrong the previous version comes back.',
+            'ffmpeg, which edimus uses to read and export audio, is not part of the app: when it is missing from the folder at startup, edimus offers to download it from its distribution (gyan.dev “essentials” build, GPL license), at the version tied to that of edimus. When a new version needs a newer ffmpeg, the update dialog first offers to update ffmpeg.',
           ],
         },
         {

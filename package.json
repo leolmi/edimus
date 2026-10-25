@@ -1,6 +1,6 @@
 {
   "name": "edimus",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "scripts": {
     "ng": "ng",
     "setup": "neu update --latest && npm run licenses",
@@ -18,7 +18,12 @@
   },
   "private": true,
   "config": {
-    "minFfmpeg": "6.0"
+    "minFfmpeg": "6.0",
+    "ffmpeg": {
+      "version": "9.0.2",
+      "size": 114768076,
+      "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba"
+    }
   },
   "packageManager": "npm@11.19.0",
   "dependencies": {

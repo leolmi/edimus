@@ -53,6 +53,14 @@ export class FfmpegService {
     return this.run((await this.locate()).ffprobe, args);
   }
 
+  /** ffmpeg is in one of the folders where the app looks for it. */
+  available(): Promise<boolean> {
+    return this.locate().then(
+      () => true,
+      () => false,
+    );
+  }
+
   private locate(): Promise<Binaries> {
     this.binaries ??= (async () => {
       const ext = window.NL_OS === 'Windows' ? '.exe' : '';
@@ -68,7 +76,11 @@ export class FfmpegService {
         }
       }
       throw new Error(`ffmpeg not found in ${root}`);
-    })();
+    })().catch((err: unknown) => {
+      // not remembered: looked for again once ffmpeg is installed (UpdaterPort.installFfmpeg)
+      this.binaries = undefined;
+      throw err;
+    });
     return this.binaries;
   }
 

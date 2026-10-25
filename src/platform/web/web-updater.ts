@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { AppRelease, InstalledUpdate, UpdaterPort } from '../../app/core/platform/updater.port';
+import { AppRelease, FfmpegBuild, InstalledUpdate, UpdaterPort } from '../../app/core/platform/updater.port';
 
 /** The page is always the published one: nothing to install. */
 @Injectable()
@@ -22,5 +22,16 @@ export class WebUpdater extends UpdaterPort {
 
   async finish(): Promise<InstalledUpdate | null> {
     return null;
+  }
+
+  // the web app does not use ffmpeg
+  readonly ffmpegBuild: FfmpegBuild = { version: '', size: 0, sha256: '' };
+
+  async ffmpegMissing(): Promise<boolean> {
+    return false;
+  }
+
+  installFfmpeg(): Promise<void> {
+    return Promise.reject(new Error('The web app does not use ffmpeg'));
   }
 }

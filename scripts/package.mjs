@@ -27,6 +27,14 @@ const files = [
 /** Left out of the update package: installed once with the app. */
 const notUpdated = new Set(['ffmpeg.exe', 'ffprobe.exe']);
 
+// the build the app downloads must satisfy the minimum it asks for
+const compareVersions = (a, b) => {
+  const [pa, pb] = [a, b].map((v) => v.split('.').map(Number));
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  return 0;
+};
+if (compareVersions(pkg.config.ffmpeg.version, pkg.config.minFfmpeg) < 0) throw new Error(`config.ffmpeg.version ${pkg.config.ffmpeg.version} is older than config.minFfmpeg ${pkg.config.minFfmpeg}`);
+
 for (const [from] of files) {
   if (!existsSync(join(root, from))) throw new Error(`missing ${from}: run "npm run setup", "neu build" and "npm run mcp:build" first`);
 }
@@ -52,6 +60,7 @@ writeFileSync(join(releaseDir, zipName), zip);
 const manifest = {
   version: pkg.version,
   minFfmpeg: pkg.config.minFfmpeg,
+  ffmpeg: pkg.config.ffmpeg,
   package: { name: zipName, size: zip.length, sha256: sha256(zip) },
 };
 writeFileSync(join(releaseDir, 'manifest.json'), JSON.stringify(manifest, null, 2));

@@ -185,8 +185,8 @@ Solo app desktop su Windows (`PlatformInfo.canUpdate`); in sviluppo (`isDevMode`
 funziona ma l'installazione è bloccata.
 
 - **Pubblicazione**: `npm run package` produce anche `release/edimus-<versione>-win-x64.zip`
-  (`edimus.exe`, `edimus-mcp.exe`, licenze; **senza ffmpeg**, installato una volta con l'app) e
-  `release/manifest.json` (`version`, `minFfmpeg` da `config.minFfmpeg` di `package.json`,
+  (`edimus.exe`, `edimus-mcp.exe`, licenze; **senza ffmpeg**, vedi sotto) e
+  `release/manifest.json` (`version`, `minFfmpeg` e `ffmpeg` da `config` di `package.json`,
   nome, dimensione e SHA-256 dello zip). `npm run release` (GitHub CLI, `gh auth login`) li
   pubblica come release `v<versione>` del repository. Le release stanno fuori dalla storia git.
 - **Controllo** (`UpdateService`): all'avvio, dopo 3 s e con l'impostazione attiva, o con
@@ -207,8 +207,17 @@ funziona ma l'installazione è bloccata.
   mostra la versione installata. Se la nuova versione esce senza togliere il marcatore, o un
   passo fallisce, lo script rimette i file precedenti e riavvia la versione di prima. Log in
   `%TEMP%\edimus-update\update.log`.
-- La prima versione con l'aggiornamento va installata a mano; un ffmpeg nuovo si copia a mano
-  nella cartella dell'app (alzando `minFfmpeg` quando una versione lo richiede).
+- **ffmpeg**: non è nelle release. `config.ffmpeg` di `package.json` fissa la build che va con
+  ogni versione dell'app (versione, dimensione, SHA-256 della build “essentials” di gyan.dev),
+  scaricata dal mirror GitHub di gyan.dev (`GyanD/codexffmpeg`, che tiene tutte le versioni;
+  gyan.dev solo l'ultima). All'avvio, se ffmpeg manca nella cartella dell'app, `UpdateService`
+  chiede se scaricarlo: `installFfmpeg` lo scarica con `curl.exe` (avanzamento dalla dimensione
+  del file parziale), verifica lo SHA-256, estrae con `tar.exe` e copia `ffmpeg.exe`,
+  `ffprobe.exe`, `LICENSE` e `README.txt` (questi due in `licenses/`), rinominando in `.old` i
+  file presenti. `config.minFfmpeg` è la versione minima: se l'ffmpeg installato è più vecchio, il
+  dialogo di aggiornamento offre prima la build di ffmpeg della release (dal suo manifest), poi
+  ripete il controllo. `package.mjs` verifica che la build fissata non sia sotto il minimo.
+- La prima versione con l'aggiornamento va installata a mano.
 
 ## Aiuto
 

@@ -15,8 +15,11 @@ export interface UpdateDialogData {
   others: number;
 }
 
-/** `install`: download and restart now; `skip`: do not offer this version again at startup. */
-export type UpdateChoice = 'install' | 'skip';
+/**
+ * `install`: download and restart now; `skip`: do not offer this version again at startup;
+ * `ffmpeg`: first install the ffmpeg build of the release (the installed one is too old).
+ */
+export type UpdateChoice = 'install' | 'skip' | 'ffmpeg';
 
 /** A newer version is available: what changes, what the update does, and the choice. */
 @Component({
@@ -56,10 +59,17 @@ export type UpdateChoice = 'install' | 'skip';
     <mat-dialog-actions align="end">
       <button mat-button [mat-dialog-close]="'skip'">{{ 'update.skip' | t }}</button>
       <button mat-button mat-dialog-close>{{ 'update.later' | t }}</button>
-      <button mat-flat-button [disabled]="!!data.blocker" [mat-dialog-close]="'install'" cdkFocusInitial>
-        <mat-icon>system_update_alt</mat-icon>
-        {{ 'update.install' | t }}
-      </button>
+      @if (data.blocker?.reason === 'ffmpeg' && data.release.ffmpeg) {
+        <button mat-flat-button [mat-dialog-close]="'ffmpeg'">
+          <mat-icon>download</mat-icon>
+          {{ 'update.installFfmpeg' | t: { version: data.release.ffmpeg.version } }}
+        </button>
+      } @else {
+        <button mat-flat-button [disabled]="!!data.blocker" [mat-dialog-close]="'install'">
+          <mat-icon>system_update_alt</mat-icon>
+          {{ 'update.install' | t }}
+        </button>
+      }
     </mat-dialog-actions>
   `,
   styles: `
