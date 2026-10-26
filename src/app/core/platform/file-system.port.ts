@@ -44,6 +44,11 @@ export abstract class FileSystemPort {
    * on the desktop in a folder next to it, in the browser in memory. Returns its path.
    */
   abstract importFile(name: string, data: ArrayBuffer, near: string): Promise<string>;
+  /**
+   * Where to save a new recording (WAV), chosen by the user from `defaultPath` (only where `PlatformInfo.canRecord`).
+   * Undefined when cancelled.
+   */
+  abstract recordingPath(title: string, defaultPath: string): Promise<string | undefined>;
   /** Files with the given extensions in a folder chosen by the user and its subfolders (empty when cancelled). */
   abstract showFolderDialog(title: string, extensions: readonly string[]): Promise<string[]>;
   /**

@@ -49,17 +49,9 @@ export class ExportService {
 
   /** Renders the mix offline and returns its samples interleaved. */
   private async render(duration: number, options: ExportOptions): Promise<Float32Array<ArrayBuffer>> {
-    const ctx = new OfflineAudioContext({
-      numberOfChannels: options.channels,
-      length: Math.ceil(duration * options.sampleRate),
-      sampleRate: options.sampleRate,
-    });
-    this.mixer.schedule(ctx, ctx.destination, 0, 0);
-    const timer = setInterval(() => {
-      this.progress.set({ stage: 'render', progress: Math.min(1, ctx.currentTime / duration) });
-    }, 200);
-    const buffer = await ctx.startRendering().finally(() => clearInterval(timer));
-
+    const buffer = await this.mixer.render(0, duration, options.channels, options.sampleRate, (progress) =>
+      this.progress.set({ stage: 'render', progress }),
+    );
     const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
     let scale = 1;
     if (options.normalize) {

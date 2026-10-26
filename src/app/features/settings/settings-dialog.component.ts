@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule } from '@angular/material/dialog';
@@ -7,13 +7,22 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { AudioOutputsService } from '../../core/audio/audio-outputs.service';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { AudioDevice, AudioDevicesService } from '../../core/audio/audio-devices.service';
+import { RecordingService } from '../../core/audio/recording.service';
 import { DocumentService } from '../../core/document.service';
 import type { TranslationKey } from '../../core/i18n/it';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { DevToolsPort } from '../../core/platform/dev-tools.port';
 import { PlatformInfo } from '../../core/platform/platform-info';
-import { DEFAULT_UPDATE_REPO, Language, SettingsService, SnapStep, ThemeMode } from '../../core/settings.service';
+import {
+  DEFAULT_UPDATE_REPO,
+  Language,
+  SettingsService,
+  SnapStep,
+  ThemeMode,
+} from '../../core/settings.service';
 import { UpdateService } from '../../core/update.service';
 
 const THEMES: { mode: ThemeMode; icon: string; label: TranslationKey }[] = [
@@ -39,14 +48,28 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
  */
 @Component({
   selector: 'app-settings-dialog',
-  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSelectModule, MatSlideToggleModule, TranslatePipe],
+  imports: [
+    MatButtonModule,
+    MatButtonToggleModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatInputModule,
+    MatSelectModule,
+    MatSlideToggleModule,
+    MatTooltipModule,
+    TranslatePipe,
+  ],
   template: `
     <h2 mat-dialog-title>{{ 'settings.title' | t }}</h2>
     <mat-dialog-content class="content">
       <h3>{{ 'settings.appearance' | t }}</h3>
       <div class="row">
         <span class="label">{{ 'settings.theme' | t }}</span>
-        <mat-button-toggle-group [value]="settings.theme()" (change)="settings.setTheme($event.value)">
+        <mat-button-toggle-group
+          [value]="settings.theme()"
+          (change)="settings.setTheme($event.value)"
+        >
           @for (theme of themes; track theme.mode) {
             <mat-button-toggle [value]="theme.mode">
               <mat-icon>{{ theme.icon }}</mat-icon>
@@ -57,7 +80,10 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       </div>
       <div class="row">
         <span class="label">{{ 'settings.language' | t }}</span>
-        <mat-button-toggle-group [value]="settings.language()" (change)="settings.setLanguage($event.value)">
+        <mat-button-toggle-group
+          [value]="settings.language()"
+          (change)="settings.setLanguage($event.value)"
+        >
           @for (language of languages; track language.code) {
             <mat-button-toggle [value]="language.code">{{ language.label }}</mat-button-toggle>
           }
@@ -68,7 +94,10 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       <div class="row">
         <span class="label">{{ 'output.title' | t }}</span>
         <mat-form-field class="output" subscriptSizing="dynamic">
-          <mat-select [value]="settings.audioOutput()?.id ?? ''" (selectionChange)="setOutput($event.value)">
+          <mat-select
+            [value]="settings.audioOutput()?.id ?? ''"
+            (selectionChange)="setOutput($event.value)"
+          >
             <mat-option value="">{{ 'output.default' | t }}</mat-option>
             @for (output of menuOutputs(); track output.id) {
               <mat-option [value]="output.id" [disabled]="output.missing">
@@ -79,11 +108,56 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
         </mat-form-field>
       </div>
       <p class="hint">{{ 'settings.outputHint' | t }}</p>
+      @if (platform.canRecord) {
+        <div class="row">
+          <span class="label">{{ 'input.title' | t }}</span>
+          <mat-form-field class="output" subscriptSizing="dynamic">
+            <mat-select
+              [value]="settings.audioInput()?.id ?? ''"
+              (selectionChange)="setInput($event.value)"
+            >
+              <mat-option value="">{{ 'input.default' | t }}</mat-option>
+              @for (input of menuInputs(); track input.id) {
+                <mat-option [value]="input.id" [disabled]="input.missing">
+                  {{ input.missing ? ('input.missing' | t: { name: input.label }) : input.label }}
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <p class="hint">{{ 'settings.inputHint' | t }}</p>
+        <div class="row">
+          <span class="label">{{ 'latency.title' | t }}</span>
+          <span class="latency">{{ latencyLabel() }}</span>
+          <button mat-stroked-button [disabled]="recorder.state() !== 'idle'" (click)="calibrate()">
+            <mat-icon>graphic_eq</mat-icon>
+            {{
+              (recorder.state() === 'calibrating' ? 'latency.calibrating' : 'latency.calibrate') | t
+            }}
+          </button>
+          @if (settings.currentLatency() !== undefined) {
+            <button
+              mat-icon-button
+              (click)="settings.setCurrentLatency(null)"
+              [matTooltip]="'latency.reset' | t"
+            >
+              <mat-icon>restart_alt</mat-icon>
+            </button>
+          }
+        </div>
+        @if (calibration(); as calibration) {
+          <p class="hint" [class.error]="calibration.failed">{{ calibration.text }}</p>
+        }
+        <p class="hint">{{ 'settings.latencyHint' | t }}</p>
+      }
 
       <h3>{{ 'settings.editing' | t }}</h3>
       <div class="row">
         <span class="label">{{ 'settings.snap' | t }}</span>
-        <mat-button-toggle-group [value]="settings.snapStep()" (change)="settings.setSnapStep($event.value)">
+        <mat-button-toggle-group
+          [value]="settings.snapStep()"
+          (change)="settings.setSnapStep($event.value)"
+        >
           @for (snap of snapSteps; track snap.step) {
             <mat-button-toggle [value]="snap.step">
               <span class="symbol">{{ snap.symbol }}</span>
@@ -94,7 +168,10 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       </div>
       <p class="hint">{{ 'settings.snapHint' | t }}</p>
       @if (platform.filesBesideSources) {
-        <mat-slide-toggle [checked]="settings.autoSaveBars()" (change)="settings.setAutoSaveBars($event.checked)">
+        <mat-slide-toggle
+          [checked]="settings.autoSaveBars()"
+          (change)="settings.setAutoSaveBars($event.checked)"
+        >
           {{ 'settings.autoSaveBars' | t }}
         </mat-slide-toggle>
         <p class="hint">{{ 'settings.autoSaveBarsHint' | t }}</p>
@@ -102,13 +179,21 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
 
       @if (platform.canUpdate) {
         <h3>{{ 'settings.updates' | t }}</h3>
-        <mat-slide-toggle [checked]="settings.checkUpdates()" (change)="settings.setCheckUpdates($event.checked)">
+        <mat-slide-toggle
+          [checked]="settings.checkUpdates()"
+          (change)="settings.setCheckUpdates($event.checked)"
+        >
           {{ 'settings.checkUpdates' | t }}
         </mat-slide-toggle>
         <div class="row">
           <mat-form-field class="repo" subscriptSizing="dynamic">
             <mat-label>{{ 'settings.updateRepo' | t }}</mat-label>
-            <input #repo matInput [value]="settings.updateRepo()" (change)="settings.setUpdateRepo(repo.value)" />
+            <input
+              #repo
+              matInput
+              [value]="settings.updateRepo()"
+              (change)="settings.setUpdateRepo(repo.value)"
+            />
           </mat-form-field>
           <button mat-stroked-button (click)="updates.check(true)">
             <mat-icon>update</mat-icon>
@@ -120,7 +205,10 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
 
       @if (platform.hasDevTools) {
         <h3>{{ 'settings.advanced' | t }}</h3>
-        <mat-slide-toggle [checked]="settings.devTools()" (change)="settings.setDevTools($event.checked)">
+        <mat-slide-toggle
+          [checked]="settings.devTools()"
+          (change)="settings.setDevTools($event.checked)"
+        >
           {{ 'settings.devTools' | t }}
         </mat-slide-toggle>
         @if (settings.devTools() !== devTools.active) {
@@ -160,6 +248,12 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
     .label {
       min-width: 140px;
     }
+    .latency {
+      flex: 1 1 auto;
+    }
+    .hint.error {
+      color: var(--mat-sys-error);
+    }
     .output,
     .repo {
       flex: 1 1 260px;
@@ -197,7 +291,9 @@ export class SettingsDialogComponent {
   protected readonly devTools = inject(DevToolsPort);
   protected readonly documents = inject(DocumentService);
   protected readonly updates = inject(UpdateService);
-  private readonly outputs = inject(AudioOutputsService);
+  protected readonly recorder = inject(RecordingService);
+  private readonly devices = inject(AudioDevicesService);
+  private readonly i18n = inject(I18nService);
 
   protected readonly defaultRepo = DEFAULT_UPDATE_REPO;
   protected readonly themes = THEMES;
@@ -205,19 +301,66 @@ export class SettingsDialogComponent {
   protected readonly snapSteps = SNAP_STEPS;
 
   /** Output devices; the chosen one, when no longer connected, is listed as missing. */
-  protected readonly menuOutputs = computed(() => {
-    const outputs = this.outputs.outputs().map((o) => ({ ...o, missing: false }));
-    const chosen = this.settings.audioOutput();
-    if (chosen && !outputs.some((o) => o.id === chosen.id)) outputs.push({ ...chosen, missing: outputs.length > 0 });
-    return outputs;
+  protected readonly menuOutputs = computed(() =>
+    withChosen(this.devices.outputs(), this.settings.audioOutput()),
+  );
+  protected readonly menuInputs = computed(() =>
+    withChosen(this.devices.inputs(), this.settings.audioInput()),
+  );
+
+  protected readonly latencyLabel = computed(() => {
+    const latency = this.settings.currentLatency();
+    return latency === undefined
+      ? this.i18n.t('latency.estimated')
+      : this.i18n.t('latency.measured', { ms: Math.round(latency * 1000) });
   });
+  /** Outcome of the last measure of the latency. */
+  protected readonly calibration = signal<{ text: string; failed: boolean } | null>(null);
 
   constructor() {
-    void this.outputs.refresh();
+    void this.devices.refresh();
   }
 
   protected setOutput(id: string): void {
     const output = this.menuOutputs().find((o) => o.id === id);
     this.settings.setAudioOutput(output ? { id: output.id, label: output.label } : null);
+    this.calibration.set(null);
   }
+
+  protected setInput(id: string): void {
+    const input = this.menuInputs().find((o) => o.id === id);
+    this.settings.setAudioInput(input ? { id: input.id, label: input.label } : null);
+    this.calibration.set(null);
+  }
+
+  protected async calibrate(): Promise<void> {
+    this.calibration.set(null);
+    try {
+      const latency = await this.recorder.calibrate();
+      this.calibration.set(
+        latency === null
+          ? { text: this.i18n.t('latency.failed'), failed: true }
+          : {
+              text: this.i18n.t('latency.done', { ms: Math.round(latency * 1000) }),
+              failed: false,
+            },
+      );
+    } catch (err) {
+      this.calibration.set({
+        text: this.i18n.t('record.error', { message: String((err as Error)?.message ?? err) }),
+        failed: true,
+      });
+    }
+  }
+}
+
+/** The devices, plus the chosen one listed as missing when it is no longer connected. */
+function withChosen(
+  devices: AudioDevice[],
+  chosen: AudioDevice | null,
+): (AudioDevice & { missing: boolean })[] {
+  const list = devices.map((d) => ({ ...d, missing: false }));
+  if (chosen && !list.some((d) => d.id === chosen.id))
+    list.push({ ...chosen, missing: list.length > 0 });
+  return list;
 }

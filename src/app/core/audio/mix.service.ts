@@ -107,6 +107,23 @@ export class MixService {
     return mix;
   }
 
+  /**
+   * Renders the mix offline from montage time `from`, for `duration` seconds: the same sound as the playback, as
+   * a single buffer (export, base of a recording).
+   */
+  async render(
+    from: number,
+    duration: number,
+    channels: number,
+    sampleRate: number,
+    onProgress?: (fraction: number) => void,
+  ): Promise<AudioBuffer> {
+    const ctx = new OfflineAudioContext({ numberOfChannels: channels, length: Math.max(1, Math.ceil(duration * sampleRate)), sampleRate });
+    this.schedule(ctx, ctx.destination, from, 0);
+    const timer = onProgress && setInterval(() => onProgress(Math.min(1, ctx.currentTime / duration)), 200);
+    return ctx.startRendering().finally(() => clearInterval(timer));
+  }
+
   /** Applies to a scheduled mix the live changes of `montage` (see `differsOnlyLive`). */
   update(mix: ScheduledMix, montage: Montage): void {
     for (const track of audibleTracks(montage)) {

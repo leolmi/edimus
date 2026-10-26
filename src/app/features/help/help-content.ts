@@ -137,7 +137,17 @@ const IT: HelpContent = {
           title: 'Volume d’ascolto e uscita audio',
           text: [
             'Il cursore del volume e il pulsante muto agiscono solo sull’ascolto, non sull’esportazione.',
-            'Il dispositivo di uscita (predefinito di sistema, cuffie, scheda audio…) si sceglie nelle Impostazioni. La prima volta Windows chiede il permesso per il microfono: serve solo a leggere i nomi dei dispositivi, non viene registrato nulla.',
+            'Il dispositivo di uscita (predefinito di sistema, cuffie, scheda audio…) si sceglie nelle Impostazioni. La prima volta Windows chiede il permesso per il microfono: serve anche a leggere i nomi dei dispositivi.',
+          ],
+        },
+        {
+          title: 'Registrare dall’ingresso',
+          keys: ['Spazio', 'R', 'Esc'],
+          text: [
+            'Solo nell’app desktop. Il + sotto le tracce aggiunge una traccia vuota. Il pallino rosso nell’intestazione di una traccia la mette in registrazione: l’intestazione mostra solo i comandi per registrare, l’ingresso usato (scelto nelle Impostazioni) e lo stato; la × (o Esc) torna alla traccia normale. Entrando in registrazione l’ascolto si ferma; Spazio avvia e ferma la ripresa invece dell’ascolto, mentre play e stop restano disponibili (spenti solo durante la ripresa) per riascoltare subito.',
+            '“Registra” (o Spazio, o R) registra dal cursore mentre il montaggio suona come base: sulla traccia compare la clip in registrazione, che si allunga verso destra finché non premi “Ferma” (Spazio o R). Poi scegli dove e con che nome salvare il file WAV, che diventa la clip della traccia (si annulla con Ctrl+Z); annullando la scelta la registrazione viene scartata.',
+            'Prima di partire la base viene preparata come un unico mix (lo stesso dell’esportazione): lo stesso montaggio si sente identico, e la registrazione si allinea alla base togliendo la latenza, cioè il ritardo tra il suono emesso e quello che torna dal microfono. Si misura una volta nelle Impostazioni (pulsante “Misura”: casse accese e microfono vicino); senza misura si usa una stima, meno precisa.',
+            'Il segnale si registra così com’è: cancellazione dell’eco, riduzione del rumore e guadagno automatico restano spenti. Ascolta la base in cuffia, se non vuoi che finisca nella registrazione.',
           ],
         },
       ],
@@ -151,7 +161,7 @@ const IT: HelpContent = {
           keys: ['rotella', 'Shift+rotella'],
           text: [
             'La rotella sulle tracce o sul righello ingrandisce e riduce attorno al puntatore; Shift+rotella (o la rotella orizzontale) scorre il tempo; la rotella sulle intestazioni delle tracce le scorre in verticale.',
-            'I pulsanti in alto a destra ingrandiscono, riducono e adattano la vista all’intero montaggio.',
+            'I pulsanti in alto a destra ingrandiscono, riducono e adattano la vista all’intero montaggio, o all’intervallo selezionato se c’è.',
           ],
         },
         {
@@ -318,7 +328,7 @@ const IT: HelpContent = {
           title: 'Impostazioni',
           keys: ['Ctrl+,'],
           text: [
-            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita audio; passo di aggancio delle clip alla griglia; aggiornamenti (vedi Aggiornamenti); apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
+            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita e ingresso audio, latenza di registrazione; passo di aggancio delle clip alla griglia; aggiornamenti (vedi Aggiornamenti); apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
           ],
         },
         {
@@ -434,6 +444,17 @@ const IT: HelpContent = {
         'Trascina il pezzo su una traccia vuota (le strisce in fondo): diventa una traccia nuova.',
         'Aggiungi gli effetti a quella traccia.',
       ],
+    },
+    {
+      title: 'Registrare una voce sulla base',
+      steps: [
+        'Nell’app desktop, nelle Impostazioni scegli l’ingresso e, la prima volta, misura la latenza.',
+        'Aggiungi una traccia con il + sotto le tracce e premi il suo pallino rosso.',
+        'Porta il cursore dove vuoi partire (un po’ prima, per avere tempo di prepararti).',
+        'Premi “Registra” (o Spazio), registra, e ferma con “Ferma” (o di nuovo Spazio).',
+        'Scegli dove e con che nome salvare il file.',
+      ],
+      note: 'La registrazione è una clip come le altre: si taglia, si sposta e si rifinisce.',
     },
     {
       title: 'Ascoltare in loop un passaggio',
@@ -588,7 +609,17 @@ const EN: HelpContent = {
           title: 'Listening volume and audio output',
           text: [
             'The volume slider and the mute button affect only listening, not the export.',
-            'The output device (system default, headphones, audio interface…) is chosen in the Settings. The first time Windows asks for microphone permission: it is only needed to read the device names, nothing is recorded.',
+            'The output device (system default, headphones, audio interface…) is chosen in the Settings. The first time Windows asks for microphone permission: it is also needed to read the device names.',
+          ],
+        },
+        {
+          title: 'Recording from the input',
+          keys: ['Space', 'R', 'Esc'],
+          text: [
+            'Desktop app only. The + below the tracks adds an empty track. The red dot in the header of a track puts it in recording mode: the header shows only the recording commands, the input used (chosen in the Settings) and the state; the × (or Esc) goes back to the normal track. Entering recording mode stops the playback; Space starts and stops the take instead of the playback, while play and stop stay available (off only during the take) to listen back at once.',
+            '“Record” (or Space, or R) records from the playhead while the montage plays as the backing: the clip being recorded appears on the track and grows to the right until you press “Stop” (Space or R). Then you choose where and with which name to save the WAV file, which becomes the clip of the track (undone with Ctrl+Z); cancelling the choice discards the recording.',
+            'Before starting, the backing is prepared as a single mix (the same as the export): the montage sounds the same, and the recording is lined up with it by removing the latency, that is, the delay between the sound played and the one coming back from the microphone. It is measured once in the Settings (“Measure” button: speakers on and the microphone close); without a measure an estimate is used, less precise.',
+            'The signal is recorded as it is: echo cancellation, noise suppression and automatic gain stay off. Listen to the backing on headphones if you do not want it in the recording.',
           ],
         },
       ],
@@ -602,7 +633,7 @@ const EN: HelpContent = {
           keys: ['wheel', 'Shift+wheel'],
           text: [
             'The wheel on the tracks or on the ruler zooms around the pointer; Shift+wheel (or the horizontal wheel) scrolls the time; the wheel on the track headers scrolls them vertically.',
-            'The buttons at the top right zoom in, zoom out and fit the whole montage in the view.',
+            'The buttons at the top right zoom in, zoom out and fit the whole montage in the view, or the selected range when there is one.',
           ],
         },
         {
@@ -763,7 +794,7 @@ const EN: HelpContent = {
           title: 'Settings',
           keys: ['Ctrl+,'],
           text: [
-            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output; snap step of the clips on the grid; updates (see Updates); opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
+            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output and input, recording latency; snap step of the clips on the grid; updates (see Updates); opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
           ],
         },
         {
@@ -876,6 +907,17 @@ const EN: HelpContent = {
         'Drag the part onto an empty track (the strips at the bottom): it becomes a new track.',
         'Add the effects to that track.',
       ],
+    },
+    {
+      title: 'Record a voice over the backing',
+      steps: [
+        'In the desktop app, in the Settings choose the input and, the first time, measure the latency.',
+        'Add a track with the + below the tracks and press its red dot.',
+        'Move the playhead where you want to start (a little earlier, to have time to get ready).',
+        'Press “Record” (or Space), record, and stop with “Stop” (or Space again).',
+        'Choose where and with which name to save the file.',
+      ],
+      note: 'The recording is a clip like the others: it is cut, moved and refined.',
     },
     {
       title: 'Loop a passage',

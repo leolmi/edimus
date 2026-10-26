@@ -160,6 +160,11 @@ export class WebFileSystem extends FileSystemPort {
     return this.registry.add(name, { kind: 'file', file: new File([data], name) });
   }
 
+  async recordingPath(): Promise<string | undefined> {
+    // no recording in the browser (PlatformInfo.canRecord)
+    return undefined;
+  }
+
   async showOpenDialog(_title: string, filters: FileFilter[]): Promise<string[]> {
     if (!picker.showOpenFilePicker) {
       return (await chooseFiles(filters)).map((file) => this.registry.add(file.name, { kind: 'file', file }));

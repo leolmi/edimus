@@ -138,16 +138,16 @@
       <button
         mat-icon-button
         [class.toggled]="playback.loop() && edits.hasRange()"
-        [disabled]="!edits.hasRange()"
+        [disabled]="!edits.hasRange() || recorder.busy()"
         (click)="playback.loop.set(!playback.loop())"
         [matTooltip]="'transport.loop' | t"
       >
         <mat-icon>repeat</mat-icon>
       </button>
-      <button mat-icon-button class="square stop" (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
+      <button mat-icon-button class="square stop" [disabled]="recorder.busy()" (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
         <mat-icon>stop</mat-icon>
       </button>
-      <button mat-icon-button class="square" [class.play]="!playback.playing()" [class.pause]="playback.playing()" (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
+      <button mat-icon-button class="square" [class.play]="!playback.playing()" [class.pause]="playback.playing()" [disabled]="recorder.busy()" (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
         <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
       </button>
       @if (audible(); as audible) {

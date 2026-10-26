@@ -10,6 +10,7 @@ import { MixService } from './core/audio/mix.service';
 import { I18nService } from './core/i18n/i18n.service';
 import { AiBridgeService } from './core/ai/ai-bridge.service';
 import { PlaybackService } from './core/audio/playback.service';
+import { RecordingService } from './core/audio/recording.service';
 import { DocumentService } from './core/document.service';
 import { EditService } from './core/edit.service';
 import { formatDuration } from './core/format';
@@ -48,6 +49,7 @@ export class App {
   protected readonly montages = inject(MontageService);
   protected readonly timeline = inject(TimelineService);
   protected readonly playback = inject(PlaybackService);
+  protected readonly recorder = inject(RecordingService);
   protected readonly documents = inject(DocumentService);
   protected readonly edits = inject(EditService);
   protected readonly exporter = inject(ExportService);
@@ -105,7 +107,7 @@ export class App {
   }
 
   /**
-   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y, Ctrl+A select all clips), transport (Space, Home, End) and edit
+   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y, Ctrl+A select all clips), transport (Space, Home, End; R records on the track in recording mode) and edit
    * (S split, E envelope, B beat grid, arrows move the selected clips, Delete, Escape) shortcuts.
    */
   protected onKeydown(event: KeyboardEvent): void {
@@ -140,7 +142,16 @@ export class App {
       }
       return;
     }
-    if (this.montages.isEmpty()) return;
+    // a track in recording mode: Space (or R) records and stops instead of playing, Escape leaves the mode;
+    // while recording nothing else counts
+    if (this.recorder.armedTrackId()) {
+      if (event.code === 'Space' || event.code === 'KeyR') {
+        event.preventDefault();
+        return void this.recorder.toggle();
+      }
+      if (event.code === 'Escape' && this.recorder.state() === 'idle') return this.recorder.disarm();
+    }
+    if (this.recorder.state() !== 'idle' || this.montages.isEmpty()) return;
     switch (event.code) {
       case 'Space':
         event.preventDefault();

@@ -20,6 +20,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import type { AudioInfo } from '../../core/platform/audio-engine.port';
 import { AudioLibraryService, SourceState } from '../../core/audio/audio-library.service';
 import { PlaybackService } from '../../core/audio/playback.service';
+import { RecordingService } from '../../core/audio/recording.service';
 import { OnsetCurve, Tempo, beatsPerBar, snapToOnsets } from '../../core/audio/tempo';
 import { isVariable, meanBpm, pinBar } from '../../core/audio/tempo-map';
 import { TempoService } from '../../core/audio/tempo.service';
@@ -117,6 +118,7 @@ export class TimelineComponent {
   private readonly settings = inject(SettingsService);
   private readonly i18n = inject(I18nService);
   private readonly shell = inject(ShellPort);
+  protected readonly recorder = inject(RecordingService);
 
   private readonly lanes = viewChild.required<ElementRef<HTMLElement>>('lanes');
   private readonly scroller = viewChild.required<ElementRef<HTMLElement>>('scroller');
@@ -220,14 +222,16 @@ export class TimelineComponent {
         untracked(() => this.timeline.fit());
       }
     });
-    // while playing, the playhead stops in the middle of the view and the tracks scroll under it
-    // (at the ends of the montage the scroll stops and the playhead moves on)
+    // while playing (or recording), the playhead stops in the middle of the view and the tracks scroll under it
+    // (at the ends of the montage the scroll stops and the playhead moves on); otherwise a playhead moved out of
+    // the view (stop, Home, End, end of a recording) brings the view to it
     effect(() => {
       const position = this.playback.position();
-      if (!this.playback.playing()) return;
+      const following = this.playback.playing() || !!this.timeline.recordingClip();
       untracked(() => {
         const x = this.timeline.timeToX(position);
-        if (x > this.timeline.viewWidth() / 2 || x < 0) this.timeline.centerOn(position);
+        const width = this.timeline.viewWidth();
+        if (x < 0 || x > (following ? width / 2 : width)) this.timeline.centerOn(position);
       });
     });
     // native scrollbar <-> timeline scroll
@@ -574,6 +578,32 @@ export class TimelineComponent {
       if (result && result.name !== track.name) this.montages.updateTrack(track.id, (t) => ({ ...t, name: result.name }));
     });
   }
+
+  /** Adds an empty track ("Track n" with the lowest n not used). */
+  protected addTrack(): void {
+    const names = new Set(this.montages.montage().tracks.map((t) => t.name));
+    let n = 1;
+    while (names.has(this.i18n.t('track.newName', { n }))) n++;
+    this.montages.addTrack(this.i18n.t('track.newName', { n }));
+  }
+
+  /** What the track in recording mode is doing, with the length of the take while recording. */
+  protected readonly recordingStatus = computed(() => {
+    const clip = this.timeline.recordingClip();
+    switch (this.recorder.state()) {
+      case 'preparing':
+        return this.i18n.t('record.preparing');
+      case 'recording':
+        return this.i18n.t('record.length', { d: formatDuration(clip ? clip.end - clip.start : 0) });
+      case 'saving':
+        return this.i18n.t('record.saving');
+      default:
+        return this.i18n.t('record.ready', { t: formatDuration(this.playback.position()) });
+    }
+  });
+
+  /** Name of the input the recording comes from. */
+  protected readonly inputLabel = computed(() => this.settings.audioInput()?.label ?? this.i18n.t('input.default'));
 
   /** Removes a track after a confirmation. */
   protected async removeTrack(track: Track): Promise<void> {

@@ -24,6 +24,7 @@ const desktop = (): PlatformInfo => ({
   canSetupAi: true,
   filesBesideSources: true,
   hasDevTools: true,
+  canRecord: true,
   canUpdate: window.NL_OS === 'Windows',
 });
 

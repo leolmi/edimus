@@ -55,9 +55,28 @@
 
 .slots-header {
   flex: 0 0 var(--header-width);
-  background: var(--stripes), var(--mat-sys-surface-container-low);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  background: var(--stripes), color-mix(in srgb, var(--mat-sys-surface-container-low) 60%, transparent);
   border-right: 1px solid var(--mat-sys-outline-variant);
-  opacity: 0.6;
+}
+
+/* the button that adds a track: in the middle of the first strip, faded until the pointer is on it */
+.slots-header > .add-track {
+  --mat-icon-button-state-layer-size: 64px;
+  --mat-icon-button-icon-size: 40px;
+  --mat-icon-button-icon-color: var(--mat-sys-on-surface-variant);
+  margin-top: calc((var(--track-height) - 64px) / 2);
+  opacity: 0.3;
+  transition: opacity 150ms;
+
+  &:hover,
+  &:focus-visible {
+    --mat-icon-button-icon-color: var(--mat-sys-primary);
+    opacity: 1;
+  }
 }
 
 .slots-lane {
@@ -257,7 +276,8 @@
     --mat-icon-button-icon-color: var(--mat-sys-primary);
   }
 
-  &.danger {
+  &.danger,
+  &.rec {
     --mat-icon-button-icon-color: var(--mat-sys-error);
   }
 
@@ -305,4 +325,51 @@
   outline: 2px solid var(--mat-sys-primary);
   outline-offset: -2px;
   background-color: color-mix(in srgb, var(--mat-sys-primary) 10%, transparent);
+}
+
+/* track in recording mode */
+.header.armed {
+  background: color-mix(in srgb, var(--mat-sys-error) 12%, var(--mat-sys-surface-container-low));
+}
+
+.armed-name {
+  cursor: default;
+
+  &:hover {
+    background: none;
+  }
+}
+
+.rec-icon {
+  color: var(--mat-sys-error);
+}
+
+/* the record dot is filled, as on any recorder */
+.rec mat-icon,
+.rec-icon,
+.rec-button mat-icon {
+  font-variation-settings: 'FILL' 1;
+}
+
+.rec-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rec-button {
+  --mat-button-filled-container-color: var(--mat-sys-error-container);
+  --mat-button-filled-label-text-color: var(--mat-sys-on-error-container);
+
+  &.recording {
+    --mat-button-filled-container-color: var(--mat-sys-error);
+    --mat-button-filled-label-text-color: var(--mat-sys-on-error);
+    animation: recording 1s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes recording {
+  to {
+    opacity: 0.65;
+  }
 }

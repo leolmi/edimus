@@ -66,8 +66,23 @@ export class TimelineService {
    */
   private readonly heldExtent = signal(0);
 
-  /** Visible length when scrolled to the end: the montage plus some room after it. */
-  readonly extent = computed(() => Math.max(this.duration() * 1.05, this.viewWidth() / this.pxPerSec(), this.heldExtent()));
+  /** Clip being recorded (it is not in the montage until the take is saved), null when not recording. */
+  readonly recordingClip = signal<{ trackId: string; start: number; end: number } | null>(null);
+
+  /** Playhead position (kept by PlaybackService): it may be past the end of the montage. */
+  readonly playhead = signal(0);
+
+  /**
+   * Visible length when scrolled to the end: the montage (or the playhead, or the clip being recorded, when
+   * further) plus some room after it.
+   */
+  readonly extent = computed(() =>
+    Math.max(
+      Math.max(this.duration(), this.playhead(), this.recordingClip()?.end ?? 0) * 1.05,
+      this.viewWidth() / this.pxPerSec(),
+      this.heldExtent(),
+    ),
+  );
 
   /** Keeps the current extent until `releaseExtent` (a pointer gesture is in progress). */
   holdExtent(): void {
@@ -126,10 +141,17 @@ export class TimelineService {
     this.setScroll(anchor - anchorX / px);
   }
 
-  /** Fits the whole montage in the viewport. */
+  /** Fits the selected range in the viewport (with a little room around it), or the whole montage when none. */
   fit(): void {
-    const duration = this.duration();
     const width = this.viewWidth();
+    const range = this.range();
+    if (range && range.end > range.start && width > 0) {
+      const span = range.end - range.start;
+      this.pxPerSec.set(Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, width / (span * 1.04))));
+      this.setScroll(range.start + span / 2 - width / 2 / this.pxPerSec());
+      return;
+    }
+    const duration = this.duration();
     if (duration <= 0 || width <= 0) return;
     this.pxPerSec.set(Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, width / (duration * 1.02))));
     this.scroll.set(0);

@@ -68,7 +68,7 @@
 - **Una istanza = un montaggio.** Il file da aprire all'avvio arriva da riga di comando
   (`ShellPort.startupFiles`, su desktop da `NL_ARGS`). Più montaggi = più finestre/processi.
 - **Cartella dell'app** (`appPath()` in `platform/neutralino/app-paths.ts`, da `NL_PATH`): contiene `.cache/` per i file PCM
-  temporanei; le impostazioni (tema, lingua, volume d’ascolto, uscita audio, passo di aggancio, salvataggio automatico delle battute)
+  temporanei; le impostazioni (tema, lingua, volume d’ascolto, uscita e ingresso audio, latenza di registrazione, passo di aggancio, salvataggio automatico delle battute)
   si cambiano dal dialog Impostazioni (`features/settings`, Ctrl+,; il volume dalla toolbar) e stanno nello storage di
   Neutralino (`SettingsService` tramite `SettingsPort`).
 - **Montaggi recenti** (`RecentFilesService`, mostrati dal dialog di Apri `RecentFilesDialogComponent`): file `.edimus`/`.edimuspack` aperti o salvati, nella
@@ -126,6 +126,24 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   effetti attivi (`MixService.tail`: ripetizioni dell'eco fino a −60 dB, decadimento del riverbero; max
   15 s) e il silenzio finale opzionale (`trailingSilence`), normalizzazione opzionale; l'encoding è del
   motore audio (su desktop: scrittura PCM a blocchi, ffmpeg con progresso letto da `-progress pipe:1`).
+- **Registrazione** (`RecordingService`, solo desktop: `PlatformInfo.canRecord`, nel web pulsante e
+  impostazioni nascosti): si registra su una traccia messa in registrazione
+  (`armedTrackId`, una alla volta; il `+` sotto le tracce ne aggiunge una vuota). La base è il montaggio dal cursore alla fine (più le code
+  degli effetti) renderizzato offline da `MixService.render` (lo stesso render dell'export) e suonato
+  come un solo buffer su un `AudioContext` dedicato, inviato all'uscita scelta: ascolto stabile e
+  ritardo costante. L'ingresso (`getUserMedia` con cancellazione dell'eco, riduzione del rumore e
+  guadagno automatico spenti) passa da un AudioWorklet inline (`input-capture.ts`) che etichetta ogni
+  blocco di campioni con il frame del contesto in cui è stato elaborato: la ripresa si allinea alla
+  base scartando i campioni fino a `quando la base parte + latenza`. La latenza (andata e ritorno,
+  uscita + ingresso) si misura con `RecordingService.calibrate` (`latency.ts`: sei clic, primo
+  campione ben sopra il rumore di fondo, mediana dei ritardi concordi entro 2 ms) ed è salvata per la
+  coppia ingresso/uscita; senza misura si stima da `outputLatency + baseLatency` e dalla `latency`
+  della traccia d'ingresso. Durante la ripresa la clip in corso (`TimelineService.recordingClip`, fuori
+  dal montaggio) si disegna sulla lane e cresce fino al playhead, che la vista segue come nell'ascolto.
+  Allo stop si chiede dove e con che nome salvare (`FileSystemPort.recordingPath`: dialog di
+  salvataggio); la ripresa diventa un WAV a
+  24 bit (`AudioEnginePort.encode`) e una clip della traccia al punto di partenza, in un solo passo di
+  annulla. Annullando il dialog la ripresa è scartata.
 
 ## Stato e servizi
 
@@ -136,7 +154,8 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
 | `EditService` | comandi di editing usati da UI e AI: split, delete, crop, dissolvenza incrociata, velocità/pitch, dialoghi tempo e allineamento, marcatura battuta |
 | `DocumentService` | nuovo/apri/salva/salva con nome/rinomina/esporta/chiudi, con conferma per le modifiche non salvate; titolo della finestra |
 | `PlaybackService` | play/stop/seek, loop, punto iniziale, posizione del playhead, `AudioContext` condiviso inviato all'uscita scelta (`setSinkId`; se il dispositivo manca, la predefinita) |
-| `AudioOutputsService` | elenco delle uscite audio (`enumerateDevices`). WebView2 dà i nomi solo a una pagina con permesso microfono: all'apertura delle Impostazioni, la prima volta, si apre e chiude subito un flusso dal microfono. La scelta (id e nome) è nelle impostazioni |
+| `AudioDevicesService` | elenco delle uscite e degli ingressi audio (`enumerateDevices`). WebView2 dà i nomi solo a una pagina con permesso microfono: all'apertura delle Impostazioni, la prima volta, si apre e chiude subito un flusso dal microfono. Le scelte (id e nome) sono nelle impostazioni |
+| `RecordingService` | traccia in registrazione, ripresa dall'ingresso con la base pre-mixata, misura della latenza (vedi sopra) |
 | `DropTargetService` + `FileSystemPort.resolveDropped` (desktop: `platform/neutralino/dropped-files.ts`) | drop di file sulla finestra o su una traccia; la web view non dà i percorsi: si ricavano dalla selezione di Esplora risorse (PowerShell) o, in mancanza, il contenuto viene copiato |
 | `ThemeColorsService` | token Material risolti in colori concreti per il canvas |
 | `I18nService` + pipe `t` | traduzioni it/en a runtime |

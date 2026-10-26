@@ -114,6 +114,11 @@
     --mat-icon-button-state-layer-size: 39px;
     --mat-icon-button-container-shape: 0;
     border-radius: 0;
+
+    // off (while recording): the coloured square fades as a whole
+    &:disabled {
+      opacity: 0.38;
+    }
   }
 
   .stop {

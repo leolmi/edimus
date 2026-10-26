@@ -73,8 +73,14 @@ l'estensione della timeline resta quella di partenza (`holdExtent`): accorciando
 l'ultima clip la vista non scorre sotto il puntatore; si adegua al rilascio.
 Durante la riproduzione, quando il playhead arriva a metà della vista si ferma lì e le tracce
 scorrono sotto (alla fine del montaggio la vista si ferma e il playhead prosegue; se il playhead
-finisce fuori a sinistra, per esempio col ciclo, la vista si centra su di lui); all'apertura di un
-montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono decodificate.
+finisce fuori a sinistra, per esempio col ciclo, la vista si centra su di lui). Lo stesso durante
+una registrazione; da fermo, un playhead spostato fuori dalla vista (stop, Home, End, fine di una
+registrazione) riporta la vista su di lui. Il playhead si posiziona ovunque, anche oltre la fine del
+montaggio o su tracce vuote (da lì parte una registrazione): la vista tiene raggiungibile anche lui
+(`TimelineService.playhead` nell'`extent`); Play da oltre la fine riparte da 0. All'apertura di un
+montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono decodificate. Il pulsante
+"Adatta alla finestra" (`TimelineService.fit`) adatta la vista all'intervallo selezionato, se c'è (con un 2%
+di margine per lato), altrimenti all'intero montaggio.
 
 ## Scorciatoie (`app.ts`)
 
@@ -84,6 +90,7 @@ montaggio la vista si adatta all'intero contenuto quando tutte le sorgenti sono 
 | Ctrl+, / F1 | Impostazioni / Aiuto |
 | Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y | annulla / ripeti |
 | Spazio, Home, End | play/pausa, inizio, fine |
+| Spazio o R / Esc | con una traccia in registrazione (pallino rosso dell'intestazione): avvia/ferma la ripresa al posto dell'ascolto / esce dalla registrazione; entrando si ferma l'ascolto; play e stop restano usabili con i pulsanti (spenti solo durante la ripresa); durante la ripresa gli altri tasti sono ignorati |
 | S | divide al playhead (le clip selezionate, o tutte se nessuna) |
 | Canc / Backspace | elimina la selezione (intervallo, altrimenti le clip selezionate; se svuota tracce, chiede conferma) |
 | ← / → | sposta le clip selezionate di un pixel allo zoom corrente; tasto tenuto o pressioni a meno di 0,8 s l'una dall'altra = un passo di annulla (`EditService.nudge` / `endNudge`) |

@@ -145,6 +145,13 @@ export class MontageService {
     return audio.length;
   }
 
+  /** Adds an empty track at the bottom (to record on it or to drop files on it); returns its id. */
+  addTrack(name: string): string {
+    const id = crypto.randomUUID();
+    this.update((m) => ({ ...m, tracks: [...m.tracks, { id, name, clips: [] }] }));
+    return id;
+  }
+
   /** Points a source to another file (a missing source found again), decoding it. */
   relinkSource(sourceId: string, path: string, fingerprint?: string): void {
     this.update((m) => ({

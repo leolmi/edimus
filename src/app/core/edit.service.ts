@@ -78,14 +78,21 @@ export class EditService {
         this.timeline.selectClip(null);
       });
     });
-    // the open effects panel follows the track of the clip selected last
-    effect(() => {
-      const ids = this.timeline.selectedClipIds();
-      untracked(() => {
+    // the open effects panel follows the track of the clip selected last, also when the clip moves to another
+    // track; only then (any other edit, e.g. to the effects of the track shown, leaves the panel where it is)
+    const clipTrack = computed(
+      () => {
+        const ids = this.timeline.selectedClipIds();
         const last = ids[ids.length - 1];
-        if (!last || !this.timeline.selectedTrackId()) return;
-        const track = this.montages.montage().tracks.find((t) => t.clips.some((c) => c.id === last));
-        if (track) this.timeline.selectedTrackId.set(track.id);
+        return { ids, trackId: last ? this.montages.montage().tracks.find((t) => t.clips.some((c) => c.id === last))?.id : undefined };
+      },
+      // a new selection, or the clip on another track
+      { equal: (a, b) => a.ids === b.ids && a.trackId === b.trackId },
+    );
+    effect(() => {
+      const { trackId } = clipTrack();
+      untracked(() => {
+        if (trackId && this.timeline.selectedTrackId()) this.timeline.selectedTrackId.set(trackId);
       });
     });
     // clips removed (undo, delete, crop...) leave the selection

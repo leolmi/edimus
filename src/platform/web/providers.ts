@@ -16,7 +16,7 @@ import { WebSettings } from './web-settings';
 import { WebShell } from './web-shell';
 import { WebUpdater } from './web-updater';
 
-const web: PlatformInfo = { kind: 'web', version, canRevealFiles: false, canSetupAi: false, filesBesideSources: false, hasDevTools: false, canUpdate: false };
+const web: PlatformInfo = { kind: 'web', version, canRevealFiles: false, canSetupAi: false, filesBesideSources: false, hasDevTools: false, canRecord: false, canUpdate: false };
 
 /** Web app: everything runs in the browser of the user, files included. */
 export const webProviders: Provider[] = [

@@ -25,6 +25,14 @@ Registrare una nuova traccia da un ingresso del PC (microfono, scheda audio), as
 - Interfaccia: scelta dell'ingresso nelle Impostazioni, pulsante registra nel trasporto, traccia di destinazione (nuova o selezionata), punto di partenza dal cursore, conteggio iniziale facoltativo sulla griglia delle battute.
 - Collegato: oggi le Impostazioni chiedono il permesso del microfono solo per leggere i nomi delle uscite; la richiesta andrebbe spostata a quando serve davvero.
 - Da valutare: monitoraggio dell'ingresso in cuffia, registrazione in loop su un intervallo, comando MCP per far partire/fermare la registrazione.
+- Base pre-mixata: prima di registrare, la base si produce con il render offline già usato dall'export e si ascolta come un unico buffer (ascolto stabile, latenza costante).
+- Fasi:
+  1. **Registrazione di base** (fatta): scelta dell'ingresso, registra su una traccia nuova dal cursore, base pre-mixata, calibrazione della latenza (clic emesso e riascoltato dal microfono, scarto salvato per dispositivo), elaborazioni del microfono spente.
+  2. **Rifiniture**: conteggio iniziale sulla griglia delle battute, più tentativi in loop su un intervallo, ascolto dell'ingresso con gli effetti della traccia.
+
+## Tracce MIDI
+
+Oltre alle tracce audio, tracce MIDI (note suonate da uno strumento virtuale o inviate a un dispositivo esterno). Il `+` sotto le tracce, che oggi aggiunge una traccia audio vuota, aprirebbe un menu con le tipologie (audio, MIDI); nel modello la traccia avrebbe un tipo (`kind`, audio per default nei montaggi esistenti).
 
 ## Release compilate da GitHub Actions
 

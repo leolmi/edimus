@@ -78,6 +78,11 @@ export class NeutralinoFileSystem extends FileSystemPort {
     return path;
   }
 
+  async recordingPath(title: string, defaultPath: string): Promise<string | undefined> {
+    const path = await this.showSaveDialog(title, [{ name: 'WAV', extensions: ['wav'] }], defaultPath);
+    return path && fileExtension(path) !== 'wav' ? `${path}.wav` : path;
+  }
+
   showOpenDialog(title: string, filters: FileFilter[]): Promise<string[]> {
     return os.showOpenDialog(title, { multiSelections: true, filters });
   }

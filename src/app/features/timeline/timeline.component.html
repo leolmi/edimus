@@ -1,83 +1,187 @@
 <div class="ruler-row" (wheel)="onWheel($event)">
   <div class="corner"></div>
-  <app-ruler class="ruler" (pointerdown)="onScrubStart($event)" (pointermove)="onScrubMove($event)" (pointerup)="onScrubEnd($event)" (pointercancel)="onScrubEnd($event)" />
+  <app-ruler
+    class="ruler"
+    (pointerdown)="onScrubStart($event)"
+    (pointermove)="onScrubMove($event)"
+    (pointerup)="onScrubEnd($event)"
+    (pointercancel)="onScrubEnd($event)"
+  />
 </div>
 
 <div class="tracks" (wheel)="onWheel($event)">
   @for (track of montages.montage().tracks; track track.id; let index = $index) {
     @let source = sourceOf(track);
     <div class="track" [attr.data-drop-track]="track.id">
-      <div class="header" [class.selected]="timeline.selectedTrackId() === track.id">
-        <div class="header-main">
-          <div class="name" role="button" tabindex="0" (click)="showInfo(track)" (keydown.enter)="showInfo(track)">
-            <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{ source?.status === 'error' ? 'error' : 'audio_file' }}</mat-icon>
-            <!-- the whole name in a tooltip, only when it is cut (checked as the pointer enters, before the tooltip opens) -->
-            <span
-              #nameText
-              #nameTip="matTooltip"
-              [matTooltip]="track.name"
-              [matTooltipDisabled]="true"
-              (pointerenter)="nameTip.disabled = nameText.scrollWidth <= nameText.clientWidth"
-              >{{ track.name }}</span
-            >
+      <div
+        class="header"
+        [class.selected]="timeline.selectedTrackId() === track.id"
+        [class.armed]="recorder.armedTrackId() === track.id"
+      >
+        @if (recorder.armedTrackId() === track.id) {
+          <!-- recording mode: only what the recording needs -->
+          <div class="header-main">
+            <div class="name armed-name">
+              <mat-icon class="rec-icon">fiber_manual_record</mat-icon>
+              <span>{{ track.name }}</span>
+            </div>
+            <div class="rec-controls">
+              @let state = recorder.state();
+              <button
+                mat-flat-button
+                class="rec-button"
+                [class.recording]="state === 'recording'"
+                [disabled]="state !== 'idle' && state !== 'recording'"
+                (click)="recorder.toggle()"
+              >
+                <mat-icon>{{ state === 'recording' ? 'stop' : 'fiber_manual_record' }}</mat-icon>
+                {{ (state === 'recording' ? 'record.stopShort' : 'record.startShort') | t }}
+              </button>
+              <button
+                mat-icon-button
+                class="small"
+                [disabled]="state !== 'idle'"
+                (click)="recorder.disarm()"
+                [matTooltip]="'record.disarm' | t"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+            <span class="info">{{ recordingStatus() }}</span>
+            <span class="info" [title]="inputLabel()">{{
+              'record.input' | t: { name: inputLabel() }
+            }}</span>
           </div>
-          <div class="track-actions">
-            <button mat-icon-button class="small" [class.active]="track.muted" (click)="toggleMute(track)" [matTooltip]="'track.mute' | t">
-              <mat-icon>{{ track.muted ? 'volume_off' : 'volume_up' }}</mat-icon>
-            </button>
-            <button mat-icon-button class="small" [class.active]="track.solo" (click)="toggleSolo(track)" [matTooltip]="'track.solo' | t">
-              <mat-icon>headphones</mat-icon>
-            </button>
-            <button
-              mat-icon-button
-              class="small"
-              [class.active]="timeline.selectedTrackId() === track.id"
-              [class.has-effects]="hasEffects(track)"
-              (click)="edits.toggleEffectsPanel(track.id)"
-              [matTooltip]="'fx.open' | t"
+        } @else {
+          <div class="header-main">
+            <div
+              class="name"
+              role="button"
+              tabindex="0"
+              (click)="showInfo(track)"
+              (keydown.enter)="showInfo(track)"
             >
-              <mat-icon>tune</mat-icon>
-            </button>
-            <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
-              <mat-icon>info</mat-icon>
-            </button>
-            <button mat-icon-button class="small danger" (click)="removeTrack(track)" [matTooltip]="'track.remove' | t">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </div>
-          @if (source?.status === 'probing') {
-            <span class="info">{{ 'source.probing' | t }}</span>
-          } @else if (source?.status === 'decoding') {
-            <mat-progress-bar mode="determinate" [value]="source.progress * 100" />
-            <span class="info">{{ 'source.decoding' | t: { p: (source.progress * 100).toFixed(0) } }}</span>
-          } @else if (source?.status === 'ready') {
-            <span class="info">{{ describe(source.info) }}</span>
-            @if (tempoLabel(track); as tempo) {
-              <span class="info">{{ tempo }}</span>
+              <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{
+                source?.status === 'error' ? 'error' : 'audio_file'
+              }}</mat-icon>
+              <!-- the whole name in a tooltip, only when it is cut (checked as the pointer enters, before the tooltip opens) -->
+              <span
+                #nameText
+                #nameTip="matTooltip"
+                [matTooltip]="track.name"
+                [matTooltipDisabled]="true"
+                (pointerenter)="nameTip.disabled = nameText.scrollWidth <= nameText.clientWidth"
+                >{{ track.name }}</span
+              >
+            </div>
+            <div class="track-actions">
+              <button
+                mat-icon-button
+                class="small"
+                [class.active]="track.muted"
+                (click)="toggleMute(track)"
+                [matTooltip]="'track.mute' | t"
+              >
+                <mat-icon>{{ track.muted ? 'volume_off' : 'volume_up' }}</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                class="small"
+                [class.active]="track.solo"
+                (click)="toggleSolo(track)"
+                [matTooltip]="'track.solo' | t"
+              >
+                <mat-icon>headphones</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                class="small"
+                [class.active]="timeline.selectedTrackId() === track.id"
+                [class.has-effects]="hasEffects(track)"
+                (click)="edits.toggleEffectsPanel(track.id)"
+                [matTooltip]="'fx.open' | t"
+              >
+                <mat-icon>tune</mat-icon>
+              </button>
+              <button
+                mat-icon-button
+                class="small"
+                (click)="showInfo(track)"
+                [matTooltip]="'trackInfo.title' | t"
+              >
+                <mat-icon>info</mat-icon>
+              </button>
+              @if (recorder.available) {
+                <button
+                  mat-icon-button
+                  class="small rec"
+                  [disabled]="recorder.state() !== 'idle'"
+                  (click)="recorder.arm(track.id)"
+                  [matTooltip]="'record.arm' | t"
+                >
+                  <mat-icon>fiber_manual_record</mat-icon>
+                </button>
+              }
+              <button
+                mat-icon-button
+                class="small danger"
+                (click)="removeTrack(track)"
+                [matTooltip]="'track.remove' | t"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+            @if (!track.clips.length) {
+              <span class="info">{{
+                (recorder.available ? 'track.empty' : 'track.emptyNoRecord') | t
+              }}</span>
+            } @else if (source?.status === 'probing') {
+              <span class="info">{{ 'source.probing' | t }}</span>
+            } @else if (source?.status === 'decoding') {
+              <mat-progress-bar mode="determinate" [value]="source.progress * 100" />
+              <span class="info">{{
+                'source.decoding' | t: { p: (source.progress * 100).toFixed(0) }
+              }}</span>
+            } @else if (source?.status === 'ready') {
+              <span class="info">{{ describe(source.info) }}</span>
+              @if (tempoLabel(track); as tempo) {
+                <span class="info">{{ tempo }}</span>
+              }
+            } @else if (source?.status === 'error') {
+              <span class="info error" [title]="source.error">{{
+                'source.error' | t: { message: source.error }
+              }}</span>
+              <a
+                href="#"
+                class="info find"
+                (click)="$event.preventDefault(); documents.showSourceFiles()"
+                >{{ 'sourceFiles.open' | t }}</a
+              >
             }
-          } @else if (source?.status === 'error') {
-            <span class="info error" [title]="source.error">{{ 'source.error' | t: { message: source.error } }}</span>
-            <a href="#" class="info find" (click)="$event.preventDefault(); documents.showSourceFiles()">{{ 'sourceFiles.open' | t }}</a>
-          }
-          @if (track.effects?.length) {
-            <app-effect-chain class="effect-chain" [effects]="track.effects ?? []" (click)="edits.toggleEffectsPanel(track.id)" />
-          }
-        </div>
-        <app-fader
-          slim
-          class="track-fader"
-          [label]="'track.volume' | t"
-          [min]="-30"
-          [max]="6"
-          [default]="0"
-          [origin]="0"
-          [marks]="volumeMarks"
-          [format]="dbLabel"
-          [round]="halfDb"
-          [value]="volumeDb(track)"
-          (valueChange)="previewVolume(track, $event)"
-          (committed)="commitVolume(track, $event)"
-        />
+            @if (track.effects?.length) {
+              <app-effect-chain
+                class="effect-chain"
+                [effects]="track.effects ?? []"
+                (click)="edits.toggleEffectsPanel(track.id)"
+              />
+            }
+          </div>
+          <app-fader
+            slim
+            class="track-fader"
+            [label]="'track.volume' | t"
+            [min]="-30"
+            [max]="6"
+            [default]="0"
+            [origin]="0"
+            [marks]="volumeMarks"
+            [format]="dbLabel"
+            [round]="halfDb"
+            [value]="volumeDb(track)"
+            (valueChange)="previewVolume(track, $event)"
+            (committed)="commitVolume(track, $event)"
+          />
+        }
       </div>
       <app-track-lane
         #lane
@@ -96,8 +200,16 @@
         @let progress = loading().get(track.id) ?? null;
         <div class="lane-loader">
           <div class="loader">
-            <mat-progress-spinner [mode]="progress === null ? 'indeterminate' : 'determinate'" [value]="(progress ?? 0) * 100" diameter="24" />
-            <span>{{ progress === null ? ('track.loading' | t) : ('track.loadingProgress' | t: { p: (progress * 100).toFixed(0) }) }}</span>
+            <mat-progress-spinner
+              [mode]="progress === null ? 'indeterminate' : 'determinate'"
+              [value]="(progress ?? 0) * 100"
+              diameter="24"
+            />
+            <span>{{
+              progress === null
+                ? ('track.loading' | t)
+                : ('track.loadingProgress' | t: { p: (progress * 100).toFixed(0) })
+            }}</span>
           </div>
         </div>
       }
@@ -105,7 +217,11 @@
   }
   <!-- empty strips: dropping audio files here adds them as new tracks -->
   <div class="slots" data-drop-track="new">
-    <div class="slots-header"></div>
+    <div class="slots-header">
+      <button mat-icon-button class="add-track" (click)="addTrack()" [matTooltip]="'track.add' | t">
+        <mat-icon>add</mat-icon>
+      </button>
+    </div>
     <div class="slots-lane">
       <div class="slot-hint">
         @if (loadingNew()) {
@@ -116,13 +232,18 @@
         } @else {
           <mat-icon>library_add</mat-icon>
           <span>{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}</span>
-          <a class="link" href="#" (click)="$event.preventDefault(); documents.browse()">{{ 'slots.browse' | t }}</a>
+          <a class="link" href="#" (click)="$event.preventDefault(); documents.browse()">{{
+            'slots.browse' | t
+          }}</a>
         }
       </div>
     </div>
   </div>
   <!-- reference for the lanes width -->
-  <div class="lanes-probe"><div class="corner"></div><div #lanes class="probe"></div></div>
+  <div class="lanes-probe">
+    <div class="corner"></div>
+    <div #lanes class="probe"></div>
+  </div>
 </div>
 
 <div class="scroll-row">
@@ -133,7 +254,11 @@
 </div>
 
 @if (rangeBox(); as box) {
-  <div class="range" [style.left]="'calc(var(--header-width) + ' + box.left + 'px)'" [style.width.px]="box.width"></div>
+  <div
+    class="range"
+    [style.left]="'calc(var(--header-width) + ' + box.left + 'px)'"
+    [style.width.px]="box.width"
+  ></div>
 }
 @if (cueX() !== null && !montages.isEmpty()) {
   <div class="cue" [style.left]="'calc(var(--header-width) + ' + cueX() + 'px)'"></div>

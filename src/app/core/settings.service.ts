@@ -1,5 +1,5 @@
 import { DOCUMENT, Injectable, effect, inject, signal } from '@angular/core';
-import type { AudioOutput } from './audio/audio-outputs.service';
+import type { AudioDevice } from './audio/audio-devices.service';
 import type { BridgeConfig } from './platform/ai-host.port';
 import { SettingsPort } from './platform/settings.port';
 
@@ -15,7 +15,11 @@ interface Settings {
   volume: number;
   muted: boolean;
   /** Output device of the playback (id and name), null = system default. */
-  audioOutput: AudioOutput | null;
+  audioOutput: AudioDevice | null;
+  /** Input device of the recording (id and name), null = system default. */
+  audioInput: AudioDevice | null;
+  /** Measured round-trip latency (s) of the recording, by input and output (see `latencyKey`). */
+  recordingLatency: Record<string, number>;
   snapStep: SnapStep;
   /** Opens the developer tools of the window at startup. */
   devTools: boolean;
@@ -41,6 +45,8 @@ const DEFAULTS: Settings = {
   volume: 1,
   muted: false,
   audioOutput: null,
+  audioInput: null,
+  recordingLatency: {},
   snapStep: 'beat',
   autoSaveBars: false,
   devTools: false,
@@ -60,7 +66,9 @@ export class SettingsService {
   readonly language = signal<Language>(DEFAULTS.language);
   readonly volume = signal(DEFAULTS.volume);
   readonly muted = signal(DEFAULTS.muted);
-  readonly audioOutput = signal<AudioOutput | null>(DEFAULTS.audioOutput);
+  readonly audioOutput = signal<AudioDevice | null>(DEFAULTS.audioOutput);
+  readonly audioInput = signal<AudioDevice | null>(DEFAULTS.audioInput);
+  readonly recordingLatency = signal<Record<string, number>>(DEFAULTS.recordingLatency);
   readonly snapStep = signal<SnapStep>(DEFAULTS.snapStep);
   readonly autoSaveBars = signal(DEFAULTS.autoSaveBars);
   readonly devTools = signal(DEFAULTS.devTools);
@@ -88,6 +96,8 @@ export class SettingsService {
       if (typeof saved.volume === 'number') this.volume.set(saved.volume);
       if (typeof saved.muted === 'boolean') this.muted.set(saved.muted);
       if (saved.audioOutput?.id) this.audioOutput.set(saved.audioOutput);
+      if (saved.audioInput?.id) this.audioInput.set(saved.audioInput);
+      if (saved.recordingLatency && typeof saved.recordingLatency === 'object') this.recordingLatency.set(saved.recordingLatency);
       if (saved.snapStep === 'bar' || saved.snapStep === 'beat' || saved.snapStep === 'half') this.snapStep.set(saved.snapStep);
       if (typeof saved.autoSaveBars === 'boolean') this.autoSaveBars.set(saved.autoSaveBars);
       if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
@@ -122,9 +132,31 @@ export class SettingsService {
     void this.save();
   }
 
-  setAudioOutput(output: AudioOutput | null): void {
+  setAudioOutput(output: AudioDevice | null): void {
     this.audioOutput.set(output);
     void this.save();
+  }
+
+  setAudioInput(input: AudioDevice | null): void {
+    this.audioInput.set(input);
+    void this.save();
+  }
+
+  /** Round-trip latency measured for the chosen input and output, undefined when never measured. */
+  currentLatency(): number | undefined {
+    return this.recordingLatency()[this.latencyKey()];
+  }
+
+  /** Saves (or, with null, forgets) the latency of the chosen input and output. */
+  setCurrentLatency(seconds: number | null): void {
+    const key = this.latencyKey();
+    this.recordingLatency.update(({ [key]: _, ...others }) => (seconds === null ? others : { ...others, [key]: seconds }));
+    void this.save();
+  }
+
+  /** The latency depends on both devices (and on their drivers). */
+  private latencyKey(): string {
+    return `${this.audioInput()?.id ?? ''}>${this.audioOutput()?.id ?? ''}`;
   }
 
   setSnapStep(step: SnapStep): void {
@@ -170,6 +202,8 @@ export class SettingsService {
       volume: this.volume(),
       muted: this.muted(),
       audioOutput: this.audioOutput(),
+      audioInput: this.audioInput(),
+      recordingLatency: this.recordingLatency(),
       snapStep: this.snapStep(),
       autoSaveBars: this.autoSaveBars(),
       devTools: this.devTools(),

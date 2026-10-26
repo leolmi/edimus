@@ -1,8 +1,8 @@
 import { Injectable, signal } from '@angular/core';
 
-/** An audio output device of the system. */
-export interface AudioOutput {
-  /** Device id for AudioContext.setSinkId (stable for the origin of the app). */
+/** An audio device of the system (output of the playback or input of the recording). */
+export interface AudioDevice {
+  /** Device id for AudioContext.setSinkId or getUserMedia (stable for the origin of the app). */
   id: string;
   label: string;
 }
@@ -10,10 +10,11 @@ export interface AudioOutput {
 /** Pseudo-devices of Chromium, offered as "system default" instead. */
 const ALIASES = ['default', 'communications'];
 
-/** Audio output devices available for the playback. */
+/** Audio output and input devices available for the playback and the recording. */
 @Injectable({ providedIn: 'root' })
-export class AudioOutputsService {
-  readonly outputs = signal<AudioOutput[]>([]);
+export class AudioDevicesService {
+  readonly outputs = signal<AudioDevice[]>([]);
+  readonly inputs = signal<AudioDevice[]>([]);
 
   /** True once the device names have been unlocked (see refresh). */
   private unlocked = false;
@@ -25,7 +26,7 @@ export class AudioOutputsService {
   }
 
   /**
-   * Reads the output devices (when the Settings open). The web view gives their names only to a page allowed to use a
+   * Reads the devices (when the Settings open). The web view gives their names only to a page allowed to use a
    * microphone: the first time a microphone stream is opened and closed at once, nothing is recorded.
    */
   async refresh(): Promise<void> {
@@ -40,15 +41,15 @@ export class AudioOutputsService {
       }
     }
     this.unlocked = true;
-    this.outputs.set(
+    const of = (kind: MediaDeviceKind) =>
       devices
-        .filter((d) => !ALIASES.includes(d.deviceId))
-        .map((d, i) => ({ id: d.deviceId, label: d.label || `#${i + 1}` })),
-    );
+        .filter((d) => d.kind === kind && !ALIASES.includes(d.deviceId))
+        .map((d, i) => ({ id: d.deviceId, label: d.label || `#${i + 1}` }));
+    this.outputs.set(of('audiooutput'));
+    this.inputs.set(of('audioinput'));
   }
 
   private async list(): Promise<MediaDeviceInfo[]> {
-    const devices = (await navigator.mediaDevices?.enumerateDevices()) ?? [];
-    return devices.filter((d) => d.kind === 'audiooutput');
+    return (await navigator.mediaDevices?.enumerateDevices()) ?? [];
   }
 }

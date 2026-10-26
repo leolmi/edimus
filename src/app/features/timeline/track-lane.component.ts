@@ -310,6 +310,7 @@ export class TrackLaneComponent {
       // the clip being marked shows only the grid of its marking
       for (const clip of this.track().clips) if (clip.id !== markingId) this.drawBeats(ctx, colors, clip, size.width, size.height);
     }
+    this.drawRecording(ctx, colors, size);
     this.drawEnvelopeGuides(ctx, colors, size.width, size.height);
     this.drawMarkedBar(ctx, colors, size.width, size.height);
     this.drawEnvelope(ctx, colors, size.width);
@@ -340,6 +341,32 @@ export class TrackLaneComponent {
     ctx.font = colors.font;
     ctx.textBaseline = 'middle';
     ctx.fillText(`${failed ? '⚠' : '…'} ${fileName(path)}`, Math.max(0, x0) + 8, size.height / 2);
+    ctx.restore();
+  }
+
+  /** Clip being recorded on this track: it grows from where the recording started up to the playhead. */
+  private drawRecording(ctx: CanvasRenderingContext2D, colors: CanvasColors, size: { width: number; height: number }): void {
+    const clip = this.timeline.recordingClip();
+    if (clip?.trackId !== this.track().id) return;
+    const x0 = this.timeline.timeToX(clip.start);
+    const x1 = Math.max(x0 + 1, this.timeline.timeToX(clip.end));
+    if (x1 < 0 || x0 > size.width) return;
+    const left = Math.max(0, Math.floor(x0));
+    const right = Math.min(size.width, Math.ceil(x1));
+    ctx.save();
+    ctx.fillStyle = colors.error;
+    ctx.globalAlpha = 0.18;
+    ctx.fillRect(left, 1, right - left, size.height - 2);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = colors.error;
+    ctx.strokeRect(Math.round(x0) + 0.5, 1.5, Math.round(x1 - x0) - 1, size.height - 3);
+    ctx.beginPath();
+    ctx.rect(left, 0, right - left, size.height);
+    ctx.clip();
+    ctx.fillStyle = colors.error;
+    ctx.font = colors.font;
+    ctx.textBaseline = 'top';
+    ctx.fillText('● REC', Math.max(0, x0) + 6, 6);
     ctx.restore();
   }
 

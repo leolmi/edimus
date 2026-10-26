@@ -77,6 +77,8 @@ export class PlaybackService {
       const gain = this.settings.muted() ? 0 : this.settings.volume();
       if (this.master && this.context) this.master.gain.setTargetAtTime(gain, this.context.currentTime, 0.015);
     });
+    // the view keeps the playhead reachable, also past the end of the montage
+    effect(() => this.timeline.playhead.set(this.position()));
     // a new montage resets the playback
     effect(() => {
       this.montages.generation();
@@ -148,12 +150,15 @@ export class PlaybackService {
 
   /** Fixes the start point the stops go back to. */
   setCue(time: number): void {
-    this.cue.set(Math.max(0, Math.min(this.timeline.duration(), time)));
+    this.cue.set(Math.max(0, time));
   }
 
-  /** Moves the playhead; playback, if running, continues from there. */
+  /**
+   * Moves the playhead, also past the end of the montage (where a recording can start); playback, if running,
+   * continues from there.
+   */
   seek(time: number): void {
-    const position = Math.max(0, Math.min(this.timeline.duration(), time));
+    const position = Math.max(0, time);
     if (this.playing()) this.play(position);
     else this.position.set(position);
   }
