@@ -231,10 +231,11 @@
           </div>
         } @else {
           <mat-icon>library_add</mat-icon>
-          <span>{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}</span>
-          <a class="link" href="#" (click)="$event.preventDefault(); documents.browse()">{{
-            'slots.browse' | t
-          }}</a>
+          <!-- one text block: the link wraps with the sentence instead of standing apart -->
+          <span
+            >{{ (montages.isEmpty() ? 'slots.hintEmpty' : 'slots.hint') | t }}
+            <a class="link" href="#" (click)="$event.preventDefault(); documents.browse()">{{ 'slots.browse' | t }}</a></span
+          >
         }
       </div>
     </div>
