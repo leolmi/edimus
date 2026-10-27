@@ -6,7 +6,7 @@ da un assistente AI.**
 Monta, taglia, metti a tempo e mixa i tuoi brani senza mai toccare i file originali: un
 *montaggio* (`.edimus`) li richiama e descrive come comporli, e l'export produce il mix finale.
 
-![edimus: tre tracce con griglia delle battute e inviluppi di volume](docs/images/screenshot.png)
+![edimus: tracce con griglia delle battute, inviluppi di volume ed effetti per traccia](docs/images/screenshot.png)
 
 ## In evidenza
 
