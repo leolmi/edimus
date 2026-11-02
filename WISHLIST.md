@@ -44,3 +44,20 @@ Oggi `npm run package` e `npm run release` girano sul PC dello sviluppatore: il 
 - Facoltativo, a parte: firma del codice (certificato a pagamento o Azure Trusted Signing) per togliere l'avviso di SmartScreen.
 - Da verificare: `neu build` e `mcp:build` (Node SEA) sul runner, tempi della build, README e `docs/architecture.md` da aggiornare (sezione Sicurezza e trasparenza: le release diventano verificabili).
 - Stima: 1–2 blocchi.
+
+## Frecce che spostano il cursore del tempo
+
+Fuori dalla modalità registrazione e senza clip selezionate, le frecce sinistra e destra spostano il cursore sulla linea temporale (oggi con clip selezionate le spostano).
+
+- Da decidere il passo: una battuta con la griglia attiva, altrimenti una frazione della vista; con un modificatore un passo più fine o più ampio.
+- La vista segue il cursore come già fa da fermo; la regola va descritta in `docs/timeline.md` e nell'Aiuto.
+
+## Preset e set di effetti personali
+
+Salvare le proprie impostazioni per riusarle in altri montaggi o condividerle.
+
+- **Preset del singolo effetto**: dalla scheda di un effetto si salvano i valori correnti con un nome; compaiono nel menu dei preset accanto a quelli predefiniti.
+- **Set di effetti**: l'intera catena di una traccia (effetti, ordine, impostazioni, esclusioni) salvata con un nome e applicabile a un'altra traccia in un colpo solo.
+- **Condivisione**: esportazione e importazione come piccoli file JSON (stesso formato delle schede in `EFFECTS`), così si scambiano tra utenti.
+- **Asset dell'app**: alcuni preset e set pronti (es. "Voce parlata", "Batteria compatta") distribuiti con l'app in `public/`, in sola lettura, distinti da quelli dell'utente.
+- Da valutare: dove si salvano quelli dell'utente (impostazioni tramite la porta `settings` o cartella dedicata), comandi MCP per elencarli e applicarli, `docs/effects.md` da aggiornare.

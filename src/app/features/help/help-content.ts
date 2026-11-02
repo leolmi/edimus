@@ -43,7 +43,7 @@ const IT: HelpContent = {
         {
           title: 'Montaggio non distruttivo',
           text: [
-            'edimus non modifica mai i file audio originali: il montaggio (file .edimus) li richiama e descrive come comporli. Il risultato finale si ottiene con l’esportazione.',
+            'edimus non modifica mai i file audio originali: il montaggio (file .edimus) li richiama e descrive come comporli. Il risultato finale, un file audio, si ottiene con l’esportazione (Esporta audio).',
             'Ogni finestra contiene un montaggio; per lavorare su più montaggi apri più finestre.',
           ],
         },
@@ -89,6 +89,7 @@ const IT: HelpContent = {
           title: 'Esportare il mix',
           keys: ['Ctrl+E'],
           text: [
+            'È il passo che salva il montaggio come file audio: pulsante Esporta audio, a destra nella barra in alto (il floppy con la nota).',
             'Produce un unico file mono o stereo con tutte le tracce udibili, i volumi e le modifiche di velocità: wav, mp3, flac, ogg, opus o m4a, con qualità, frequenza di campionamento e normalizzazione a scelta.',
             'Il file parte sempre dall’inizio della linea temporale e arriva alla fine dell’ultima clip; il silenzio finale (es. 2,450 = 2 secondi e 450 millesimi) aggiunge altro silenzio in fondo.',
           ],
@@ -466,7 +467,7 @@ const IT: HelpContent = {
     },
     {
       title: 'Esportare il risultato',
-      steps: ['Premi Ctrl+E (o il pulsante esporta).', 'Scegli formato, qualità e canali, poi il file di destinazione.'],
+      steps: ['Premi Ctrl+E (o Esporta audio, a destra nella barra in alto).', 'Scegli formato, qualità e canali, poi il file di destinazione.'],
       note: 'Si esportano solo le tracce udibili: controlla muto e solo prima di esportare.',
     },
     {
@@ -515,7 +516,7 @@ const EN: HelpContent = {
         {
           title: 'Non-destructive montage',
           text: [
-            'edimus never changes the original audio files: the montage (.edimus file) refers to them and describes how to combine them. The final result comes from the export.',
+            'edimus never changes the original audio files: the montage (.edimus file) refers to them and describes how to combine them. The final result, an audio file, comes from the export (Export audio).',
             'Each window holds one montage; open more windows to work on more montages.',
           ],
         },
@@ -561,6 +562,7 @@ const EN: HelpContent = {
           title: 'Export the mix',
           keys: ['Ctrl+E'],
           text: [
+            'It is the step that saves the montage as an audio file: the Export audio button, at the right of the top bar (the floppy with a note).',
             'Produces a single mono or stereo file with all the audible tracks, volumes and speed changes: wav, mp3, flac, ogg, opus or m4a, with the quality, sample rate and normalization you choose.',
             'The file always starts at the beginning of the timeline and ends with the last clip; the trailing silence (e.g. 2.450 = 2 seconds and 450 thousandths) adds more silence at the end.',
           ],
@@ -929,7 +931,7 @@ const EN: HelpContent = {
     },
     {
       title: 'Export the result',
-      steps: ['Press Ctrl+E (or the export button).', 'Choose format, quality and channels, then the destination file.'],
+      steps: ['Press Ctrl+E (or Export audio, at the right of the top bar).', 'Choose format, quality and channels, then the destination file.'],
       note: 'Only the audible tracks are exported: check mute and solo before exporting.',
     },
     {

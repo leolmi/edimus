@@ -78,7 +78,8 @@ comandi della sezione [Sviluppo](#sviluppo) e ottenere lo stesso programma.
 - **Pacchetto `.edimuspack`**: il montaggio con i suoi file audio in un unico file da inviare.
 - **File mancanti ritrovati dal contenuto**: se un file audio è stato spostato o rinominato,
   edimus lo riconosce e lo ricollega.
-- Export in wav, mp3, flac, ogg, opus e m4a, mono o stereo, con normalizzazione e silenzio finale.
+- **Esporta audio** (a destra nella barra in alto, Ctrl+E): il mix finale in wav, mp3, flac, ogg,
+  opus e m4a, mono o stereo, con normalizzazione e silenzio finale.
 
 **Editing**
 - Clip trascinabili tra le tracce, trim dei bordi, divisione, ritaglio ed eliminazione di un

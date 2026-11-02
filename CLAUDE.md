@@ -90,7 +90,8 @@ scripts/                licenses.mjs, package.mjs
 - **Una finestra = un montaggio**: niente multi-documento; più montaggi = più istanze.
 - **UI**: solo Angular Material e token del tema (`--mat-sys-*`), nessun colore fisso;
   per il canvas usare `ThemeColorsService`. Icone nei pulsanti mai ridimensionate a mano
-  (usare i token Material). Ogni testo visibile va in `i18n/it.ts` **e** `i18n/en.ts`.
+  (usare i token Material); quelle che Material Symbols non ha stanno in `app-icons.ts` (SVG sulla
+  sua griglia 960, `svgIcon`). Ogni testo visibile va in `i18n/it.ts` **e** `i18n/en.ts`.
 - **Codice e commenti in inglese**, documentazione in italiano. Commenti brevi che dicono
   il *perché*, come quelli esistenti.
 - **Funzioni esposte all'AI**: una nuova capacità di editing va aggiunta anche a

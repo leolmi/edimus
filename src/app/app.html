@@ -8,7 +8,7 @@
   </span>
 
   <button mat-icon-button (click)="documents.reset()" [disabled]="montages.pristine()" [matTooltip]="'action.reset' | t">
-    <mat-icon>file_export</mat-icon>
+    <mat-icon>note_add</mat-icon>
   </button>
   <button mat-icon-button (click)="documents.openDialog()" [matTooltip]="'action.open' | t">
     <mat-icon>folder_open</mat-icon>
@@ -18,9 +18,6 @@
   </button>
   <button mat-icon-button (click)="documents.saveAs()" [disabled]="montages.isEmpty()" [matTooltip]="'action.saveAs' | t">
     <mat-icon>save_as</mat-icon>
-  </button>
-  <button mat-icon-button (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
-    <mat-icon>audio_file</mat-icon>
   </button>
   <span class="divider"></span>
   <button mat-icon-button (click)="montages.undo()" [disabled]="!montages.canUndo()" [matTooltip]="'action.undo' | t">
@@ -101,6 +98,12 @@
     <span class="divider"></span>
   }
 
+  <!-- the goal of the work: set apart and labelled so it is found at a glance -->
+  <button matButton="tonal" (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
+    <mat-icon svgIcon="save-audio" />
+    {{ 'action.exportLabel' | t }}
+  </button>
+  <span class="divider"></span>
   <button mat-icon-button (click)="showSettings()" [matTooltip]="'settings.tooltip' | t">
     <mat-icon>settings</mat-icon>
   </button>
