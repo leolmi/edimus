@@ -147,6 +147,8 @@ export class TimelineComponent {
   }
   /** Playing state at the start of a scrub on the ruler. */
   private scrubResume = false;
+  /** Range selection with Shift on the ruler. */
+  private rulerRange?: { anchor: number; anchorX: number; extend: boolean; moved: boolean };
   /** Gesture in progress on a lane. */
   private gesture?:
     | {
@@ -622,26 +624,57 @@ export class TimelineComponent {
     this.montages.updateTrack(track.id, (t) => ({ ...t, solo: !t.solo }));
   }
 
-  /** Click or drag on the ruler moves the playhead; where it is released becomes the start point of the stops. */
+  /**
+   * Click or drag on the ruler moves the playhead; where it is released becomes the start point of the stops.
+   * With Shift it selects a time range instead: dragging from the press point; a click extends the range
+   * (its far edge stays put) or, with none, selects from the playhead.
+   */
   protected onScrubStart(event: PointerEvent): void {
     if (event.button !== 0) return;
     const target = event.currentTarget as HTMLElement;
     target.setPointerCapture(event.pointerId);
+    if (event.shiftKey) {
+      const time = Math.max(0, this.timeAt(event));
+      const range = this.timeline.range();
+      const anchor = range ? (time - range.start > range.end - time ? range.start : range.end) : time;
+      this.rulerRange = { anchor, anchorX: event.clientX, extend: !!range, moved: false };
+      if (range) this.selectRange(anchor, time);
+      return;
+    }
     this.scrubResume = this.playback.playing();
     this.playback.pause();
     this.playback.seek(this.timeAt(event));
   }
 
   protected onScrubMove(event: PointerEvent): void {
-    if ((event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId)) this.playback.seek(this.timeAt(event));
+    if (!(event.currentTarget as HTMLElement).hasPointerCapture(event.pointerId)) return;
+    const range = this.rulerRange;
+    if (!range) return this.playback.seek(this.timeAt(event));
+    if (!range.moved && Math.abs(event.clientX - range.anchorX) < RANGE_THRESHOLD) return;
+    range.moved = true;
+    this.selectRange(range.anchor, Math.max(0, this.timeAt(event)));
   }
 
   protected onScrubEnd(event: PointerEvent): void {
     const target = event.currentTarget as HTMLElement;
     if (!target.hasPointerCapture(event.pointerId)) return;
     target.releasePointerCapture(event.pointerId);
+    const range = this.rulerRange;
+    if (range) {
+      this.rulerRange = undefined;
+      // Shift+click with no range: from the playhead to the click
+      if (!range.extend && !range.moved) this.selectRange(this.playback.position(), range.anchor);
+      return;
+    }
     this.playback.setCue(this.playback.position());
     if (this.scrubResume) this.playback.play();
+  }
+
+  /** Selects the range between two times (in any order) and brings the playhead to its start. */
+  private selectRange(a: number, b: number): void {
+    if (a === b) return;
+    this.timeline.range.set({ start: Math.min(a, b), end: Math.max(a, b) });
+    this.playback.seek(Math.min(a, b));
   }
 
   private xAt(event: PointerEvent): number {

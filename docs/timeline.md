@@ -63,6 +63,9 @@ degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello)
 | modalità inviluppo | clic / trascina su una clip | aggiunge un punto all'inviluppo della clip più in alto sotto il puntatore e lo sposta; su un punto lo sposta. Il punto resta dentro la clip e si aggancia (10 px) ai bordi di tutte le clip e ai punti degli inviluppi delle altre clip, in verticale a 0 dB (6 px); Alt per lo spostamento libero |
 | modalità inviluppo | trascina maniglia | piega il segmento (doppio clic: lo raddrizza) |
 | modalità inviluppo | clic destro su un punto | lo elimina |
+| righello | clic / trascina | sposta il playhead e fissa il punto iniziale (vedi sotto) |
+| righello | Maiusc+trascina | seleziona un intervallo di tempo (anche sopra le clip) |
+| righello | Maiusc+clic | estende l'intervallo fino al punto (il bordo più lontano resta fermo); senza intervallo, seleziona dal playhead al punto |
 | lane o righello | rotella | zoom attorno al puntatore |
 | intestazioni tracce | rotella | scorre le tracce in verticale |
 | ovunque | Ctrl+rotella | zoom attorno al puntatore |

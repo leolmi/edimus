@@ -214,6 +214,7 @@ const IT: HelpContent = {
           keys: ['Esc'],
           text: [
             'Trascina su un’area vuota delle tracce: la fascia selezionata vale per tutte le tracce. Serve per ritagliare, eliminare o ripetere in loop un tratto. Esc toglie la selezione.',
+            'Sul righello dei tempi, Maiusc+trascina seleziona l’intervallo anche sopra le clip (utile con una traccia sola). Maiusc+clic estende l’intervallo fino al punto cliccato; senza intervallo seleziona dal cursore al punto.',
           ],
         },
         {
@@ -683,7 +684,10 @@ const EN: HelpContent = {
         {
           title: 'Select a time range',
           keys: ['Esc'],
-          text: ['Drag on an empty area of the tracks: the selected band applies to all the tracks. Use it to crop, delete or loop a stretch. Esc clears the selection.'],
+          text: [
+            'Drag on an empty area of the tracks: the selected band applies to all the tracks. Use it to crop, delete or loop a stretch. Esc clears the selection.',
+            'On the time ruler, Shift+drag selects the range over the clips too (handy with a single track). Shift+click extends the range to the clicked point; with no range it selects from the playhead to the point.',
+          ],
         },
         {
           title: 'Crop and delete',
