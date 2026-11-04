@@ -156,19 +156,28 @@ export class SettingsService {
 
   /** Round-trip latency measured for the chosen input and output, undefined when never measured. */
   currentLatency(): number | undefined {
-    return this.recordingLatency()[this.latencyKey()];
+    return this.latencyOf(this.audioInput()?.id ?? null);
   }
 
   /** Saves (or, with null, forgets) the latency of the chosen input and output. */
   setCurrentLatency(seconds: number | null): void {
-    const key = this.latencyKey();
+    this.setLatencyOf(this.audioInput()?.id ?? null, seconds);
+  }
+
+  /** Round-trip latency measured for an input (null: the system default) and the chosen output. */
+  latencyOf(inputId: string | null): number | undefined {
+    return this.recordingLatency()[this.latencyKey(inputId)];
+  }
+
+  setLatencyOf(inputId: string | null, seconds: number | null): void {
+    const key = this.latencyKey(inputId);
     this.recordingLatency.update(({ [key]: _, ...others }) => (seconds === null ? others : { ...others, [key]: seconds }));
     void this.save();
   }
 
   /** The latency depends on both devices (and on their drivers). */
-  private latencyKey(): string {
-    return `${this.audioInput()?.id ?? ''}>${this.audioOutput()?.id ?? ''}`;
+  private latencyKey(inputId: string | null): string {
+    return `${inputId ?? ''}>${this.audioOutput()?.id ?? ''}`;
   }
 
   setSnapStep(step: SnapStep): void {

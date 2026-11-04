@@ -49,9 +49,8 @@
               </button>
             </div>
             <span class="info">{{ recordingStatus() }}</span>
-            <span class="info" [title]="inputLabel()">{{
-              'record.input' | t: { name: inputLabel() }
-            }}</span>
+            @let input = inputs.label(track);
+            <span class="info" [title]="input">{{ 'record.input' | t: { name: input } }}</span>
           </div>
         } @else {
           <div class="header-main">
@@ -60,8 +59,8 @@
                 class="name"
                 role="button"
                 tabindex="0"
-                (click)="showInfo(track)"
-                (keydown.enter)="showInfo(track)"
+                (click)="edits.showPanel(track.id, 'info')"
+                (keydown.enter)="edits.showPanel(track.id, 'info')"
               >
                 <mat-icon [style.color]="source?.status === 'error' ? null : colorOf(track)">{{
                   source?.status === 'error' ? 'error' : 'audio_file'
@@ -76,7 +75,13 @@
                   >{{ track.name }}</span
                 >
               </div>
-              <button mat-icon-button class="small" (click)="showInfo(track)" [matTooltip]="'trackInfo.title' | t">
+              <button
+                mat-icon-button
+                class="small"
+                [class.active]="timeline.selectedTrackId() === track.id && timeline.panelTab() === 'info'"
+                (click)="edits.togglePanel(track.id, 'info')"
+                [matTooltip]="'trackInfo.title' | t"
+              >
                 <mat-icon>info</mat-icon>
               </button>
               <button
@@ -134,7 +139,7 @@
                 <button
                   mat-icon-button
                   class="toggle fx"
-                  [class.on]="timeline.selectedTrackId() === track.id"
+                  [class.on]="timeline.selectedTrackId() === track.id && timeline.panelTab() === 'fx'"
                   [class.has-effects]="hasEffects(track)"
                   [disabled]="edits.locked()"
                   (click)="edits.toggleEffectsPanel(track.id)"
@@ -356,11 +361,14 @@
         <mat-icon>content_cut</mat-icon>{{ 'clipMenu.split' | t }}
       </button>
       <mat-divider />
-      <button mat-menu-item [disabled]="locked" (click)="timeline.selectedTrackId.set(clip.track.id)">
+      <button mat-menu-item [disabled]="locked" (click)="edits.showPanel(clip.track.id, 'fx')">
         <mat-icon>tune</mat-icon>{{ 'clipMenu.effects' | t }}
       </button>
-      <button mat-menu-item (click)="showInfo(clip.track)">
+      <button mat-menu-item (click)="edits.showPanel(clip.track.id, 'info')">
         <mat-icon>info</mat-icon>{{ 'trackInfo.title' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.showTrackFiles(clip.track.id, clip.clipId)">
+        <mat-icon>audio_file</mat-icon>{{ 'trackFiles.clipTitle' | t }}
       </button>
       <mat-divider />
       <!-- the lock of the clip protects only: also on a locked montage -->

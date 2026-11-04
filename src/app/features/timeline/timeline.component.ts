@@ -37,6 +37,7 @@ import { KnobComponent } from '../../shared/controls/knob.component';
 import { TrackMeterComponent } from './track-meter.component';
 import { Clip, Marker, Montage, Track, audibleTracks, copyName, fileName, toSource, trackPan, trackVolume } from '../../core/montage/montage.model';
 import { MontageService } from '../../core/montage/montage.service';
+import { TrackInputService } from '../../core/audio/track-input';
 import { MIN_TRACK_HEIGHT, SettingsService } from '../../core/settings.service';
 import { snapToBeats } from '../../core/timeline/beat-snap';
 import { snapAnchors, snapTime, snapToEdges } from '../../core/timeline/edge-snap';
@@ -45,7 +46,6 @@ import { sourceColors } from '../../core/source-colors';
 import { ThemeColorsService } from '../../core/theme-colors.service';
 import { EffectChainComponent } from '../effects/effect-chain.component';
 import { RulerComponent } from './ruler.component';
-import { TrackInfoData, TrackInfoDialogComponent, TrackInfoResult, TrackInfoSource } from './track-info-dialog.component';
 import { ClipHit, TrackLaneComponent } from './track-lane.component';
 
 /** Replaces the envelope of a clip (none when empty). */
@@ -127,6 +127,7 @@ export class TimelineComponent {
   private readonly i18n = inject(I18nService);
   private readonly shell = inject(ShellPort);
   protected readonly recorder = inject(RecordingService);
+  protected readonly inputs = inject(TrackInputService);
 
   private readonly lanes = viewChild.required<ElementRef<HTMLElement>>('lanes');
   private readonly scroller = viewChild.required<ElementRef<HTMLElement>>('scroller');
@@ -800,46 +801,6 @@ export class TimelineComponent {
   }
 
   /** Details of the track and of its files, with its name editable. */
-  protected showInfo(track: Track): void {
-    const sources = new Map<string, TrackInfoSource>();
-    for (const clip of track.clips) {
-      const existing = sources.get(clip.sourceId);
-      if (existing) {
-        existing.clips++;
-        continue;
-      }
-      const source = this.montages.montage().sources.find((s) => s.id === clip.sourceId);
-      const state = this.library.sources()[clip.sourceId];
-      const info = state && 'info' in state ? state.info : undefined;
-      const tempo = this.tempos.sourceTempo(clip.sourceId);
-      sources.set(clip.sourceId, {
-        path: source?.path ?? '',
-        ...info,
-        bpm: tempo ? meanBpm(tempo) : undefined,
-        bpmManual: !!source?.tempo,
-        clips: 1,
-      });
-    }
-    const start = Math.min(...track.clips.map((c) => c.start));
-    const end = Math.max(...track.clips.map((c) => c.start + this.timeline.clipLength(c)));
-    const data: TrackInfoData = {
-      name: track.name,
-      clips: track.clips.length,
-      length: track.clips.length ? end - start : 0,
-      muted: !!track.muted,
-      solo: !!track.solo,
-      envelopePoints: track.clips.reduce((n, c) => n + (c.envelope?.length ?? 0), 0),
-      sources: [...sources.values()],
-    };
-    const ref = this.dialogs.open<TrackInfoDialogComponent, TrackInfoData, TrackInfoResult>(TrackInfoDialogComponent, {
-      data,
-      autoFocus: 'first-tabbable',
-    });
-    ref.afterClosed().subscribe((result) => {
-      if (result && result.name !== track.name) this.montages.updateTrack(track.id, (t) => ({ ...t, name: result.name }));
-    });
-  }
-
   /** Adds an empty track ("Track n" with the lowest n not used). */
   protected addTrack(): void {
     const names = new Set(this.montages.montage().tracks.map((t) => t.name));
@@ -864,7 +825,6 @@ export class TimelineComponent {
   });
 
   /** Name of the input the recording comes from. */
-  protected readonly inputLabel = computed(() => this.settings.audioInput()?.label ?? this.i18n.t('input.default'));
 
   /** Removes a track after a confirmation. */
   protected async removeTrack(track: Track): Promise<void> {

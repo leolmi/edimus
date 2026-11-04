@@ -68,12 +68,14 @@ interface CapturedBlock {
 
 /**
  * Opens an input device (null: the system default) as the raw signal: echo cancellation, noise suppression and
- * automatic gain off, as a recording needs (they are meant for calls and would change the sound).
+ * automatic gain off, as a recording needs (they are meant for calls and would change the sound). `channels` asks
+ * for that many channels at least (a card with several inputs); otherwise the device gives its usual ones.
  */
-export function openInput(deviceId: string | null): Promise<MediaStream> {
+export function openInput(deviceId: string | null, channels?: number): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({
     audio: {
       deviceId: deviceId ? { exact: deviceId } : undefined,
+      channelCount: channels ? { ideal: channels } : undefined,
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
@@ -133,10 +135,17 @@ function joinBlocks(blocks: CapturedBlock[]): CapturedAudio {
   if (!blocks.length) return { start: 0, channels: [new Float32Array(0)] };
   const start = blocks[0].start;
   const end = Math.max(...blocks.map((b) => b.start + b.channels[0].length));
-  const count = Math.min(2, Math.max(...blocks.map((b) => b.channels.length)));
+  // every channel of the device: the recording picks those of the track
+  const count = Math.max(...blocks.map((b) => b.channels.length));
   const channels = Array.from({ length: count }, () => new Float32Array(end - start));
   for (const block of blocks) {
     channels.forEach((out, c) => out.set(block.channels[c] ?? block.channels[0], block.start - start));
   }
   return { start, channels };
+}
+
+/** Channels a stream really gives (what the device and the driver granted). */
+export function streamChannels(stream: MediaStream): number {
+  const track = stream.getAudioTracks()[0];
+  return Math.max(1, track?.getSettings().channelCount ?? 1);
 }

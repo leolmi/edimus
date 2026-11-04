@@ -20,6 +20,9 @@ export interface BarMarking {
 }
 
 /** Zoom and horizontal scroll of the timeline, shared by the ruler and all the tracks. */
+/** Tabs of the side panel of a track. */
+export type TrackPanelTab = 'info' | 'fx';
+
 @Injectable({ providedIn: 'root' })
 export class TimelineService {
   private readonly montages = inject(MontageService);
@@ -40,8 +43,10 @@ export class TimelineService {
   });
   /** Selected clips as a set, for lookups. */
   readonly selectedClips = computed(() => new Set(this.selectedClipIds()));
-  /** Track whose effects are shown in the side panel, null when the panel is closed. */
+  /** Track shown in the side panel, null when the panel is closed. */
   readonly selectedTrackId = signal<string | null>(null);
+  /** Tab of the side panel: the settings of the track or its effects. */
+  readonly panelTab = signal<TrackPanelTab>('fx');
   /** Bar marking in progress, to set the tempo of the clip's source by hand. */
   readonly beatMarking = signal<BarMarking | null>(null);
   /** Shows the beat grid of the clips with a known tempo. */

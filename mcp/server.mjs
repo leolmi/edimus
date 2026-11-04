@@ -173,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.10.0' },
+  { name: 'edimus', version: '1.11.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -412,14 +412,23 @@ appTool(
   { from: z.number().min(0), to: z.number().min(0) },
   { destructiveHint: true },
 );
-appTool('set_track', 'Track properties', 'Renames, mutes or solos a track (mute and solo exclude each other: switching one on switches the other off), or sets the volume (dB) and the pan of the whole track.', {
+appTool('set_track', 'Track properties', 'Renames, mutes or solos a track (mute and solo exclude each other: switching one on switches the other off), sets the volume (dB) and the pan of the whole track, or the audio input it records from.', {
   trackId: z.string(),
   name: z.string().optional(),
   muted: z.boolean().optional(),
   solo: z.boolean().optional(),
   volumeDb: z.number().max(6).optional().describe('Volume of the whole track in dB (0 = unchanged, max +6)'),
   pan: z.number().min(-100).max(100).optional().describe('Stereo position: -100 left, 0 centre, 100 right'),
+  input: z
+    .object({
+      device: z.string().describe('Input device, by name (or part of it) or id, from list_inputs'),
+      channels: z.array(z.number().int().min(1)).min(1).max(2).optional().describe('Channels of the device, from 1: one (mono take) or two (stereo take); default the first two'),
+    })
+    .nullable()
+    .optional()
+    .describe('Audio input the track records from; null = the input chosen in the Settings'),
 });
+appTool('list_inputs', 'List audio inputs', 'Audio input devices of the PC (id and name), for the input of set_track.', {}, { readOnlyHint: true });
 appTool(
   'set_effects',
   'Set track effects',

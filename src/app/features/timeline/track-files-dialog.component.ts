@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, resource, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { formatDuration } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
@@ -8,10 +8,9 @@ import { dirName, fileName } from '../../core/montage/montage.model';
 import { FileSystemPort } from '../../core/platform/file-system.port';
 import { PlatformInfo } from '../../core/platform/platform-info';
 import { ShellPort } from '../../core/platform/shell.port';
-import { FieldComponent } from '../../shared/controls/field.component';
 
-/** A source used by the track, with what is known about it. */
-export interface TrackInfoSource {
+/** A file used by the track, with what is known about it. */
+export interface TrackFile {
   path: string;
   codec?: string;
   format?: string;
@@ -26,42 +25,25 @@ export interface TrackInfoSource {
   clips: number;
 }
 
-export interface TrackInfoResult {
-  name: string;
-}
-
-export interface TrackInfoData {
-  name: string;
-  clips: number;
-  length: number;
-  muted: boolean;
-  solo: boolean;
-  envelopePoints: number;
-  sources: TrackInfoSource[];
+export interface TrackFilesData {
+  /** Name of the track. */
+  track: string;
+  /** Only the file of a clip (from the menu of the clip). */
+  clip: boolean;
+  sources: TrackFile[];
 }
 
 const formatSize = (bytes: number) =>
   bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} kB`;
 
-/** Details of a track and of the files it uses, with a shortcut to show them in the file manager. */
+/** The files used by a track (or by a clip), with a shortcut to show them in the file manager. */
 @Component({
-  selector: 'app-track-info-dialog',
-  imports: [FieldComponent, MatButtonModule, MatDialogModule, MatIconModule, TranslatePipe],
+  selector: 'app-track-files-dialog',
+  imports: [MatButtonModule, MatDialogModule, MatIconModule, TranslatePipe],
   template: `
-    <h2 mat-dialog-title>{{ 'trackInfo.title' | t }}</h2>
+    <h2 mat-dialog-title>{{ (data.clip ? 'trackFiles.clipTitle' : 'trackFiles.title') | t }}</h2>
     <mat-dialog-content class="content">
-      <app-field class="name-field">
-        <span fieldLabel>{{ 'trackInfo.name' | t }}</span>
-        <input #input [value]="name()" (input)="name.set(input.value)" (keydown.enter)="close()" (focus)="input.select()" />
-        <span fieldHint>{{ 'trackInfo.nameHint' | t }}</span>
-      </app-field>
-      <table class="facts">
-        <tr><td>{{ 'trackInfo.clips' | t }}</td><td>{{ data.clips }}</td></tr>
-        <tr><td>{{ 'trackInfo.length' | t }}</td><td>{{ duration(data.length) }}</td></tr>
-        <tr><td>{{ 'trackInfo.state' | t }}</td><td>{{ stateLabel() | t }}</td></tr>
-        <tr><td>{{ 'trackInfo.envelope' | t }}</td><td>{{ data.envelopePoints || '—' }}</td></tr>
-      </table>
-
+      <p class="track">{{ data.track }}</p>
       @for (source of data.sources; track source.path; let i = $index) {
         <section class="source">
           <div class="file">
@@ -111,17 +93,16 @@ const formatSize = (bytes: number) =>
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>{{ 'common.cancel' | t }}</button>
-      <button mat-flat-button [disabled]="!name().trim()" (click)="close()">{{ 'common.ok' | t }}</button>
+      <button mat-flat-button mat-dialog-close>{{ 'common.close' | t }}</button>
     </mat-dialog-actions>
   `,
   styles: `
     .content {
       width: min(560px, 85vw);
     }
-    .name-field {
-      width: 100%;
-      margin-bottom: 8px;
+    .track {
+      margin: 0;
+      color: var(--mat-sys-on-surface-variant);
     }
     .facts {
       width: 100%;
@@ -137,7 +118,7 @@ const formatSize = (bytes: number) =>
       }
     }
     .source {
-      margin-top: 16px;
+      margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--mat-sys-outline-variant);
     }
@@ -165,13 +146,11 @@ const formatSize = (bytes: number) =>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TrackInfoDialogComponent {
-  protected readonly data = inject<TrackInfoData>(MAT_DIALOG_DATA);
-  private readonly dialog = inject(MatDialogRef<TrackInfoDialogComponent, TrackInfoResult>);
+export class TrackFilesDialogComponent {
+  protected readonly data = inject<TrackFilesData>(MAT_DIALOG_DATA);
   private readonly files = inject(FileSystemPort);
   private readonly shell = inject(ShellPort);
   protected readonly platform = inject(PlatformInfo);
-  protected readonly name = signal(this.data.name);
 
   protected readonly fileNameOf = fileName;
   protected readonly folder = dirName;
@@ -186,18 +165,6 @@ export class TrackInfoDialogComponent {
         ),
       ),
   });
-
-  protected stateLabel() {
-    if (this.data.muted) return 'trackInfo.muted' as const;
-    if (this.data.solo) return 'trackInfo.solo' as const;
-    return 'trackInfo.active' as const;
-  }
-
-  /** Closes with the (trimmed) name, when not empty. */
-  protected close(): void {
-    const name = this.name().trim();
-    if (name) this.dialog.close({ name });
-  }
 
   protected reveal(path: string): void {
     void this.shell.revealFile(path);

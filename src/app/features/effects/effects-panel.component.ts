@@ -43,7 +43,7 @@ interface ParamTools {
 }
 
 /**
- * Side panel of the effects of the selected track: the chain in order (drag to reorder), each
+ * Effects tab of the side panel of the selected track: the chain in order (drag to reorder), each
  * effect with its switch, presets and controls built from its descriptor, and the list of the
  * effects to add. Values change live while playing; a whole gesture on a control is one undo step.
  */
@@ -69,16 +69,6 @@ interface ParamTools {
   ],
   template: `
     @if (track(); as track) {
-      <header class="head">
-        <mat-icon class="head-icon">tune</mat-icon>
-        <div class="titles">
-          <span class="title">{{ 'fx.title' | t }}</span>
-          <span class="track">{{ track.name }}</span>
-        </div>
-        <button mat-icon-button class="small" (click)="close()" [matTooltip]="'fx.close' | t">
-          <mat-icon>close</mat-icon>
-        </button>
-      </header>
       <div class="body">
         <div class="chain" cdkDropList (cdkDropListDropped)="drop($event)">
           @for (fx of track.effects ?? []; track fx.id) {
@@ -199,38 +189,7 @@ interface ParamTools {
     :host {
       display: flex;
       flex-direction: column;
-      /* fixed: five controls fit in a row */
-      flex: 0 0 330px;
-      width: 330px;
       min-height: 0;
-      background: var(--mat-sys-surface-container-low);
-      border-left: 1px solid var(--mat-sys-outline-variant);
-    }
-    .head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 8px 8px 12px;
-      border-bottom: 1px solid var(--mat-sys-outline-variant);
-    }
-    .head-icon {
-      color: var(--mat-sys-primary);
-    }
-    .titles {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-    .title {
-      font: var(--mat-sys-title-small);
-    }
-    .track {
-      font: var(--mat-sys-body-small);
-      color: var(--mat-sys-on-surface-variant);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
     .body {
       flex: 1 1 auto;
@@ -433,9 +392,5 @@ export class EffectsPanelComponent {
     const track = this.track();
     const effect = track?.effects?.[event.previousIndex];
     if (track && effect && event.previousIndex !== event.currentIndex) this.edits.moveEffect(track.id, effect.id, event.currentIndex);
-  }
-
-  protected close(): void {
-    this.timeline.selectedTrackId.set(null);
   }
 }

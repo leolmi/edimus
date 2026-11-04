@@ -114,10 +114,10 @@
   <span class="spacer"></span>
 
   @if (!montages.isEmpty() && level < 1) {
-    <button mat-icon-button (click)="timeline.zoomBy(1 / 1.5)" [matTooltip]="'zoom.out' | t">
+    <button mat-icon-button (click)="zoom(1 / 1.5)" [matTooltip]="'zoom.out' | t">
       <mat-icon>zoom_out</mat-icon>
     </button>
-    <button mat-icon-button (click)="timeline.zoomBy(1.5)" [matTooltip]="'zoom.in' | t">
+    <button mat-icon-button (click)="zoom(1.5)" [matTooltip]="'zoom.in' | t">
       <mat-icon>zoom_in</mat-icon>
     </button>
     <button mat-icon-button (click)="timeline.fit()" [matTooltip]="'zoom.fit' | t">
@@ -201,10 +201,10 @@
       @if (level >= 2) {
         <mat-divider />
       }
-      <button mat-menu-item (click)="timeline.zoomBy(1 / 1.5)">
+      <button mat-menu-item (click)="zoom(1 / 1.5)">
         <mat-icon>zoom_out</mat-icon>{{ 'zoom.out' | t }}
       </button>
-      <button mat-menu-item (click)="timeline.zoomBy(1.5)">
+      <button mat-menu-item (click)="zoom(1.5)">
         <mat-icon>zoom_in</mat-icon>{{ 'zoom.in' | t }}
       </button>
       <button mat-menu-item (click)="timeline.fit()">
@@ -218,7 +218,7 @@
   <div class="work-area">
     <app-timeline />
     @if (timeline.selectedTrackId()) {
-      <app-effects-panel />
+      <app-track-panel />
     }
   </div>
   @if (!montages.isEmpty()) {

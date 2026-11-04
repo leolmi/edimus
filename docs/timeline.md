@@ -50,10 +50,23 @@ e il fader verticale del volume della traccia (`FaderComponent` in versione `sli
 la traccia; −30…+6 dB, passo 0,5; un passo di annulla per trascinamento). Sotto i pulsanti, il pan
 (`KnobComponent` `inline`, da S 100 a D 100, doppio clic al centro) e la catena degli effetti.
 Le caratteristiche del file non sono più nell'intestazione: stanno nel tooltip del nome sulla
-clip e nei dettagli della traccia. Il pulsante degli effetti apre a destra
-`EffectsPanelComponent` per quella traccia (`TimelineService.selectedTrackId`; Esc o di nuovo il
-pulsante lo chiude; a pannello aperto segue la traccia dell'ultima clip selezionata), con
-l'intestazione evidenziata; il pulsante è colorato se la traccia ha
+clip e nel popup dei file della traccia. A destra si apre il pannello della traccia
+(`TrackPanelComponent`, `TimelineService.selectedTrackId`; a pannello aperto segue la traccia
+dell'ultima clip selezionata; Esc o la × lo chiudono), con l'intestazione evidenziata e due schede
+(`TimelineService.panelTab`):
+
+- **Info** (`TrackInfoPanelComponent`; il pulsante *i* o il clic sul nome della traccia): nome
+  (si conferma con Invio o uscendo dal campo, Esc annulla), ingresso audio della traccia (solo app
+  desktop: dispositivo, canali se il dispositivo ne ha più di uno, livello dal vivo dei canali scelti,
+  latenza e sua misura per quel dispositivo; il livello si accende con *Prova l'ingresso*, così il
+  microfono non resta aperto per il solo fatto di guardare la scheda), contenuto (clip, estensione, stato, punti di volume,
+  effetti) e il pulsante *File della traccia…* (`TrackFilesDialogComponent`: per ogni file formato,
+  audio, durata, dimensione, tempo e *Mostra il file*).
+- **Effetti** (`EffectsPanelComponent`; il pulsante FX o la catena degli effetti): vedi
+  [effects.md](effects.md). Con il montaggio bloccato la scheda è spenta e il blocco chiude il
+  pannello solo se mostrava gli effetti.
+
+Il pulsante FX è colorato se la traccia ha
 effetti attivi. Accanto al pan `EffectChainComponent` mostra la catena
 degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello). Vedi
 [effects.md](effects.md).
@@ -84,6 +97,7 @@ degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello)
 | lane o righello | rotella | zoom attorno al puntatore |
 | intestazioni tracce | rotella | scorre le tracce in verticale |
 | ovunque | Ctrl+rotella | zoom attorno al puntatore |
+| barra in alto | pulsanti zoom +/− | zoom attorno al playhead, che resta al suo posto sullo schermo (fuori vista: vista centrata su di esso) |
 | ovunque | Shift+rotella / rotella orizzontale | scorre il tempo |
 
 I gesti trascinati usano `preview` + `commit` (un passo di annulla per gesto). Durante un gesto
@@ -131,7 +145,8 @@ il contenuto scelto da `TimelineComponent.menu`:
   playhead sul marker e vista centrata), elimina tutti i marker (con conferma); spenti senza marker;
 - **clip** (sulle clip, prima del menu delle tracce): tempo e battute, velocità e intonazione,
   allinea il tempo, modalità inviluppo, dividi al cursore (attivo solo se il playhead è dentro la
-  clip), effetti della traccia, dettagli della traccia, elimina le clip selezionate (toglie prima
+  clip), effetti della traccia, dettagli della traccia, file della clip (il popup dei file con
+  il solo file della clip), elimina le clip selezionate (toglie prima
   l'intervallo, che Canc eliminerebbe al loro posto).
 
 Niente menu durante la marcatura della battuta, su un punto d'inviluppo in modalità inviluppo e

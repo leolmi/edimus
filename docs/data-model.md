@@ -5,7 +5,7 @@ Tipi in `src/app/core/montage/montage.model.ts`, `envelope.ts`, `src/app/core/au
 ## Montage
 
 ```ts
-Montage { version: 4; channels: 1 | 2; sources: AudioSource[]; tracks: Track[]; markers?: Marker[] }
+Montage { version: 5; channels: 1 | 2; sources: AudioSource[]; tracks: Track[]; markers?: Marker[] }
 Marker { id: string; time: number; name: string }
 ```
 
@@ -37,6 +37,7 @@ Formato, durata, canali e tempo rilevato **non** sono nel file: vengono ricavati
 | `volume?` | volume di tutta la traccia, gain lineare (0..`MAX_GAIN`); assente = 1 (`trackVolume`) |
 | `pan?` | posizione stereo dopo il volume, da -1 (sinistra) a 1 (destra), come bilanciamento: si abbassa il lato opposto; assente = 0, centro (`trackPan`) |
 | `effects?` | catena di effetti applicata in ordine alla somma delle clip, prima del volume; assente = nessun effetto (vedi *Effetti*) |
+| `input?` | ingresso audio da cui la traccia registra: `{ deviceId, label, channels? }`; `label` ritrova il dispositivo se l'id cambia (altro PC, driver); `channels` 0-based, uno (ripresa mono) o due (stereo), assente = i primi due; `input` assente = l'ingresso delle Impostazioni |
 
 ## Effetti
 
@@ -200,3 +201,4 @@ Migrazioni:
 - **2 → 3**: aggiunge solo gli effetti di traccia, nulla da convertire. Le versioni dell'app che
   non conoscono gli effetti rifiutano i file in versione 3 invece di perderli al salvataggio.
 - **3 → 4**: aggiunge solo i marker e il pan delle tracce, nulla da convertire (stesso motivo dell'incremento).
+- **4 → 5**: aggiunge solo l'ingresso audio delle tracce, nulla da convertire (stesso motivo dell'incremento).

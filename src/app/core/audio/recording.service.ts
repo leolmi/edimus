@@ -11,6 +11,7 @@ import { TimelineService } from '../timeline/timeline.service';
 import { CapturedAudio, InputCapture, openInput } from './input-capture';
 import { CLICK_COUNT, CLICK_INTERVAL, clickBuffer, measureLatency } from './latency';
 import { MixService } from './mix.service';
+import { ResolvedInput, TrackInputService } from './track-input';
 import { PlaybackService } from './playback.service';
 
 export type RecordingState = 'idle' | 'preparing' | 'recording' | 'saving' | 'calibrating';
@@ -33,6 +34,8 @@ interface Take {
   when: number;
   /** Round trip (s) removed from the take. */
   latency: number;
+  /** Channels of the input kept in the take (0-based); none: the first two. */
+  channels?: number[];
 }
 
 const errorMessage = (err: unknown) => String((err as { message?: string })?.message ?? err);
@@ -54,6 +57,7 @@ export class RecordingService {
   private readonly files = inject(FileSystemPort);
   private readonly engine = inject(AudioEnginePort);
   private readonly i18n = inject(I18nService);
+  private readonly inputs = inject(TrackInputService);
   /** Recording is a feature of the desktop app only. */
   readonly available = inject(PlatformInfo).canRecord;
 
@@ -105,7 +109,9 @@ export class RecordingService {
     let ctx: AudioContext | undefined;
     let stream: MediaStream | undefined;
     try {
-      stream = await this.openInput();
+      const input = await this.inputs.resolve(this.montages.montage().tracks.find((t) => t.id === trackId));
+      if (input.missing) this.documents.notify({ key: 'record.inputMissing' });
+      stream = await this.openInput(input);
       ctx = await this.openContext();
       const from = this.playback.position();
       // the stops go back to where the take started (a second stop to the start of the montage)
@@ -115,8 +121,8 @@ export class RecordingService {
       await ctx.resume();
       const when = ctx.currentTime + LEAD;
       backing?.start(when);
-      const latency = this.settings.currentLatency() ?? estimatedLatency(ctx, stream);
-      this.take = { ctx, stream, capture, backing, trackId, from, when, latency };
+      const latency = this.settings.latencyOf(input.deviceId) ?? estimatedLatency(ctx, stream);
+      this.take = { ctx, stream, capture, backing, trackId, from, when, latency, channels: input.channels };
       this.timeline.recordingClip.set({ trackId, start: from, end: from });
       this.state.set('recording');
       this.documents.notify({ key: 'record.recording' });
@@ -140,7 +146,7 @@ export class RecordingService {
       take.backing?.stop();
       const captured = await take.capture.stop();
       release(take);
-      const channels = alignedTake(captured, take, take.ctx.sampleRate);
+      const channels = alignedTake(pickChannels(captured, take.channels), take, take.ctx.sampleRate);
       this.playback.position.set(take.from);
       if (channels[0].length < MIN_TAKE * take.ctx.sampleRate) return this.documents.notify({ key: 'record.empty' });
       // asked at once: in the browser the file picker needs the click on stop
@@ -167,17 +173,19 @@ export class RecordingService {
   }
 
   /**
-   * Measures the round-trip latency of the chosen input and output: plays a few clicks and finds them in the
-   * input. Saved for the pair of devices; null (nothing saved) when the clicks were not heard clearly.
+   * Measures the round-trip latency of an input (by default the one of the Settings) and of the chosen output:
+   * plays a few clicks and finds them in the input. Saved for the pair of devices; null (nothing saved) when the
+   * clicks were not heard clearly.
    */
-  async calibrate(): Promise<number | null> {
+  async calibrate(input?: ResolvedInput): Promise<number | null> {
     if (this.state() !== 'idle') return null;
     this.playback.pause();
     this.state.set('calibrating');
     let ctx: AudioContext | undefined;
     let stream: MediaStream | undefined;
     try {
-      stream = await this.openInput();
+      const chosen = input ?? { deviceId: this.settings.audioInput()?.id ?? null, missing: false };
+      stream = await this.openInput(chosen);
       ctx = await this.openContext();
       const capture = await InputCapture.start(ctx, stream);
       await ctx.resume();
@@ -196,7 +204,7 @@ export class RecordingService {
         times.map((t) => Math.round(t * ctx!.sampleRate)),
         ctx.sampleRate,
       );
-      if (latency !== null) this.settings.setCurrentLatency(latency);
+      if (latency !== null) this.settings.setLatencyOf(chosen.deviceId, latency);
       return latency;
     } finally {
       stream?.getTracks().forEach((track) => track.stop());
@@ -223,11 +231,12 @@ export class RecordingService {
     return near ? `${dirName(near)}/${name}` : name;
   }
 
-  /** The chosen input; when it is no longer connected, the default one. */
-  private async openInput(): Promise<MediaStream> {
-    const id = this.settings.audioInput()?.id ?? null;
+  /** An input with the channels it needs; when it is no longer connected, the default one. */
+  private async openInput(input: ResolvedInput): Promise<MediaStream> {
+    const id = input.deviceId;
+    const channels = input.channels?.length ? Math.max(...input.channels) + 1 : undefined;
     try {
-      return await openInput(id);
+      return await openInput(id, channels);
     } catch (err) {
       if (!id || (err as { name?: string })?.name !== 'OverconstrainedError') throw err;
       return openInput(null);
@@ -279,6 +288,14 @@ function alignedTake(captured: CapturedAudio, take: Take, rate: number): Float32
     out.set(data, -skip);
     return out;
   });
+}
+
+/** The channels of the track (a missing one, e.g. a card giving fewer channels, reads the first); by default the first two. */
+function pickChannels(captured: CapturedAudio, channels?: number[]): CapturedAudio {
+  const picked = channels?.length
+    ? channels.map((c) => captured.channels[c] ?? captured.channels[0])
+    : captured.channels.slice(0, 2);
+  return { start: captured.start, channels: picked };
 }
 
 function interleave(channels: Float32Array<ArrayBuffer>[]): Float32Array<ArrayBuffer> {

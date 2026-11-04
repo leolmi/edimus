@@ -26,8 +26,9 @@ stereo mix, which is rendered by \`export\`.
   passage again (\`markers\` in get_state, \`set_markers\` replaces them); seek to its time to
   play from there.
 - **track** — a horizontal lane: name, muted, solo, \`volumeDb\` (volume of the whole track), \`pan\`
-  (-100 left … 0 centre … 100 right, after the volume), \`effects\`
-  and clips. Tracks are mixed together; when any track is soloed only soloed tracks are heard.
+  (-100 left … 0 centre … 100 right, after the volume), \`effects\`, the audio \`input\` it records
+  from (device and channels, set with \`set_track\`; devices from \`list_inputs\`; none = the input of
+  the Settings) and clips. Tracks are mixed together; when any track is soloed only soloed tracks are heard.
 - **effects** — a chain per track (eq, compressor, echo, reverb, saturation), applied in order to the
   sum of its clips, before the track volume; heard live and in the export (which keeps the tails of
   echoes and reverbs). Each has \`params\` in human units (dB, Hz, %, ms, ratio; the echo time is a

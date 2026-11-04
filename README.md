@@ -96,7 +96,8 @@ comandi della sezione [Sviluppo](#sviluppo) e ottenere lo stesso programma.
 - Play, loop di un intervallo, cursore che resta al centro durante l'ascolto, scelta
   dell'uscita audio.
 - **Registrazione dall'ingresso** (microfono, scheda audio; solo app desktop) su una traccia, dal
-  cursore, con il montaggio come base e la latenza misurata per allineare la ripresa.
+  cursore, con il montaggio come base e la latenza misurata per allineare la ripresa; ogni traccia
+  può avere il suo ingresso, con la scelta dei canali sulle schede che ne hanno più di uno.
 - **Durata udibile**: quanto dura il mix senza i silenzi iniziale e finale, selezionabile con un clic.
 
 **Tempo**

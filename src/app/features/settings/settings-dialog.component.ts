@@ -104,7 +104,7 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       <p class="hint">{{ 'settings.outputHint' | t }}</p>
       @if (platform.canRecord) {
         <div class="row">
-          <span class="label">{{ 'input.title' | t }}</span>
+          <span class="label">{{ 'input.defaultTitle' | t }}</span>
           <app-field class="output">
             <mat-select
               [value]="settings.audioInput()?.id ?? ''"

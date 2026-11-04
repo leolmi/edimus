@@ -161,7 +161,7 @@ const IT: HelpContent = {
           title: 'Registrare dall’ingresso',
           keys: ['Spazio', 'R', 'Esc'],
           text: [
-            'Solo nell’app desktop. Il + sotto le tracce aggiunge una traccia vuota. Il pallino rosso nell’intestazione di una traccia la mette in registrazione: l’intestazione mostra solo i comandi per registrare, l’ingresso usato (scelto nelle Impostazioni) e lo stato; la × (o Esc) torna alla traccia normale. Entrando in registrazione l’ascolto si ferma; Spazio avvia e ferma la ripresa invece dell’ascolto, mentre play e stop restano disponibili (spenti solo durante la ripresa) per riascoltare subito.',
+            'Solo nell’app desktop. Il + sotto le tracce aggiunge una traccia vuota. Il pallino rosso nell’intestazione di una traccia la mette in registrazione: l’intestazione mostra solo i comandi per registrare, l’ingresso usato (quello della traccia, scelto nel pannello Info, o altrimenti quello predefinito delle Impostazioni) e lo stato; la × (o Esc) torna alla traccia normale. Entrando in registrazione l’ascolto si ferma; Spazio avvia e ferma la ripresa invece dell’ascolto, mentre play e stop restano disponibili (spenti solo durante la ripresa) per riascoltare subito.',
             '“Registra” (o Spazio, o R) registra dal cursore mentre il montaggio suona come base: sulla traccia compare la clip in registrazione, che si allunga verso destra finché non premi “Ferma” (Spazio o R). Poi scegli dove e con che nome salvare il file WAV, che diventa la clip della traccia (si annulla con Ctrl+Z); annullando la scelta la registrazione viene scartata.',
             'Prima di partire la base viene preparata come un unico mix (lo stesso dell’esportazione): lo stesso montaggio si sente identico, e la registrazione si allinea alla base togliendo la latenza, cioè il ritardo tra il suono emesso e quello che torna dal microfono. Si misura una volta nelle Impostazioni (pulsante “Misura”: casse accese e microfono vicino); senza misura si usa una stima, meno precisa.',
             'Il segnale si registra così com’è: cancellazione dell’eco, riduzione del rumore e guadagno automatico restano spenti. Ascolta la base in cuffia, se non vuoi che finisca nella registrazione.',
@@ -178,7 +178,7 @@ const IT: HelpContent = {
           keys: ['rotella', 'Shift+rotella'],
           text: [
             'La rotella sulle tracce o sul righello ingrandisce e riduce attorno al puntatore; Shift+rotella (o la rotella orizzontale) scorre il tempo; la rotella sulle intestazioni delle tracce le scorre in verticale.',
-            'I pulsanti in alto a destra ingrandiscono, riducono e adattano la vista all’intero montaggio, o all’intervallo selezionato se c’è.',
+            'I pulsanti in alto a destra ingrandiscono e riducono attorno al cursore del tempo (che resta dov’è sullo schermo, o viene portato al centro se era fuori vista) e adattano la vista all’intero montaggio, o all’intervallo selezionato se c’è.',
             'Sulle tracce vuote e sull’area vuota sotto le tracce, trascinando si sposta la vista a destra e a sinistra; un clic su una traccia vuota sposta il cursore.',
           ],
         },
@@ -203,7 +203,8 @@ const IT: HelpContent = {
         {
           title: 'Tracce',
           text: [
-            'Nell’intestazione di ogni traccia: muto, solo (se una traccia è in solo si sentono solo quelle in solo), dettagli sui file usati (con il pulsante per mostrarli in Esplora risorse) e la × in fondo al nome per eliminare la traccia.',
+            'Nell’intestazione di ogni traccia: muto, solo (se una traccia è in solo si sentono solo quelle in solo), il pulsante i dei dettagli e la × in fondo al nome per eliminare la traccia.',
+            'Il pulsante i (o un clic sul nome) apre a destra il pannello della traccia sulla scheda Info: nome (Invio per confermare), ingresso audio da cui registra (solo app desktop: dispositivo, canali se la scheda ne ha più di uno, livello dal vivo con Prova l’ingresso (il microfono resta aperto solo finché è acceso), misura della latenza per quel dispositivo; senza scelta vale quello predefinito delle Impostazioni), contenuto della traccia e il pulsante File della traccia…, che apre l’elenco dei file usati con formato, durata, dimensione, tempo e il pulsante per mostrarli in Esplora risorse. La scheda Effetti dello stesso pannello ha la catena degli effetti.',
             'Ogni clip mostra in basso a sinistra il nome del suo file; passandoci sopra, un suggerimento ne riporta le caratteristiche (formato, frequenza, canali, bitrate, durata, tempo). Quando la clip esce a sinistra dalla vista il nome scorre restando dentro la clip.',
             'Trascinando il bordo inferiore di un’intestazione cambia l’altezza di tutte le tracce (fino a tre volte quella iniziale); un doppio clic sul bordo torna all’altezza iniziale.',
           ],
@@ -212,7 +213,7 @@ const IT: HelpContent = {
           title: 'Menu contestuali',
           keys: ['clic destro'],
           text: [
-            'Il clic destro su una clip la seleziona (se non è già tra le selezionate) e apre il suo menu: tempo e battute, velocità e intonazione, allineamento del tempo, inviluppo, divisione al cursore, effetti e dettagli della traccia, eliminazione delle clip selezionate. Con il montaggio bloccato restano solo i dettagli.',
+            'Il clic destro su una clip la seleziona (se non è già tra le selezionate) e apre il suo menu: tempo e battute, velocità e intonazione, allineamento del tempo, inviluppo, divisione al cursore, effetti e dettagli della traccia, file della clip, eliminazione delle clip selezionate. Con il montaggio bloccato restano solo i dettagli e il file.',
             'Sotto, e ovunque nell’area delle tracce, il menu delle tracce: Vai al marker ed Elimina tutti i marker. Sul righello, il menu dei marker.',
           ],
         },
@@ -299,7 +300,7 @@ const IT: HelpContent = {
         {
           title: 'Effetti della traccia',
           text: [
-            'Il pulsante con i cursori nell’intestazione della traccia apre a destra il pannello dei suoi effetti (Esc lo chiude); il pulsante è colorato quando la traccia ha effetti attivi. A pannello aperto, selezionando una clip di un’altra traccia il pannello mostra gli effetti di quella traccia.',
+            'Il pulsante FX nell’intestazione della traccia apre a destra il pannello della traccia sulla scheda Effetti (Esc lo chiude); il pulsante è colorato quando la traccia ha effetti attivi. A pannello aperto, selezionando una clip di un’altra traccia il pannello mostra gli effetti di quella traccia.',
             'In fondo all’intestazione la catena degli effetti li mostra in ordine: un quadratino colorato per effetto con la sua sigla (EQ, C compressore, E eco, R riverbero, S saturazione), vuoto se escluso; il tooltip dà nome e valori, un clic apre il pannello.',
             'Gli effetti disponibili sono equalizzatore, compressore, eco, riverbero e saturazione. Agiscono in ordine, dall’alto in basso, sul suono di tutte le clip della traccia e prima del suo volume; l’ordine si cambia trascinando la maniglia. Il menu dei preset offre impostazioni pronte e i valori iniziali; l’interruttore esclude l’effetto senza perderne le impostazioni.',
             'Durante l’ascolto le regolazioni si sentono subito, e un’intera regolazione è un solo passo di annulla. L’esportazione tiene le code di eco e riverbero dopo la fine dell’ultima clip. L’eco va a tempo con la prima clip della traccia (divisioni da 1/2 a 1/16).',
@@ -368,7 +369,7 @@ const IT: HelpContent = {
           title: 'Impostazioni',
           keys: ['Ctrl+,'],
           text: [
-            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita e ingresso audio, latenza di registrazione; passo di aggancio delle clip alla griglia; aggiornamenti (vedi Aggiornamenti); apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
+            'Il pulsante ingranaggio in alto a destra apre le preferenze che si cambiano di rado: tema chiaro, scuro o di sistema; lingua; uscita audio, ingresso audio predefinito (quello delle tracce senza un ingresso loro), latenza di registrazione; passo di aggancio delle clip alla griglia; aggiornamenti (vedi Aggiornamenti); apertura degli strumenti per sviluppatori all’avvio (vale dal prossimo avvio, o con “Riavvia ora”). Ogni modifica resta salvata.',
           ],
         },
         {
@@ -472,7 +473,7 @@ const IT: HelpContent = {
     {
       title: 'Aggiungere riverbero o eco a una voce',
       steps: [
-        'Premi il pulsante con i cursori nell’intestazione della traccia.',
+        'Premi il pulsante FX nell’intestazione della traccia.',
         'Nel pannello a destra premi Aggiungi effetto e scegli Riverbero (o Eco).',
         'Scegli un preset dal menu dell’effetto, poi regola il Mix ascoltando.',
       ],
@@ -489,13 +490,23 @@ const IT: HelpContent = {
     {
       title: 'Registrare una voce sulla base',
       steps: [
-        'Nell’app desktop, nelle Impostazioni scegli l’ingresso e, la prima volta, misura la latenza.',
+        'Nell’app desktop, nelle Impostazioni scegli l’ingresso e, la prima volta, misura la latenza (per un ingresso diverso su una traccia: pulsante i della traccia, scheda Info).',
         'Aggiungi una traccia con il + sotto le tracce e premi il suo pallino rosso.',
         'Porta il cursore dove vuoi partire (un po’ prima, per avere tempo di prepararti).',
         'Premi “Registra” (o Spazio), registra, e ferma con “Ferma” (o di nuovo Spazio).',
         'Scegli dove e con che nome salvare il file.',
       ],
       note: 'La registrazione è una clip come le altre: si taglia, si sposta e si rifinisce.',
+    },
+    {
+      title: 'Registrare una traccia da un ingresso della scheda audio',
+      steps: [
+        'Premi il pulsante i della traccia (o clicca sul suo nome): si apre il pannello Info.',
+        'In Ingresso audio scegli il dispositivo e, se la scheda ha più ingressi, i canali: uno per una ripresa mono (es. il microfono sul canale 3), due per una stereo.',
+        'Premi Prova l’ingresso e controlla sul misuratore che il segnale arrivi su quel canale e, la prima volta, misura la latenza.',
+        'Registra dal pallino rosso della traccia come al solito.',
+      ],
+      note: 'L’ingresso è salvato nel montaggio con la traccia: su un altro PC si ritrova per nome; se non è collegato si registra dall’ingresso predefinito.',
     },
     {
       title: 'Ascoltare in loop un passaggio',
@@ -678,7 +689,7 @@ const EN: HelpContent = {
           title: 'Recording from the input',
           keys: ['Space', 'R', 'Esc'],
           text: [
-            'Desktop app only. The + below the tracks adds an empty track. The red dot in the header of a track puts it in recording mode: the header shows only the recording commands, the input used (chosen in the Settings) and the state; the × (or Esc) goes back to the normal track. Entering recording mode stops the playback; Space starts and stops the take instead of the playback, while play and stop stay available (off only during the take) to listen back at once.',
+            'Desktop app only. The + below the tracks adds an empty track. The red dot in the header of a track puts it in recording mode: the header shows only the recording commands, the input used (the one of the track, chosen in the Info panel, or else the default one of the Settings) and the state; the × (or Esc) goes back to the normal track. Entering recording mode stops the playback; Space starts and stops the take instead of the playback, while play and stop stay available (off only during the take) to listen back at once.',
             '“Record” (or Space, or R) records from the playhead while the montage plays as the backing: the clip being recorded appears on the track and grows to the right until you press “Stop” (Space or R). Then you choose where and with which name to save the WAV file, which becomes the clip of the track (undone with Ctrl+Z); cancelling the choice discards the recording.',
             'Before starting, the backing is prepared as a single mix (the same as the export): the montage sounds the same, and the recording is lined up with it by removing the latency, that is, the delay between the sound played and the one coming back from the microphone. It is measured once in the Settings (“Measure” button: speakers on and the microphone close); without a measure an estimate is used, less precise.',
             'The signal is recorded as it is: echo cancellation, noise suppression and automatic gain stay off. Listen to the backing on headphones if you do not want it in the recording.',
@@ -695,7 +706,7 @@ const EN: HelpContent = {
           keys: ['wheel', 'Shift+wheel'],
           text: [
             'The wheel on the tracks or on the ruler zooms around the pointer; Shift+wheel (or the horizontal wheel) scrolls the time; the wheel on the track headers scrolls them vertically.',
-            'The buttons at the top right zoom in, zoom out and fit the whole montage in the view, or the selected range when there is one.',
+            'The buttons at the top right zoom in and out around the playhead (which keeps its place on the screen, or is brought to the centre when it was out of view) and fit the whole montage in the view, or the selected range when there is one.',
             'On empty tracks and on the empty area below the tracks, dragging pans the view left and right; a click on an empty track moves the playhead.',
           ],
         },
@@ -718,7 +729,8 @@ const EN: HelpContent = {
         {
           title: 'Tracks',
           text: [
-            'In the header of each track: mute, solo (when a track is soloed only the soloed tracks are heard), details of the files used (with a button to show them in File Explorer) and the × at the end of the name to remove the track.',
+            'In the header of each track: mute, solo (when a track is soloed only the soloed tracks are heard), the i button of the details and the × at the end of the name to remove the track.',
+            'The i button (or a click on the name) opens the track panel on the right on its Info tab: name (Enter to confirm), audio input it records from (desktop app only: device, channels when the card has more than one, live level with Test the input (the microphone stays open only while it is on), latency measure for that device; with no choice the default one of the Settings applies), contents of the track and the Track files… button, which lists the files used with format, length, size, tempo and the button to show them in File Explorer. The Effects tab of the same panel holds the effect chain.',
             'Each clip shows the name of its file at the bottom left; hovering it, a tooltip gives the details of the file (format, rate, channels, bitrate, length, tempo). When the clip runs out of the view on the left the name slides along, staying inside the clip.',
             'Dragging the bottom edge of a header changes the height of all the tracks (up to three times the initial one); a double click on the edge goes back to the initial height.',
           ],
@@ -727,7 +739,7 @@ const EN: HelpContent = {
           title: 'Context menus',
           keys: ['right click'],
           text: [
-            'A right click on a clip selects it (unless it is already selected) and opens its menu: tempo and bars, speed and pitch, tempo alignment, envelope, split at the playhead, track effects and details, deletion of the selected clips. With the montage locked only the details are left.',
+            'A right click on a clip selects it (unless it is already selected) and opens its menu: tempo and bars, speed and pitch, tempo alignment, envelope, split at the playhead, track effects and details, clip file, deletion of the selected clips. With the montage locked only the details and the file are left.',
             'Below it, and anywhere in the tracks area, the tracks menu: Go to marker and Delete all markers. On the ruler, the markers menu.',
           ],
         },
@@ -814,7 +826,7 @@ const EN: HelpContent = {
         {
           title: 'Track effects',
           text: [
-            'The button with the sliders in the track header opens the panel of its effects on the right (Esc closes it); the button is coloured when the track has effects switched on. While the panel is open, selecting a clip of another track shows the effects of that track.',
+            'The FX button in the track header opens the track panel on the right on its Effects tab (Esc closes it); the button is coloured when the track has effects switched on. While the panel is open, selecting a clip of another track shows the effects of that track.',
             'At the bottom of the header the effect chain shows them in order: a coloured square per effect with its letters (EQ, C compressor, E echo, R reverb, S saturation), hollow when bypassed; the tooltip gives name and values, a click opens the panel.',
             'The effects available are equalizer, compressor, echo, reverb and saturation. They act in order, top to bottom, on the sound of all the clips of the track and before its volume; drag the handle to change the order. The presets menu offers ready settings and the default values; the switch bypasses the effect keeping its settings.',
             'While playing, changes are heard at once, and a whole adjustment is one undo step. The export keeps the tails of echoes and reverbs after the end of the last clip. The echo follows the tempo of the first clip of the track (divisions from 1/2 to 1/16).',
@@ -881,7 +893,7 @@ const EN: HelpContent = {
           title: 'Settings',
           keys: ['Ctrl+,'],
           text: [
-            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output and input, recording latency; snap step of the clips on the grid; updates (see Updates); opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
+            'The gear button at the top right opens the preferences changed rarely: light, dark or system theme; language; audio output, default audio input (the one of the tracks with no input of their own), recording latency; snap step of the clips on the grid; updates (see Updates); opening the developer tools at startup (applies from the next start, or with “Restart now”). Every change is saved.',
           ],
         },
         {
@@ -982,7 +994,7 @@ const EN: HelpContent = {
     {
       title: 'Add reverb or echo to a voice',
       steps: [
-        'Press the button with the sliders in the track header.',
+        'Press the FX button in the track header.',
         'In the panel on the right press Add effect and choose Reverb (or Echo).',
         'Choose a preset from the menu of the effect, then set the Mix while listening.',
       ],
@@ -999,13 +1011,23 @@ const EN: HelpContent = {
     {
       title: 'Record a voice over the backing',
       steps: [
-        'In the desktop app, in the Settings choose the input and, the first time, measure the latency.',
+        'In the desktop app, in the Settings choose the input and, the first time, measure the latency (for a different input on a track: i button of the track, Info tab).',
         'Add a track with the + below the tracks and press its red dot.',
         'Move the playhead where you want to start (a little earlier, to have time to get ready).',
         'Press “Record” (or Space), record, and stop with “Stop” (or Space again).',
         'Choose where and with which name to save the file.',
       ],
       note: 'The recording is a clip like the others: it is cut, moved and refined.',
+    },
+    {
+      title: 'Record a track from an input of the sound card',
+      steps: [
+        'Press the i button of the track (or click its name): the Info panel opens.',
+        'In Audio input choose the device and, when the card has several inputs, the channels: one for a mono take (e.g. the microphone on channel 3), two for a stereo one.',
+        'Press Test the input and check on the meter that the signal arrives on that channel and, the first time, measure the latency.',
+        'Record from the red dot of the track as usual.',
+      ],
+      note: 'The input is saved in the montage with the track: on another PC it is found again by name; when it is not connected the default input is recorded.',
     },
     {
       title: 'Loop a passage',

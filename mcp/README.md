@@ -62,6 +62,7 @@ Con più finestre aperte l'AI le vede con `list_instances` e sceglie con `select
 | Trasporto e storia | `play`, `stop`, `seek`, `select`, `undo`, `redo` |
 | Clip e tracce | `move_clip`, `trim_clip`, `split`, `delete_clip`, `delete_range`, `crop`, `set_track`, `delete_track` |
 | Effetti | `list_effects`, `set_effects` |
+| Ingressi | `list_inputs` (dispositivi per l’ingresso di `set_track`) |
 | Volume | `set_envelope`, `fade`, `crossfade` |
 | Velocità e tempo | `set_clip_timing`, `set_tempo`, `set_bar_map`, `align_tempo` |
 | Analisi | `analyze_levels`, `find_silence`, `get_beats`, `snapshot` |

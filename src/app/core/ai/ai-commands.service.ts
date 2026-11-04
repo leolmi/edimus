@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { AudioDevicesService } from '../audio/audio-devices.service';
 import { AudioLibraryService } from '../audio/audio-library.service';
 import { ExportOptions, ExportService } from '../audio/export.service';
 import { MixService } from '../audio/mix.service';
@@ -17,6 +18,7 @@ import {
   MONTAGE_EXTENSION,
   Montage,
   Track,
+  TrackInput,
   audibleTracks,
   clipRate,
   copyName,
@@ -73,7 +75,8 @@ const LOCKED_COMMANDS = new Set([
 ]);
 
 /** set_track changing only mute and solo: how the montage is heard, allowed while locked. */
-const onlyListening = (p: Params) => p['name'] === undefined && p['volumeDb'] === undefined && p['pan'] === undefined;
+const onlyListening = (p: Params) =>
+  p['name'] === undefined && p['volumeDb'] === undefined && p['pan'] === undefined && p['input'] === undefined;
 
 const FADE_CURVES = { linear: 0, exponential: 4, logarithmic: -4, smooth: 2 } as const;
 
@@ -95,6 +98,7 @@ export class AiCommandsService {
   private readonly playback = inject(PlaybackService);
   private readonly mixer = inject(MixService);
   private readonly exporter = inject(ExportService);
+  private readonly devices = inject(AudioDevicesService);
 
   private readonly length = (clip: Clip) => this.timeline.clipLength(clip);
   private stopTimer?: ReturnType<typeof setTimeout>;
@@ -261,6 +265,7 @@ export class AiCommandsService {
       const track = this.track(String(p['trackId']));
       // mute and solo exclude each other, as in the window: switching one on switches the other off
       if (p['muted'] && p['solo']) throw new Error('A track cannot be muted and soloed together');
+      const input = p['input'] !== undefined ? await this.trackInput(p['input'] as Params | null) : track.input;
       this.montages.updateTrack(track.id, (t) => ({
         ...t,
         name: p['name'] !== undefined ? String(p['name']) : t.name,
@@ -268,6 +273,7 @@ export class AiCommandsService {
         solo: p['solo'] !== undefined ? !!p['solo'] : p['muted'] ? false : t.solo,
         volume: p['volumeDb'] !== undefined ? (Number(p['volumeDb']) === 0 ? undefined : fromDb(Number(p['volumeDb']))) : t.volume,
         pan: p['pan'] !== undefined ? Math.max(-1, Math.min(1, Number(p['pan']) / 100)) || undefined : t.pan,
+        input,
       }), onlyListening(p));
       return this.trackState(this.track(track.id));
     },
@@ -281,6 +287,10 @@ export class AiCommandsService {
       });
       this.montages.update((m) => setTrackEffects(m, track.id, sanitizeEffects(given) ?? []));
       return this.trackState(this.track(track.id));
+    },
+    list_inputs: async () => {
+      await this.devices.refresh();
+      return this.devices.inputs().map((d) => ({ id: d.id, name: d.label }));
     },
     list_effects: async () =>
       EFFECTS.map((d) => ({
@@ -685,8 +695,27 @@ export class AiCommandsService {
       volumeDb: toDb(trackVolume(track)),
       pan: Math.round(trackPan(track) * 100),
       effects: (track.effects ?? []).map((e) => ({ type: e.type, ...(e.bypass ? { bypass: true } : {}), params: e.params })),
+      ...(track.input
+        ? { input: { device: track.input.label, ...(track.input.channels ? { channels: track.input.channels.map((c) => c + 1) } : {}) } }
+        : {}),
       clips: track.clips.map((c) => this.clipState(c.id)),
     };
+  }
+
+  /** Audio input of set_track: a device by name (or id) and its channels (1-based); null = the one of the Settings. */
+  private async trackInput(given: Params | null): Promise<TrackInput | undefined> {
+    if (!given) return undefined;
+    await this.devices.refresh();
+    const wanted = String(given['device'] ?? '');
+    const inputs = this.devices.inputs();
+    const device =
+      inputs.find((d) => d.id === wanted || d.label === wanted) ??
+      inputs.find((d) => d.label.toLowerCase().includes(wanted.toLowerCase()));
+    if (!wanted || !device) throw new Error(`Unknown input device "${wanted}"; inputs: ${inputs.map((d) => d.label).join(', ') || 'none'}`);
+    const channels = Array.isArray(given['channels']) ? (given['channels'] as unknown[]).map((c) => Math.round(Number(c)) - 1) : undefined;
+    if (channels && (!channels.length || channels.length > 2 || channels.some((c) => !(c >= 0))))
+      throw new Error('channels: one channel (mono) or two (stereo), numbered from 1');
+    return { deviceId: device.id, label: device.label, ...(channels ? { channels } : {}) };
   }
 
   /** Replaces the envelope of a clip (none when empty), as one undo step. */

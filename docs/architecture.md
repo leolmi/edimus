@@ -146,7 +146,15 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   uscita + ingresso) si misura con `RecordingService.calibrate` (`latency.ts`: sei clic, primo
   campione ben sopra il rumore di fondo, mediana dei ritardi concordi entro 2 ms) ed è salvata per la
   coppia ingresso/uscita; senza misura si stima da `outputLatency + baseLatency` e dalla `latency`
-  della traccia d'ingresso. Durante la ripresa la clip in corso (`TimelineService.recordingClip`, fuori
+  della traccia d'ingresso. Ogni traccia può avere un ingresso suo (`Track.input`: dispositivo e
+  canali, `TrackInputService` lo ritrova per id o, se l'id è cambiato, per nome; senza, quello delle
+  Impostazioni; se il dispositivo non è collegato si usa il predefinito con un avviso). Il dispositivo
+  si apre chiedendo almeno i canali che servono (`channelCount`); la cattura tiene tutti i canali e la
+  ripresa prende quelli della traccia (uno: mono, due: stereo; senza scelta i primi due). La latenza
+  si misura e si salva per il dispositivo della traccia. Nel pannello Info `InputMonitor.channelsOf` legge i canali del
+  dispositivo aprendolo e chiudendolo subito (una volta per dispositivo), mentre `InputMonitor.open`
+  tiene aperto l'ingresso senza registrare solo con *Prova l'ingresso* acceso (picchi per il
+  misuratore), chiuso durante ripresa e misura. Durante la ripresa la clip in corso (`TimelineService.recordingClip`, fuori
   dal montaggio) si disegna sulla lane e cresce fino al playhead, che la vista segue come nell'ascolto.
   Allo stop si chiede dove e con che nome salvare (`FileSystemPort.recordingPath`: dialog di
   salvataggio); la ripresa diventa un WAV a

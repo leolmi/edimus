@@ -4,8 +4,8 @@ Ogni traccia può avere una **catena di effetti**: agiscono in ordine, dall'alto
 suono di tutte le sue clip, prima del volume della traccia. Sono non distruttivi come il resto del
 montaggio: sono parametri salvati nel file `.edimus`, i file audio non vengono toccati.
 
-- Il pulsante con i cursori nell'intestazione della traccia apre il **pannello degli effetti** a
-  destra (Esc lo chiude). Il pulsante è colorato quando la traccia ha effetti attivi. A pannello
+- Il pulsante FX nell'intestazione della traccia apre a destra il pannello della traccia sulla
+  scheda **Effetti** (Esc lo chiude; l'altra scheda, Info, ha le impostazioni della traccia). Il pulsante è colorato quando la traccia ha effetti attivi. A pannello
   aperto, selezionando una clip di un'altra traccia il pannello passa agli effetti di quella traccia.
 - In fondo all'intestazione la **catena** mostra gli effetti della traccia in ordine: un quadratino
   per effetto con colore e sigla del tipo (**EQ** equalizzatore, **C** compressore, **E** eco,

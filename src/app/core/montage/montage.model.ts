@@ -6,8 +6,11 @@ import type { EnvelopePoint } from './envelope';
 export const MONTAGE_EXTENSION = 'edimus';
 /** Montage and copies of its sources in one zip file. */
 export const BUNDLE_EXTENSION = 'edimuspack';
-/** 2: volume envelopes on the clips (in source time) and a single volume per track; 3: effects per track; 4: markers, track pan and locked clips. */
-export const MONTAGE_VERSION = 4;
+/**
+ * 2: volume envelopes on the clips (in source time) and a single volume per track; 3: effects per track; 4: markers,
+ * track pan and locked clips; 5: audio input of a track.
+ */
+export const MONTAGE_VERSION = 5;
 
 export const AUDIO_EXTENSIONS = ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aif', 'aiff', 'wma'];
 
@@ -82,6 +85,19 @@ export interface Track {
   pan?: number;
   /** Effects applied in order to the sum of the clips, before the volume (see effects.ts). */
   effects?: TrackEffect[];
+  /** Audio input the track records from; none = the input chosen in the Settings, its first two channels. */
+  input?: TrackInput;
+}
+
+/**
+ * Audio input of a track: a device and its channels. The device id may change from a PC to another (or after a
+ * driver update): the name finds it again.
+ */
+export interface TrackInput {
+  deviceId: string;
+  label: string;
+  /** Channels recorded, 0-based: one (mono take) or two (stereo take); none = the first two of the device. */
+  channels?: number[];
 }
 
 /** Volume of a track (linear gain). */

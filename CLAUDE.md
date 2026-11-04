@@ -64,7 +64,7 @@ src/app/
     ai/                 bridge WebSocket verso mcp/server.mjs ed esecuzione dei comandi
     i18n/               it.ts / en.ts + pipe `t`
     settings, theme-colors, instance, drop-target, ...
-  features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi), effects (pannello laterale), export, rename, settings,
+  features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi), track-panel (pannello laterale della traccia: schede Info ed Effetti), effects (scheda degli effetti), export, rename, settings,
                         help (Aiuto: guida, come fare, assistente AI, info e licenze)
   shared/               componenti riusabili (scale-slider; controls/: manopola, fader, interruttore, selettore, indicatore)
 src/platform/           implementazioni delle porte: neutralino/ (ffmpeg, dialoghi, drop, reveal);

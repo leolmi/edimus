@@ -4,6 +4,8 @@ import { firstValueFrom } from 'rxjs';
 import { ClipTiming, ClipTimingData, ClipTimingDialogComponent } from '../features/timeline/clip-timing-dialog.component';
 import { MarkerDialogComponent, MarkerDialogData } from '../features/timeline/marker-dialog.component';
 import { TempoDialogComponent, TempoDialogData, TempoDialogResult } from '../features/timeline/tempo-dialog.component';
+import { TrackFile, TrackFilesData, TrackFilesDialogComponent } from '../features/timeline/track-files-dialog.component';
+import { AudioLibraryService } from './audio/audio-library.service';
 import { BarFileService } from './audio/bar-file.service';
 import { TempoService } from './audio/tempo.service';
 import { type Tempo, snapToOnsets } from './audio/tempo';
@@ -17,10 +19,10 @@ import { cropToRange, deleteRange, moveClips, setClipTiming, splitAt, withClipLo
 import { addMarker, removeMarker, renameMarker, sortedMarkers, withMarkers } from './montage/markers';
 import { formatDuration } from './format';
 import { EffectPreset, EffectType, EffectValue, addEffect, applyPreset, moveEffect, newEffect, removeEffect, setEffectBypass, setEffectParams } from './effects/effects';
-import { Clip, Montage, clipRate } from './montage/montage.model';
+import { Clip, Montage, TrackInput, clipRate } from './montage/montage.model';
 import { nextAnchorShift } from './timeline/edge-snap';
 import { MontageService } from './montage/montage.service';
-import { BarMarking, TimelineService } from './timeline/timeline.service';
+import { BarMarking, TimelineService, TrackPanelTab } from './timeline/timeline.service';
 import { I18nService } from './i18n/i18n.service';
 import { ShellPort } from './platform/shell.port';
 
@@ -42,6 +44,7 @@ export class EditService {
   private readonly playback = inject(PlaybackService);
   private readonly dialogs = inject(MatDialog);
   private readonly tempos = inject(TempoService);
+  private readonly library = inject(AudioLibraryService);
   private readonly i18n = inject(I18nService);
   private readonly shell = inject(ShellPort);
   private readonly barFiles = inject(BarFileService);
@@ -124,7 +127,8 @@ export class EditService {
     if (!locked) return;
     this.timeline.envelopeMode.set(false);
     this.timeline.beatMarking.set(null);
-    this.timeline.selectedTrackId.set(null);
+    // the details of a track stay readable; the effects would do nothing
+    if (this.timeline.panelTab() === 'fx') this.timeline.selectedTrackId.set(null);
   }
 
   /** Splits at the playhead the selected clips or, with no clip selected, every clip crossing it. */
@@ -525,10 +529,60 @@ export class EditService {
   /** State before the effect value being dragged, for one undo step per gesture. */
   private effectFrom?: Montage;
 
-  /** Opens the effects panel of a track, or closes it when it already shows that track. */
+  /** Opens the effects panel of a track, or closes it when it already shows them. */
   toggleEffectsPanel(trackId: string): void {
-    if (this.locked()) return;
-    this.timeline.selectedTrackId.update((id) => (id === trackId ? null : trackId));
+    if (!this.locked()) this.togglePanel(trackId, 'fx');
+  }
+
+  /** Opens the side panel of a track on a tab, or closes it when it already shows that tab of that track. */
+  togglePanel(trackId: string, tab: TrackPanelTab): void {
+    const open = this.timeline.selectedTrackId() === trackId && this.timeline.panelTab() === tab;
+    this.timeline.panelTab.set(tab);
+    this.timeline.selectedTrackId.set(open ? null : trackId);
+  }
+
+  /** Opens the side panel of a track on a tab (left open when it already shows it). */
+  showPanel(trackId: string, tab: TrackPanelTab): void {
+    if (tab === 'fx' && this.locked()) return;
+    this.timeline.panelTab.set(tab);
+    this.timeline.selectedTrackId.set(trackId);
+  }
+
+  renameTrack(trackId: string, name: string): void {
+    const trimmed = name.trim();
+    const track = this.montages.montage().tracks.find((t) => t.id === trackId);
+    if (!trimmed || !track || track.name === trimmed) return;
+    this.montages.updateTrack(trackId, (t) => ({ ...t, name: trimmed }));
+  }
+
+  /** Shows the files used by a track or, with a clip, only the file of that clip. */
+  showTrackFiles(trackId: string, clipId?: string): void {
+    const track = this.montages.montage().tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    const only = clipId ? track.clips.find((c) => c.id === clipId)?.sourceId : undefined;
+    const files = new Map<string, TrackFile>();
+    for (const clip of track.clips) {
+      if (only && clip.sourceId !== only) continue;
+      const existing = files.get(clip.sourceId);
+      if (existing) {
+        existing.clips++;
+        continue;
+      }
+      const source = this.montages.montage().sources.find((s) => s.id === clip.sourceId);
+      const state = this.library.sources()[clip.sourceId];
+      const info = state && 'info' in state ? state.info : undefined;
+      const tempo = this.tempos.sourceTempo(clip.sourceId);
+      files.set(clip.sourceId, { path: source?.path ?? '', ...info, bpm: tempo ? meanBpm(tempo) : undefined, bpmManual: !!source?.tempo, clips: 1 });
+    }
+    this.dialogs.open<TrackFilesDialogComponent, TrackFilesData>(TrackFilesDialogComponent, {
+      data: { track: track.name, clip: !!only, sources: [...files.values()] },
+      autoFocus: 'dialog',
+    });
+  }
+
+  /** Sets the audio input of a track (none: the one of the Settings). */
+  setTrackInput(trackId: string, input: TrackInput | undefined): void {
+    this.montages.updateTrack(trackId, ({ input: _, ...track }) => (input ? { ...track, input } : track));
   }
 
   addEffect(trackId: string, type: EffectType): void {
