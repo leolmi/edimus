@@ -22,6 +22,8 @@ html {
   // green container from the Material palette (no system token for it): the play button
   --app-success-container: light-dark(#{map.get(mat.$green-palette, 90)}, #{map.get(mat.$green-palette, 30)});
   --app-on-success-container: light-dark(#{map.get(mat.$green-palette, 10)}, #{map.get(mat.$green-palette, 90)});
+  // green of the level meters, below the orange (tertiary) and red (error) zones
+  --app-success: light-dark(#{map.get(mat.$green-palette, 50)}, #{map.get(mat.$green-palette, 70)});
 
   &.theme-light {
     color-scheme: light;
@@ -52,11 +54,39 @@ body {
 }
 
 // dialogs take the width of their content (each sets its own), up to most of the window;
-// the Material default caps them at 560px
+// the Material default caps them at 560px; corners barely rounded (the M3 28px is too much)
 html {
   @include mat.dialog-overrides(
     (
       container-max-width: 92vw,
+      container-shape: 3px,
+    )
+  );
+}
+
+// buttons with barely rounded corners, as the dialogs (not the M3 pill)
+html {
+  @include mat.button-overrides(
+    (
+      filled-container-shape: 3px,
+      outlined-container-shape: 3px,
+      protected-container-shape: 3px,
+      text-container-shape: 3px,
+      tonal-container-shape: 3px,
+    )
+  );
+}
+
+// a labelled app-field with buttons beside it (class on the row, which aligns its items to the
+// end): the buttons take the height of the box, so they line up with it and not with the label
+.field-row {
+  @include mat.button-overrides(
+    (
+      filled-container-height: 34px,
+      outlined-container-height: 34px,
+      protected-container-height: 34px,
+      text-container-height: 34px,
+      tonal-container-height: 34px,
     )
   );
 }

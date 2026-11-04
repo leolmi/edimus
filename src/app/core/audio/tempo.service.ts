@@ -6,8 +6,9 @@ import { fileFingerprint } from '../montage/fingerprint';
 import { FileSystemPort } from '../platform/file-system.port';
 import { PlatformInfo } from '../platform/platform-info';
 import { barFilePath, readBarFile } from './bar-file';
-import { OnsetCurve, Tempo, detectTempo, onsetStrength } from './tempo';
+import { Tempo, detectTempo } from './tempo';
 import { meanBpm } from './tempo-map';
+import { RhythmFeatures, RhythmReport, analyzeRhythm } from './rhythm';
 
 /** `fromFile`: the tempo comes from the bar file next to the audio, not from the detection. */
 export type TempoState = { status: 'detecting' } | { status: 'ready'; tempo: Tempo | null; fromFile?: boolean };
@@ -26,7 +27,9 @@ export class TempoService {
 
   readonly detected = signal<Record<string, TempoState>>({});
   private queue: Promise<void> = Promise.resolve();
-  private readonly curves = new Map<string, Promise<OnsetCurve | null>>();
+  private readonly curves = new Map<string, Promise<RhythmFeatures | null>>();
+  /** What the last bar tracking of each source found (not saved: it is redone on demand). */
+  readonly reports = signal<Record<string, RhythmReport>>({});
 
   constructor() {
     effect(() => {
@@ -48,6 +51,7 @@ export class TempoService {
       this.montages.generation();
       untracked(() => {
         this.detected.set({});
+        this.reports.set({});
         this.curves.clear();
       });
     });
@@ -83,12 +87,12 @@ export class TempoService {
     return tempo ? meanBpm(tempo) * clipRate(clip) : null;
   }
 
-  /** Onset strength of the whole source (computed once, on demand). */
-  onsetCurve(sourceId: string): Promise<OnsetCurve | null> {
+  /** Rhythm features (onsets per band, chroma) of the whole source, computed once, on demand. */
+  onsetCurve(sourceId: string): Promise<RhythmFeatures | null> {
     let curve = this.curves.get(sourceId);
     if (!curve) {
       const buffer = this.library.ready(sourceId)?.buffer;
-      curve = buffer ? onsetStrength(buffer) : Promise.resolve(null);
+      curve = buffer ? analyzeRhythm(buffer) : Promise.resolve(null);
       this.curves.set(sourceId, curve);
     }
     return curve;

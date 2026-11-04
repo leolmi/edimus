@@ -1,9 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { FieldComponent } from '../../shared/controls/field.component';
 
 export interface RenameDialogData {
   name: string;
@@ -18,28 +17,27 @@ const RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
 /** Name of the montage (= name of its .edimus file). Closes with the name, or nothing when cancelled. */
 @Component({
   selector: 'app-rename-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatInputModule, TranslatePipe],
+  imports: [FieldComponent, MatButtonModule, MatDialogModule, TranslatePipe],
   template: `
     <h2 mat-dialog-title>{{ (data.firstSave ? 'rename.firstSaveTitle' : 'rename.title') | t }}</h2>
     <mat-dialog-content class="content">
-      <mat-form-field class="field">
-        <mat-label>{{ 'rename.label' | t }}</mat-label>
+      <app-field class="field">
+        <span fieldLabel>{{ 'rename.label' | t }}</span>
         <input
           #input
-          matInput
           cdkFocusInitial
           [value]="name()"
           (input)="name.set(input.value)"
           (keydown.enter)="confirm()"
           (focus)="input.select()"
         />
-        <span matTextSuffix>.edimus</span>
+        <span fieldSuffix>.edimus</span>
         @if (error(); as key) {
-          <mat-hint class="error">{{ key | t }}</mat-hint>
+          <span fieldHint class="error">{{ key | t }}</span>
         } @else {
-          <mat-hint>{{ (data.firstSave ? 'rename.firstSaveHint' : 'rename.hint') | t }}</mat-hint>
+          <span fieldHint>{{ (data.firstSave ? 'rename.firstSaveHint' : 'rename.hint') | t }}</span>
         }
-      </mat-form-field>
+      </app-field>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>{{ 'common.cancel' | t }}</button>

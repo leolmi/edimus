@@ -4,15 +4,20 @@ Componenti in `src/app/features/timeline/`; stato di vista in `TimelineService`.
 
 ## Struttura
 
-- `TimelineComponent`: righello, intestazioni delle tracce (nome → dettagli, mute, solo,
-  effetti, info, elimina), una `TrackLaneComponent` per traccia, scrollbar nativa, area di drop.
+- `TimelineComponent`: righello, intestazioni delle tracce (nome → dettagli e × per eliminarla;
+  mute, solo, effetti, info, registrazione; pan, misuratore, volume), una `TrackLaneComponent`
+  per traccia, scrollbar nativa, area di drop.
   Gestisce tutti i gesti del puntatore sulle lane (`onLaneDown/Move/Up`).
   Caricamento dei file trascinati: dal rilascio (`DocumentService.pendingDrop`, che copre la
   risoluzione dei percorsi e il probe) alla fine della decodifica delle sorgenti della traccia,
   sopra la lane compare un indicatore (indeterminato, poi con la percentuale di decodifica);
   per i file destinati a tracce nuove compare nell'area vuota finché la traccia non esiste.
 - `TrackLaneComponent`: disegna una traccia su `<canvas>` e offre gli hit test
-  (`clipAt`, `pointAt`, `curveHandleAt`, `markedBarAt`) usati dai gesti.
+  (`clipAt`, `pointAt`, `curveHandleAt`, `markedBarAt`) usati dai gesti. Sopra il canvas, in DOM,
+  il nome del file di ogni clip in basso a sinistra, con le caratteristiche del file in un tooltip
+  (`SourceSummaryService`: formato, frequenza, canali, bitrate, durata, tempo): sta in un
+  contenitore largo quanto la clip (`overflow: clip`) con `position: sticky`, così quando la clip
+  esce a sinistra dalla vista il nome scorre verso destra restando dentro la clip.
 - `RulerComponent`: righello dei tempi.
 - `ClipBarComponent`: barra della clip selezionata (BPM → dialogo tempo, velocità/pitch);
   durante la marcatura della battuta mostra istruzioni e Ricomincia/Annulla/Conferma.
@@ -37,13 +42,19 @@ Nell'ordine:
 6. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
    inviluppo anche senza, con punti e maniglie; i punti nascosti da un trim non si vedono).
 
-L'intestazione della traccia ha sul lato destro il fader verticale del volume della traccia
-(`FaderComponent` in versione `slim`, alto quanto la traccia; −30…+6 dB, passo 0,5;
-un passo di annulla per trascinamento) e il pulsante degli effetti: apre a destra
+L'intestazione della traccia ha sul lato destro il misuratore di picco (`TrackMeterComponent`:
+una barra per canale, due se la traccia ha audio stereo; verde, arancio sopra −6 dB, rosso
+sopra 0 dB, da −48 a +6 dBFS, con il picco più alto segnato per un secondo; letto a ogni frame
+durante l'ascolto da `PlaybackService.trackPeaks`, dopo volume e pan, prima del volume d'ascolto)
+e il fader verticale del volume della traccia (`FaderComponent` in versione `slim`, alto quanto
+la traccia; −30…+6 dB, passo 0,5; un passo di annulla per trascinamento). Sotto i pulsanti, il pan
+(`KnobComponent` `inline`, da S 100 a D 100, doppio clic al centro) e la catena degli effetti.
+Le caratteristiche del file non sono più nell'intestazione: stanno nel tooltip del nome sulla
+clip e nei dettagli della traccia. Il pulsante degli effetti apre a destra
 `EffectsPanelComponent` per quella traccia (`TimelineService.selectedTrackId`; Esc o di nuovo il
 pulsante lo chiude; a pannello aperto segue la traccia dell'ultima clip selezionata), con
 l'intestazione evidenziata; il pulsante è colorato se la traccia ha
-effetti attivi. Sotto le informazioni della sorgente `EffectChainComponent` mostra la catena
+effetti attivi. Accanto al pan `EffectChainComponent` mostra la catena
 degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello). Vedi
 [effects.md](effects.md).
 
@@ -52,11 +63,15 @@ degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello)
 | Contesto | Gesto | Effetto |
 |---|---|---|
 | fuori dalle clip | clic | sposta il playhead, deseleziona |
-| fuori dalle clip | trascina | seleziona un intervallo di tempo |
-| corpo clip | clic | seleziona solo quella clip (anche se era in una selezione multipla) |
+| fuori dalle clip, o da una clip non selezionata | trascina | seleziona un intervallo di tempo (la clip non viene selezionata: un gesto `press` diventa `range` oltre 3 px) |
+| dentro l'intervallo selezionato (non su una clip selezionata né su un bordo) | trascina | sposta l'intervallo (solo la selezione, non l'audio; il playhead segue il suo inizio); un clic senza trascinare vale come fuori dall'intervallo |
+| traccia vuota, area vuota sotto le tracce | trascina | sposta la vista (pan); sulla traccia vuota un clic senza trascinare sposta il playhead |
+| corpo clip | clic (pressione e rilascio nello stesso punto) | seleziona solo quella clip (anche se era in una selezione multipla) |
 | clip | Ctrl+clic | aggiunge la clip alla selezione o la toglie (`TimelineService.toggleClip`) |
-| corpo clip | trascina | sposta la clip (anche su altre tracce; oltre l'ultima crea una traccia nuova); inizio, fine e punti d'inviluppo si agganciano a bordi e punti d'inviluppo delle altre clip, con la griglia visibile a passi di battito, Alt per lo spostamento libero |
-| corpo di una clip selezionata | trascina | sposta insieme tutte le clip selezionate (`moveClips`): stesse distanze, cambio traccia solo se restano tutte su tracce esistenti, si ferma quando la prima arriva a 0; l'aggancio considera i bordi di tutte e ignora le clip del gruppo |
+| corpo di una clip selezionata | trascina | sposta la clip, o insieme tutte le clip selezionate (`moveClips`): stesse distanze; una clip sola cambia anche traccia (oltre l'ultima crea una traccia nuova), un gruppo solo se restano tutte su tracce esistenti; si ferma quando la prima arriva a 0. Inizio, fine e punti d'inviluppo si agganciano a bordi e punti d'inviluppo delle altre clip (escluse quelle del gruppo), con la griglia visibile a passi di battito, Alt per lo spostamento libero |
+| area delle tracce | clic destro | menu delle tracce; su una clip, preceduto dal menu della clip, e la clip viene selezionata se non lo è già (sotto) |
+| righello | clic destro | menu del righello: nuovo marker; su un marker (6 px) anche avvia da qui, rinomina, elimina |
+| bordo inferiore dell'intestazione di traccia | trascina / doppio clic | altezza di tutte le tracce (`SettingsService.trackHeight`, da 120 a 360 px, salvata nelle impostazioni; il bordo trascinato resta sotto il puntatore) / torna a 120 px |
 | bordo clip (6 px) | trascina | trim dell'inizio o della fine |
 | linea di battuta, con la griglia | Maiusc+trascina / Maiusc+clic destro | fissa la battuta lì (stretch della mappa) / la libera |
 | corpo clip | doppio clic | dialogo velocità/pitch |
@@ -101,7 +116,54 @@ di margine per lato), altrimenti all'intero montaggio.
 | E | modalità inviluppo |
 | B | griglia delle battute |
 | Ctrl+A | seleziona tutte le clip |
+| Ctrl+L | blocca / sblocca il montaggio (sotto) |
 | Esc | toglie la selezione |
+
+## Menu contestuali
+
+Un solo `mat-menu` aperto nel punto del puntatore (ancora `.menu-anchor` a posizione fissa), con
+il contenuto scelto da `TimelineComponent.menu`:
+
+- **righello** (`onRulerContextMenu`): nuovo marker nel punto; sul marker più vicino entro 6 px
+  anche avvia da qui (play dal marker), rinomina, elimina;
+- **tracce** (`onLaneContextMenu`, `onSlotsContextMenu`: ovunque nell'area delle tracce, anche
+  sulle clip e sulle strisce vuote): vai al marker (sottomenu con i marker in ordine di tempo:
+  playhead sul marker e vista centrata), elimina tutti i marker (con conferma); spenti senza marker;
+- **clip** (sulle clip, prima del menu delle tracce): tempo e battute, velocità e intonazione,
+  allinea il tempo, modalità inviluppo, dividi al cursore (attivo solo se il playhead è dentro la
+  clip), effetti della traccia, dettagli della traccia, elimina le clip selezionate (toglie prima
+  l'intervallo, che Canc eliminerebbe al loro posto).
+
+Niente menu durante la marcatura della battuta, su un punto d'inviluppo in modalità inviluppo e
+su una linea di battuta con Maiusc: lì il tasto destro ha già un significato.
+
+## Marker
+
+Punti con nome della timeline (`Montage.markers`, operazioni pure in `markers.ts`, comandi in
+`EditService`): una linea continua sulle tracce con il nome in un'etichetta sul righello. Il nome
+si sceglie alla creazione ("Marker n" proposto) in `MarkerDialogComponent`. Sono un aiuto
+all'ascolto: si modificano anche con il montaggio bloccato (`update(…, true)`), ma ogni modifica è
+un passo di annulla e finisce nel file. Il punto iniziale degli stop (`PlaybackService.cue`) resta
+il marker primario, non salvato.
+
+## Blocco del montaggio
+
+`MontageService.locked`, pulsante lucchetto accanto al titolo (grigio aperto, rosso chiuso) o
+Ctrl+L: il montaggio si ascolta ma non si modifica. `update`, `preview`, `commit`, `undo`, `redo`
+non fanno nulla da bloccato; passano solo le modifiche d'ascolto (`update(…, true)`: muto, solo,
+sorgente ritrovata, marker). Bloccando si esce da inviluppo, marcatura e registrazione e si chiude il
+pannello effetti. Nella UI: pulsanti di modifica spenti (toolbar, barra della clip, intestazioni,
+menu della clip), fader della traccia fermo, lane che sui clic e trascinamenti si comportano come
+fuori dalle clip (playhead e intervallo), file trascinati rifiutati con un messaggio, tasti di
+modifica ignorati (restano Spazio, Home, End, B, Esc). I comandi MCP di modifica falliscono con un
+messaggio; `get_state` riporta `locked`. Un montaggio nuovo o aperto parte sbloccato.
+
+## Toolbar nelle finestre strette
+
+`App.compact` (larghezza della finestra) sposta gruppi di comandi nel menu Altri comandi (…):
+sotto 1440 px lo zoom, sotto 1300 i comandi di modifica (l'export resta con la sola icona),
+sotto 900 nuovo, salva con nome e il cursore del volume d'ascolto, sotto 720 annulla, ripeti e
+il logo. I pulsanti non si restringono; il titolo sì, con i puntini.
 
 ## Selezione
 
@@ -142,7 +204,13 @@ della clip. La lettura è **prima per battute, poi per movimenti**:
 - sotto 6 px per battuta (in media nella vista) la griglia non si disegna;
 - le battute seguono la mappa della sorgente (`barTime`), quindi possono avere durate diverse;
   le battute fissate a mano hanno un triangolino in alto, quelle del tracciamento automatico un
-  quadratino in basso.
+  quadratino in basso;
+- i movimenti stanno dove il tracciamento li ha trovati (`BarAnchor.beats`), altrimenti
+  equidistanti; dove il metro cambia (`barMeter`) accanto al numero c'è il nuovo metro, se ci sta;
+- le battute incerte (affidabilità sotto `UNCERTAIN_BAR`, 0,45) hanno la linea tratteggiata nel
+  colore d'errore del tema, e così il quadratino;
+- nelle regioni libere (`Tempo.regions`) non c'è griglia: una fascia tratteggiata leggera con la
+  scritta "tempo libero" (`drawFree`).
 
 ### Stretch della mappa delle battute
 
@@ -156,15 +224,47 @@ scendere sotto un battito di 150 ms (400 BPM). Un gesto = un passo di annulla.
 
 ### Tracciamento delle battute
 
-`trackBars()` (`tempo-map.ts`), dal dialogo Tempo ("Rileva le battute") o da `set_bar_map`:
-sulla curva degli attacchi di tutta la sorgente un anello ad aggancio di fase prevede ogni
-battito un battito dopo il precedente, lo attira verso l'attacco più forte vicino (±15 % del
-battito, pesato con la distanza) e aggiorna lentamente la durata del battito (entro 0,7–1,4×).
-Parte dalle ancore a mano: tra due ancore il numero di battute è fissato e l'errore all'arrivo
-è distribuito sui battiti; prima della prima e dopo l'ultima procede libero fino agli estremi
-del file. Senza ancore a mano parte dall'attacco più forte nel primo battito della griglia,
-segue i battiti nei due versi e sceglie come 1 il movimento con gli attacchi più forti in
-media (l'accento), perché la fase rilevata può essere sbagliata di qualche battito. Il risultato è un'ancora `auto` per battuta.
+`trackRhythm()` (`core/audio/rhythm.ts`), dal dialogo Tempo ("Rileva le battute") o da
+`set_bar_map` / `analyze_rhythm`. La battuta si determina **progressivamente su tutto il brano**,
+battito per battito, non su un tratto poi ripetuto: la musica suonata non è regolare, nemmeno
+dentro la battuta.
+
+1. **Caratteristiche** (`analyzeRhythm`, una volta per sorgente, in `TempoService.onsetCurve`):
+   flusso spettrale per banda (bassi < 200 Hz: cassa; medi fino a 2,5 kHz: rullante e voce;
+   acuti: charleston) e profilo delle 12 classi di altezza (chroma, finestre di 4096 campioni
+   ogni 8 passi), i cui cambi segnano gli 1.
+2. **Curva del pulso**: le tre bande portate alla stessa scala (gli acuti hanno molti più bin),
+   gli acuti a un quarto del peso, perché marcano le suddivisioni più del battito.
+3. **Tempo locale**: autocorrelazione su finestre di 8 s ogni secondo, pesata con una
+   log-normale attorno al tempo di riferimento, e Viterbi sulle finestre (il tempo cambia
+   piano, non salta d'ottava). Tempo di riferimento: i BPM cambiati nel dialogo o `bpm` di
+   `set_bar_map` (vincolo stretto), il tempo segnato a mano (`confidence` 1), altrimenti 110
+   BPM con un'ottava di tolleranza (il rilevamento iniziale scambia spesso le crome per il
+   battito). Le finestre ai bordi del file prendono il periodo della prima finestra intera.
+4. **Battiti**: programmazione dinamica su tutto il file (Ellis 2007): la catena di battiti sugli
+   attacchi in cui ognuno cade circa un periodo locale dopo il precedente. La scelta è globale:
+   ogni battito dipende dalla musica dopo quanto da quella prima, quindi una intro debole prende
+   il tempo dalla parte che segue (a ritroso). Le battute fissate a mano forzano un battito lì.
+5. **Regioni**: finestre con chiarezza del pulso sotto 0,4 × il 75° percentile (minimo 0,05)
+   sono libere; buchi sotto 4 s riempiti, isole sotto 6 s tolte; le finestre delle battute
+   fissate a mano hanno sempre un pulso. I bordi si spostano poi sui battiti: un battito è dentro
+   se il disegno degli attacchi attorno (due battiti per parte) somiglia a quello tipico della
+   regione, cosa che le note irregolari di un passo libero non fanno.
+6. **Battute**: per ogni regione l'accento di ogni battito (bassi, cambio d'accordo, attacco;
+   i medi, dove il rullante batte il 2 e il 4, in negativo) e un secondo Viterbi che divide i
+   battiti in battute di 3 o 4 (o del metro fisso), con un costo per cambiare metro: gli 1 cadono
+   sugli accenti. I battiti prima del primo 1 sono un'anacrusi.
+7. **Numerazione e ancore**: battuta 0 al primo 1 trovato; attraverso un passo libero tante
+   battute quante ne starebbero al tempo di prima. Un'ancora `auto` per ogni 1 con i suoi
+   battiti e l'affidabilità, una che chiude ogni regione; le battute a mano tengono il loro
+   tempo e prendono il numero contato.
+
+Il resoconto (`RhythmReport`, tenuto in memoria da `TempoService.reports`, non salvato): regioni
+libere e con pulso (battute, BPM tra il 10° e il 90° percentile, metri, `meterAlternative` se
+l'altro metro va quasi altrettanto bene o meglio di quello imposto, `downbeatUncertain` se
+l'1 non si distingue dagli altri movimenti, affidabilità), `bpmAlternatives` (il battito doppio
+o dimezzato con un pulso quasi altrettanto forte), battute incerte, tempo locale ogni secondo con
+la chiarezza del pulso.
 
 ### Aggancio ai bordi delle clip
 
@@ -209,7 +309,12 @@ Dal dialogo, "Segna la battuta" chiude il dialogo e avvia la marcatura
    `confidence: 1`.
 
 La battuta segnata diventa un'ancora a mano: è il punto fermo dei successivi stretch e del
-tracciamento. Il dialogo mostra anche lo stato della mappa e "Rileva le battute"; con almeno
+tracciamento. Il dialogo mostra anche lo stato della mappa e "Rileva le battute", con
+l'interruttore "Metro automatico" (acceso: 3/4 o 4/4 battuta per battuta; spento: il metro
+scelto sopra) e i BPM passati come riferimento solo se cambiati nel dialogo. Finito il
+tracciamento il dialogo si riapre con il resoconto: una riga per regione (intervallo, battute,
+metri, BPM, affidabilità, dubbi), il numero di battute incerte e i pulsanti "Riprova a … BPM" /
+"Riprova in …" per le letture alternative. Con almeno
 un'ancora, "Rimuovi ancore" (`clearAnchors`: torna alla griglia costante di partenza, `bpm` e
 `offset`, che la mappa non modifica), "Rimuovi ancore automatiche" (con ancore di entrambi i
 tipi: tiene quelle a mano) e, con la mappa variabile, "Tempo costante" (`steadyTempo`: toglie

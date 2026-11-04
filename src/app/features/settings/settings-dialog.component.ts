@@ -1,12 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialogModule } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AudioDevice, AudioDevicesService } from '../../core/audio/audio-devices.service';
 import { RecordingService } from '../../core/audio/recording.service';
@@ -24,11 +20,13 @@ import {
   ThemeMode,
 } from '../../core/settings.service';
 import { UpdateService } from '../../core/update.service';
+import { FieldComponent } from '../../shared/controls/field.component';
+import { SwitchComponent } from '../../shared/controls/switch.component';
 
-const THEMES: { mode: ThemeMode; icon: string; label: TranslationKey }[] = [
-  { mode: 'light', icon: 'light_mode', label: 'settings.theme.light' },
-  { mode: 'dark', icon: 'dark_mode', label: 'settings.theme.dark' },
-  { mode: 'system', icon: 'contrast', label: 'settings.theme.system' },
+const THEMES: { mode: ThemeMode; label: TranslationKey }[] = [
+  { mode: 'light', label: 'settings.theme.light' },
+  { mode: 'dark', label: 'settings.theme.dark' },
+  { mode: 'system', label: 'settings.theme.system' },
 ];
 
 const LANGUAGES: { code: Language; label: string }[] = [
@@ -49,15 +47,13 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
 @Component({
   selector: 'app-settings-dialog',
   imports: [
+    FieldComponent,
     MatButtonModule,
-    MatButtonToggleModule,
     MatDialogModule,
-    MatFormFieldModule,
     MatIconModule,
-    MatInputModule,
     MatSelectModule,
-    MatSlideToggleModule,
     MatTooltipModule,
+    SwitchComponent,
     TranslatePipe,
   ],
   template: `
@@ -66,34 +62,32 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       <h3>{{ 'settings.appearance' | t }}</h3>
       <div class="row">
         <span class="label">{{ 'settings.theme' | t }}</span>
-        <mat-button-toggle-group
-          [value]="settings.theme()"
-          (change)="settings.setTheme($event.value)"
-        >
-          @for (theme of themes; track theme.mode) {
-            <mat-button-toggle [value]="theme.mode">
-              <mat-icon>{{ theme.icon }}</mat-icon>
-              {{ theme.label | t }}
-            </mat-button-toggle>
-          }
-        </mat-button-toggle-group>
+        <app-field class="choice">
+          <mat-select [value]="settings.theme()" (selectionChange)="settings.setTheme($event.value)">
+            @for (theme of themes; track theme.mode) {
+              <mat-option [value]="theme.mode">{{ theme.label | t }}</mat-option>
+            }
+          </mat-select>
+        </app-field>
       </div>
       <div class="row">
         <span class="label">{{ 'settings.language' | t }}</span>
-        <mat-button-toggle-group
-          [value]="settings.language()"
-          (change)="settings.setLanguage($event.value)"
-        >
-          @for (language of languages; track language.code) {
-            <mat-button-toggle [value]="language.code">{{ language.label }}</mat-button-toggle>
-          }
-        </mat-button-toggle-group>
+        <app-field class="choice">
+          <mat-select
+            [value]="settings.language()"
+            (selectionChange)="settings.setLanguage($event.value)"
+          >
+            @for (language of languages; track language.code) {
+              <mat-option [value]="language.code">{{ language.label }}</mat-option>
+            }
+          </mat-select>
+        </app-field>
       </div>
 
       <h3>{{ 'settings.audio' | t }}</h3>
       <div class="row">
         <span class="label">{{ 'output.title' | t }}</span>
-        <mat-form-field class="output" subscriptSizing="dynamic">
+        <app-field class="output">
           <mat-select
             [value]="settings.audioOutput()?.id ?? ''"
             (selectionChange)="setOutput($event.value)"
@@ -105,13 +99,13 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
               </mat-option>
             }
           </mat-select>
-        </mat-form-field>
+        </app-field>
       </div>
       <p class="hint">{{ 'settings.outputHint' | t }}</p>
       @if (platform.canRecord) {
         <div class="row">
           <span class="label">{{ 'input.title' | t }}</span>
-          <mat-form-field class="output" subscriptSizing="dynamic">
+          <app-field class="output">
             <mat-select
               [value]="settings.audioInput()?.id ?? ''"
               (selectionChange)="setInput($event.value)"
@@ -123,7 +117,7 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
                 </mat-option>
               }
             </mat-select>
-          </mat-form-field>
+          </app-field>
         </div>
         <p class="hint">{{ 'settings.inputHint' | t }}</p>
         <div class="row">
@@ -154,47 +148,48 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       <h3>{{ 'settings.editing' | t }}</h3>
       <div class="row">
         <span class="label">{{ 'settings.snap' | t }}</span>
-        <mat-button-toggle-group
-          [value]="settings.snapStep()"
-          (change)="settings.setSnapStep($event.value)"
-        >
-          @for (snap of snapSteps; track snap.step) {
-            <mat-button-toggle [value]="snap.step">
-              <span class="symbol">{{ snap.symbol }}</span>
-              {{ snap.label | t }}
-            </mat-button-toggle>
-          }
-        </mat-button-toggle-group>
+        <app-field class="choice">
+          <mat-select
+            [value]="settings.snapStep()"
+            (selectionChange)="settings.setSnapStep($event.value)"
+          >
+            @for (snap of snapSteps; track snap.step) {
+              <mat-option [value]="snap.step">
+                <span class="symbol">{{ snap.symbol }}</span>
+                {{ snap.label | t }}
+              </mat-option>
+            }
+          </mat-select>
+        </app-field>
       </div>
       <p class="hint">{{ 'settings.snapHint' | t }}</p>
       @if (platform.filesBesideSources) {
-        <mat-slide-toggle
+        <app-switch
           [checked]="settings.autoSaveBars()"
-          (change)="settings.setAutoSaveBars($event.checked)"
+          (checkedChange)="settings.setAutoSaveBars($event)"
         >
           {{ 'settings.autoSaveBars' | t }}
-        </mat-slide-toggle>
+        </app-switch>
         <p class="hint">{{ 'settings.autoSaveBarsHint' | t }}</p>
       }
 
       @if (platform.canUpdate) {
         <h3>{{ 'settings.updates' | t }}</h3>
-        <mat-slide-toggle
+        <app-switch
           [checked]="settings.checkUpdates()"
-          (change)="settings.setCheckUpdates($event.checked)"
+          (checkedChange)="settings.setCheckUpdates($event)"
         >
           {{ 'settings.checkUpdates' | t }}
-        </mat-slide-toggle>
-        <div class="row">
-          <mat-form-field class="repo" subscriptSizing="dynamic">
-            <mat-label>{{ 'settings.updateRepo' | t }}</mat-label>
+        </app-switch>
+        <div class="row field-row">
+          <app-field class="repo">
+            <span fieldLabel>{{ 'settings.updateRepo' | t }}</span>
             <input
               #repo
-              matInput
               [value]="settings.updateRepo()"
               (change)="settings.setUpdateRepo(repo.value)"
             />
-          </mat-form-field>
+          </app-field>
           <button mat-stroked-button (click)="updates.check(true)">
             <mat-icon>update</mat-icon>
             {{ 'settings.checkNow' | t }}
@@ -205,12 +200,12 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
 
       @if (platform.hasDevTools) {
         <h3>{{ 'settings.advanced' | t }}</h3>
-        <mat-slide-toggle
+        <app-switch
           [checked]="settings.devTools()"
-          (change)="settings.setDevTools($event.checked)"
+          (checkedChange)="settings.setDevTools($event)"
         >
           {{ 'settings.devTools' | t }}
-        </mat-slide-toggle>
+        </app-switch>
         @if (settings.devTools() !== devTools.active) {
           <div class="restart">
             <span class="hint">{{ 'settings.restartNeeded' | t }}</span>
@@ -245,6 +240,9 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       gap: 12px;
       margin-bottom: 8px;
     }
+    .field-row {
+      align-items: flex-end;
+    }
     .label {
       min-width: 140px;
     }
@@ -272,15 +270,17 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
         margin: 0;
       }
     }
-    // the state layer of the handle is taller than the toggle: the room around it keeps it
-    // inside the content (as the last element it would make the dialog scroll)
-    mat-slide-toggle {
-      display: block;
-      padding: 8px 0;
+    .choice {
+      width: 220px;
+    }
+    app-switch {
+      display: flex;
+      margin: 4px 0;
     }
     .symbol {
+      display: inline-block;
+      width: 20px;
       font-size: 18px;
-      margin-right: 2px;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

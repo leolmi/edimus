@@ -10,6 +10,8 @@ import { ProcessedAudioService } from './processed-audio.service';
 const CUE_TOLERANCE = 0.001;
 /** Shortest range (s) the loop repeats. */
 const MIN_LOOP = 0.05;
+/** Samples read by a level meter (about 40 ms). */
+const METER_WINDOW = 2048;
 
 /** Plays the montage, scheduling its mix (see MixService) on a shared AudioContext. */
 @Injectable({ providedIn: 'root' })
@@ -27,6 +29,9 @@ export class PlaybackService {
 
   private context?: AudioContext;
   private master?: GainNode;
+  /** Sum of the tracks, before the listening volume: what the master meter reads (and the export gets). */
+  private bus?: GainNode;
+  private busMeter?: Meter;
   /** Scheduled mixes: one, or the passes of the loop queued ahead. */
   private mixes: ScheduledMix[] = [];
   /** Context time and montage time at the start of the playback. */
@@ -112,12 +117,12 @@ export class PlaybackService {
       // this pass up to the end of the range, and the next whole one already queued
       const next = when + (range.end - from);
       this.mixes = [
-        this.mixer.schedule(ctx, this.master!, from, when, range.end),
-        this.mixer.schedule(ctx, this.master!, range.start, next, range.end),
+        this.mixer.schedule(ctx, this.bus!, from, when, range.end, this.tap),
+        this.mixer.schedule(ctx, this.bus!, range.start, next, range.end, this.tap),
       ];
       this.looping = { ...range, lastPassAt: next };
     } else {
-      this.mixes = [this.mixer.schedule(ctx, this.master!, from, when)];
+      this.mixes = [this.mixer.schedule(ctx, this.bus!, from, when, Infinity, this.tap)];
       this.looping = null;
     }
     this.startedAt = { context: when, position: from };
@@ -183,7 +188,7 @@ export class PlaybackService {
       const next = looping.lastPassAt + (looping.end - looping.start);
       const done = this.mixes.shift();
       if (done) releaseMix(done);
-      this.mixes.push(this.mixer.schedule(ctx, this.master!, looping.start, next, looping.end));
+      this.mixes.push(this.mixer.schedule(ctx, this.bus!, looping.start, next, looping.end, this.tap));
       looping.lastPassAt = next;
     }
     const position = this.currentPosition();
@@ -208,6 +213,33 @@ export class PlaybackService {
     return looping.start + ((elapsed - first) % (looping.end - looping.start));
   }
 
+  /** Level meters of the tracks. */
+  private readonly meters = new Map<string, Meter>();
+
+  private readonly tap = (trackId: string): AudioNode => {
+    let meter = this.meters.get(trackId);
+    if (!meter) {
+      meter = createMeter(this.audioContext());
+      this.meters.set(trackId, meter);
+    }
+    return meter.input;
+  };
+
+  /**
+   * Peak level (linear) of the left and right output of a track over the last few milliseconds
+   * of the playback; null when the track is not playing.
+   */
+  trackPeaks(trackId: string): [number, number] | null {
+    const meter = this.meters.get(trackId);
+    if (!meter || !this.playing() || !this.mixes.some((m) => m.tracks.has(trackId))) return null;
+    return readPeaks(meter);
+  }
+
+  /** Peak level (linear) of the left and right mix, before the listening volume; null when not playing. */
+  mixPeaks(): [number, number] | null {
+    return this.busMeter && this.playing() ? readPeaks(this.busMeter) : null;
+  }
+
   private halt(): void {
     cancelAnimationFrame(this.frame);
     this.stopNodes();
@@ -226,6 +258,10 @@ export class PlaybackService {
       this.master = this.context.createGain();
       this.master.gain.value = this.settings.muted() ? 0 : this.settings.volume();
       this.master.connect(this.context.destination);
+      this.bus = this.context.createGain();
+      this.bus.connect(this.master);
+      this.busMeter = createMeter(this.context);
+      this.bus.connect(this.busMeter.input);
       const id = this.settings.audioOutput()?.id;
       if (id) void this.applyOutput(this.context, id);
     }
@@ -243,4 +279,34 @@ export class PlaybackService {
       await sink.setSinkId('').catch(() => undefined);
     }
   }
+}
+
+/** Level meter: the signal split in two channels, each read by an analyser. */
+interface Meter {
+  input: GainNode;
+  analysers: AnalyserNode[];
+  data: Float32Array<ArrayBuffer>;
+}
+
+function createMeter(ctx: AudioContext): Meter {
+  const input = new GainNode(ctx, { channelCount: 2, channelCountMode: 'explicit' });
+  const splitter = ctx.createChannelSplitter(2);
+  input.connect(splitter);
+  const analysers = [0, 1].map((channel) => {
+    const analyser = new AnalyserNode(ctx, { fftSize: METER_WINDOW });
+    splitter.connect(analyser, channel);
+    return analyser;
+  });
+  return { input, analysers, data: new Float32Array(METER_WINDOW) };
+}
+
+/** Peak (linear) of each channel over the last window of the meter. */
+function readPeaks(meter: Meter): [number, number] {
+  const peak = (analyser: AnalyserNode) => {
+    analyser.getFloatTimeDomainData(meter.data);
+    let max = 0;
+    for (const sample of meter.data) max = Math.max(max, Math.abs(sample));
+    return max;
+  };
+  return [peak(meter.analysers[0]), peak(meter.analysers[1])];
 }

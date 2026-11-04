@@ -32,12 +32,12 @@ import { TimelineService } from '../../core/timeline/timeline.service';
     } @else if (selection(); as sel) {
       <span class="name">{{ sel.track.name }}</span>
       <span class="length">{{ length() }}</span>
-      <button mat-stroked-button (click)="edits.editTempo(sel.clip.id)" [matTooltip]="'tempo.clipHint' | t">
+      <button mat-stroked-button [disabled]="edits.locked()" (click)="edits.editTempo(sel.clip.id)" [matTooltip]="'tempo.clipHint' | t">
         <mat-icon>music_note</mat-icon>
         {{ bpm() ? bpm() + ' BPM' : ('tempo.title' | t) }}
       </button>
 
-      <button mat-stroked-button (click)="edits.editTiming(sel.clip.id)">
+      <button mat-stroked-button [disabled]="edits.locked()" (click)="edits.editTiming(sel.clip.id)">
         <mat-icon>speed</mat-icon>
         {{ 'timing.title' | t }}
       </button>

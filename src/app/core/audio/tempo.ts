@@ -14,6 +14,15 @@ export interface Tempo {
    * the length of the nearest span (of the steady grid with a single anchor). See tempo-map.ts.
    */
   anchors?: BarAnchor[];
+  /** Spans with no steady pulse (free intro, rubato, silence), found by the bar tracking: no grid there. */
+  regions?: TempoRegion[];
+}
+
+/** Span of a source (source seconds) where the music has no beat to follow. */
+export interface TempoRegion {
+  from: number;
+  to: number;
+  kind: 'free';
 }
 
 /** Start of a bar pinned on the audio (source seconds). */
@@ -22,10 +31,21 @@ export interface BarAnchor {
   time: number;
   /** Placed by the bar tracking (replaced when it runs again); otherwise set by hand. */
   auto?: boolean;
+  /**
+   * Beats of the bar after its downbeat (source seconds), as found by the tracking: played music
+   * is not even inside the bar either. Their number + 1 is the meter of the bar (mixed meters);
+   * without them the beats are even and the bar has `beatsPerBar` of them.
+   */
+  beats?: number[];
+  /** Reliability of the tracking on this bar, 0–1 (tracking only). */
+  confidence?: number;
 }
 
 /** Beats per bar of a tempo. */
 export const beatsPerBar = (tempo: Tempo) => tempo.beatsPerBar ?? 4;
+
+/** Name of a meter from its beats per bar (6 is 6/8). */
+export const meterName = (beats: number) => (beats === 6 ? '6/8' : `${beats}/4`);
 
 /** Onset strength of a source over time (frames of HOP samples). */
 export interface OnsetCurve {
@@ -188,7 +208,7 @@ function comb(novelty: Float32Array, t: number): number {
 }
 
 /** In-place radix-2 FFT (length must be a power of two). */
-function fft(re: Float32Array, im: Float32Array): void {
+export function fft(re: Float32Array, im: Float32Array): void {
   const n = re.length;
   for (let i = 1, j = 0; i < n; i++) {
     let bit = n >> 1;

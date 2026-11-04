@@ -80,9 +80,6 @@ interface ParamTools {
         </button>
       </header>
       <div class="body">
-        @if (!track.effects?.length) {
-          <p class="empty">{{ 'fx.empty' | t }}</p>
-        }
         <div class="chain" cdkDropList (cdkDropListDropped)="drop($event)">
           @for (fx of track.effects ?? []; track fx.id) {
             @let descriptor = descriptorOf(fx);
@@ -143,16 +140,15 @@ interface ParamTools {
             </section>
           }
         </div>
-        <button mat-stroked-button class="add" [matMenuTriggerFor]="add">
+        <!-- only a plus, as the one adding a track under the track headers -->
+        <button mat-icon-button class="add" [matMenuTriggerFor]="add" [matTooltip]="'fx.add' | t">
           <mat-icon>add</mat-icon>
-          {{ 'fx.add' | t }}
         </button>
         <mat-menu #add="matMenu">
           @for (descriptor of catalog; track descriptor.type) {
             <button mat-menu-item (click)="edits.addEffect(track.id, descriptor.type)">{{ descriptor.label | t }}</button>
           }
         </mat-menu>
-        <p class="hint">{{ 'fx.hint' | t }}</p>
       </div>
       <ng-template #control let-param let-fx="fx" let-track="track">
         @if (param.kind === 'choice') {
@@ -242,15 +238,6 @@ interface ParamTools {
       overflow-y: auto;
       padding: 8px;
     }
-    .empty,
-    .hint {
-      font: var(--mat-sys-body-small);
-      color: var(--mat-sys-on-surface-variant);
-      margin: 4px 4px 12px;
-    }
-    .hint {
-      margin-top: 12px;
-    }
     .card {
       background: var(--mat-sys-surface-container);
       border: 1px solid var(--mat-sys-outline-variant);
@@ -324,7 +311,19 @@ interface ParamTools {
       padding-top: 8px;
     }
     .add {
-      width: 100%;
+      --mat-icon-button-state-layer-size: 64px;
+      --mat-icon-button-icon-size: 40px;
+      --mat-icon-button-icon-color: var(--mat-sys-on-surface-variant);
+      display: flex;
+      margin: 8px auto;
+      opacity: 0.3;
+      transition: opacity 150ms;
+      &:hover,
+      &:focus-visible,
+      &[aria-expanded='true'] {
+        --mat-icon-button-icon-color: var(--mat-sys-primary);
+        opacity: 1;
+      }
     }
     .small {
       --mat-icon-button-state-layer-size: 28px;

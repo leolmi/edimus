@@ -7,6 +7,15 @@ export function formatDuration(seconds: number): string {
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
+/** Formats seconds as `m:ss.mmm` (or `h:mm:ss.mmm`): the playhead clock. */
+export function formatPrecise(seconds: number): string {
+  const ms = Math.max(0, Math.floor(seconds * 1000));
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+}
+
 /** Parses `m:ss.mmm`, `h:mm:ss.mmm` or plain seconds (comma or dot as decimal separator). */
 export function parseTime(text: string): number | null {
   const parts = text.trim().replace(',', '.').split(':');

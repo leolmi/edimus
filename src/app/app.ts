@@ -1,6 +1,8 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, DestroyRef, ElementRef, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
@@ -13,10 +15,10 @@ import { PlaybackService } from './core/audio/playback.service';
 import { RecordingService } from './core/audio/recording.service';
 import { DocumentService } from './core/document.service';
 import { EditService } from './core/edit.service';
-import { formatDuration } from './core/format';
+import { formatDuration, formatPrecise } from './core/format';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import { MontageService } from './core/montage/montage.service';
-import { SettingsService } from './core/settings.service';
+import { MAX_VOLUME_DB, SettingsService } from './core/settings.service';
 import { TimelineService } from './core/timeline/timeline.service';
 import { UpdateService } from './core/update.service';
 import { ClipBarComponent } from './features/timeline/clip-bar.component';
@@ -24,7 +26,11 @@ import { EffectsPanelComponent } from './features/effects/effects-panel.componen
 import { HelpDialogComponent, HelpTab } from './features/help/help-dialog.component';
 import { SettingsDialogComponent } from './features/settings/settings-dialog.component';
 import { TimelineComponent } from './features/timeline/timeline.component';
-import { ScaleSliderComponent } from './shared/scale-slider.component';
+import { TrackMeterComponent } from './features/timeline/track-meter.component';
+import { KnobComponent } from './shared/controls/knob.component';
+
+/** Keys that still work with the montage locked. */
+const LISTENING_KEYS = new Set(['Space', 'Home', 'End', 'Backspace', 'KeyB', 'Escape']);
 
 @Component({
   selector: 'app-root',
@@ -33,9 +39,12 @@ import { ScaleSliderComponent } from './shared/scale-slider.component';
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
+    MatMenuModule,
+    MatDividerModule,
     MatTooltipModule,
     MatProgressBarModule,
-    ScaleSliderComponent,
+    KnobComponent,
+    TrackMeterComponent,
     TranslatePipe,
     TimelineComponent,
     ClipBarComponent,
@@ -61,26 +70,62 @@ export class App {
 
   constructor() {
     void inject(UpdateService).startup();
+    // the width of the window (the toolbar spans it) decides how much of the toolbar fits
+    const host = inject(ElementRef<HTMLElement>).nativeElement;
+    const observer = new ResizeObserver(() => this.width.set(host.clientWidth));
+    observer.observe(host);
+    inject(DestroyRef).onDestroy(() => observer.disconnect());
   }
 
-  protected readonly percentLabel = (value: number) => `${Math.round(value)}%`;
-
-  protected readonly volumeIcon = computed(() => {
-    const volume = this.settings.volume();
-    if (this.settings.muted() || volume === 0) return 'volume_off';
-    return volume < 0.5 ? 'volume_down' : 'volume_up';
+  /** Width of the window: the toolbar follows it. */
+  protected readonly width = signal(Infinity);
+  /**
+   * How much of the toolbar goes into the "more" menu as the window narrows: 1 the zoom, 2 the
+   * editing commands (and the export keeps only its icon), 3 new, save as and the listening
+   * volume slider, 4 undo, redo and the logo.
+   */
+  protected readonly compact = computed(() => {
+    const width = this.width();
+    return width > 1440 ? 0 : width > 1300 ? 1 : width > 900 ? 2 : width > 720 ? 3 : 4;
   });
 
-  protected readonly time = computed(
-    () => `${formatDuration(this.playback.position())} / ${formatDuration(this.timeline.duration())}`,
-  );
+  /** Locks the montage against edits, or unlocks it; a track in recording mode leaves it. */
+  protected toggleLock(): void {
+    if (this.recorder.state() !== 'idle') return;
+    this.recorder.disarm();
+    this.edits.toggleLock();
+  }
+
+  /** Listening volume on a knob in dB, as the volume of the tracks. */
+  protected readonly minVolumeDb = -30;
+  protected readonly maxVolumeDb = MAX_VOLUME_DB;
+  protected readonly volumeDb = computed(() => {
+    const volume = this.settings.volume();
+    return volume > 0 ? Math.max(this.minVolumeDb, Math.round(40 * Math.log10(volume)) / 2) : this.minVolumeDb;
+  });
+  protected readonly volumeLabel = computed(() => {
+    const muted = this.settings.muted() ? this.i18n.t('volume.muted') : null;
+    return (db: number) => muted ?? `${db > 0 ? '+' : ''}${db.toFixed(1)} dB`;
+  });
+  protected readonly halfDb = (db: number) => Math.round(db * 2) / 2;
+  /** The value is not written under the knob: the tooltip tells it. */
+  protected readonly volumeTooltip = computed(() => `${this.volumeLabel()(this.volumeDb())} · ${this.i18n.t('volume.hint')}`);
+
+  protected setVolumeDb(db: number, persist = true): void {
+    this.settings.setVolume(10 ** (db / 20), persist);
+  }
+
+  /** Playhead position, to the millisecond: the large clock of the status bar. */
+  protected readonly clock = computed(() => formatPrecise(this.playback.position()));
+  /** Length of the montage: up to the end of its last clip. */
+  protected readonly length = computed(() => formatDuration(this.timeline.duration()));
 
   /** Length of the mix without its leading and trailing silences, with its span in the tooltip. */
   protected readonly audible = computed(() => {
     const range = this.mixer.audibleRange();
     if (!range) return null;
     return {
-      label: this.i18n.t('audible.label', { d: formatDuration(range.end - range.start) }),
+      value: formatDuration(range.end - range.start),
       tooltip: this.i18n.t('audible.tooltip', { from: formatDuration(range.start), to: formatDuration(range.end) }),
     };
   });
@@ -107,7 +152,7 @@ export class App {
   }
 
   /**
-   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y, Ctrl+A select all clips), transport (Space, Home, End; R records on the track in recording mode) and edit
+   * Help (F1), document (Ctrl+N/O/S/Shift+S/Z/Y, Ctrl+A select all clips, Ctrl+L lock), transport (Space, Home, End, Backspace back to the previous marker; R records on the track in recording mode) and edit
    * (S split, E envelope, B beat grid, arrows move the selected clips, Delete, Escape) shortcuts.
    */
   protected onKeydown(event: KeyboardEvent): void {
@@ -152,6 +197,8 @@ export class App {
       if (event.code === 'Escape' && this.recorder.state() === 'idle') return this.recorder.disarm();
     }
     if (this.recorder.state() !== 'idle' || this.montages.isEmpty()) return;
+    // locked: only the keys of listening and moving around
+    if (this.montages.locked() && !LISTENING_KEYS.has(event.code)) return;
     switch (event.code) {
       case 'Space':
         event.preventDefault();
@@ -167,8 +214,11 @@ export class App {
         if (!this.timeline.selectedClipIds().length) return;
         event.preventDefault();
         return this.edits.nudge(event.code === 'ArrowRight' ? 1 : -1, event.shiftKey);
-      case 'Delete':
       case 'Backspace':
+        // back, as the button of the transport: to the previous marker
+        event.preventDefault();
+        return this.edits.previousMarker();
+      case 'Delete':
         event.preventDefault();
         return void this.edits.delete();
       case 'KeyS':
@@ -203,6 +253,8 @@ export class App {
         return () => this.montages.redo();
       case 'KeyA':
         return () => this.edits.selectAll();
+      case 'KeyL':
+        return () => this.montages.isEmpty() || this.toggleLock();
       default:
         return undefined;
     }

@@ -85,9 +85,9 @@
 file originale ──ffprobe──▶ AudioInfo
                ──ffmpeg (f32le)──▶ AudioBuffer ──▶ AudioLibraryService (per sourceId)
                                                ├─▶ peaks.ts (piramide min/max per il disegno)
-                                               └─▶ TempoService (rilevamento BPM, curva degli attacchi)
+                                               └─▶ TempoService (rilevamento BPM, caratteristiche ritmiche)
 clip con rate/pitch ≠ neutri ──ffmpeg rubberband / asetrate──▶ ProcessedAudioService (buffer renderizzato)
-clip ──▶ catena di effetti della traccia ──▶ volume della traccia ──▶ uscita
+clip ──▶ catena di effetti della traccia ──▶ volume della traccia ──▶ pan ──▶ uscita (e misuratore in ascolto)
 MixService.schedule(ctx) ──▶ AudioContext (PlaybackService)  |  OfflineAudioContext (ExportService)
 ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/ogg/opus/m4a)
 ```
@@ -99,7 +99,11 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
 - **Tempo** (`TempoService`, `tempo.ts`): BPM e fase stimati dopo la decodifica (flusso
   spettrale → autocorrelazione con preferenza ~120 BPM → pettine per la fase), tenuti in
   memoria e ricalcolati a ogni apertura. Un tempo impostato a mano viene salvato sulla
-  sorgente nel montaggio e ha la precedenza (`sourceTempo()`).
+  sorgente nel montaggio e ha la precedenza (`sourceTempo()`). Su richiesta, le
+  caratteristiche ritmiche dell'intera sorgente (`rhythm.ts`: attacchi per banda e chroma)
+  servono all'aggancio agli attacchi e al tracciamento delle battute (`trackRhythm`, vedi
+  [timeline.md](timeline.md#tracciamento-delle-battute)), il cui resoconto resta in
+  `TempoService.reports`.
 - **Audio processato** (`ProcessedAudioService`): una clip con velocità o pitch diversi da
   1/0 suona un render dell'**intera sorgente** per quella coppia rate/pitch, chiesto al motore
   audio come `AudioProcessing` (su desktop, filtri ffmpeg: stretch:
@@ -107,7 +111,11 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
   aggiuntivo). Il render è riusato da trim, split, undo/redo e clip con le stesse impostazioni.
   Il buffer renderizzato è in tempo *timeline*: offset nel buffer = `clip.offset / rate`.
 - **Mix** (`MixService`): per traccia udibile un `AudioBufferSourceNode` per clip, la catena degli
-  effetti (`EffectChain`) e un `GainNode` con il volume della traccia; una clip con inviluppo passa da
+  effetti (`EffectChain`), un `GainNode` con il volume della traccia e il pan come bilanciamento
+  (`Balance`: ingresso forzato a due canali, una traccia mono viene prima aperta sui due lati; al
+  centro il suono non cambia, spostandosi si abbassa solo il lato opposto, −3 dB a metà corsa, e
+  nessun lato viene mai alzato: uno `StereoPannerNode` sposterebbe un lato nell'altro, fino a +6 dB). In ascolto l'uscita di ogni traccia va anche al suo misuratore
+  (`PlaybackService.tap`: divisore dei canali e un `AnalyserNode` per lato); una clip con inviluppo passa da
   un suo `GainNode` automatizzato (`automate` con i punti convertiti in tempo di timeline,
   `clipEnvelopeOnTimeline`). Lo stesso grafo serve riproduzione ed export, quindi suonano uguali.
 - **Effetti** (`core/effects/`): ogni effetto è costruito con i nodi nativi di Web Audio (EQ:

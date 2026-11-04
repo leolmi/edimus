@@ -1,18 +1,26 @@
-import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, input, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AudioLibraryService } from '../../core/audio/audio-library.service';
 import { rangePeak } from '../../core/audio/peaks';
 import { MAX_GAIN, clipGainAt, gainAt, gainToDb } from '../../core/montage/envelope';
 import { Clip, Track, clipRate, fileName, isProcessed, toSource, toTimeline, trackVolume } from '../../core/montage/montage.model';
 import { ProcessedAudioService } from '../../core/audio/processed-audio.service';
-import { Tempo, beatsPerBar } from '../../core/audio/tempo';
-import { anchorOf, barAt, barTime } from '../../core/audio/tempo-map';
+import { Tempo, meterName } from '../../core/audio/tempo';
+import { anchorOf, barAt, barMeter, barTime } from '../../core/audio/tempo-map';
+import { UNCERTAIN_BAR } from '../../core/audio/rhythm';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TempoService } from '../../core/audio/tempo.service';
 import { sourceColors } from '../../core/source-colors';
 import { CanvasColors, ThemeColorsService } from '../../core/theme-colors.service';
 import { MontageService } from '../../core/montage/montage.service';
+import { SourceSummaryService } from '../../core/source-summary.service';
+import { EditService } from '../../core/edit.service';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { envelopeAnchors } from '../../core/timeline/edge-snap';
 import { TimelineService } from '../../core/timeline/timeline.service';
 import { observeSize, prepareCanvas } from './canvas';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 
 /** Distance (px) from a clip edge within which the pointer grabs the edge to trim it. */
 const EDGE_GRAB = 6;
@@ -37,13 +45,104 @@ const ENVELOPE_MARGIN = 6;
 /** Vertical gap between the channels of a stereo clip. */
 const CHANNEL_GAP = 2;
 
-/** Lane of a track: its clips with the waveform of their source (one row per channel). */
+/** Size (px) of the padlock of a clip, and narrowest clip (in view) showing it. */
+const LOCK_SIZE = 20;
+const LOCK_ROOM = 32;
+/** Dash of the border of a locked clip. */
+const LOCKED_DASH = [6, 3];
+
+/** Room (px) the clip names may take beyond the view: they stay pinned to its left edge anyway. */
+const NAME_ROOM = 1000;
+
+/**
+ * Lane of a track: its clips with the waveform of their source (one row per channel) and the
+ * name of the file at the bottom left of each clip, with its details in a tooltip.
+ */
 @Component({
   selector: 'app-track-lane',
-  template: '<canvas #canvas></canvas>',
-  styles: ':host { display: block; position: relative; overflow: hidden; } canvas { position: absolute; inset: 0; }',
+  imports: [MatButtonModule, MatIconModule, MatTooltipModule, TranslatePipe],
+  template: `
+    <canvas #canvas></canvas>
+    @for (name of names(); track name.id) {
+      <!-- as wide as the clip: the name sticks to the left edge of the view while the clip runs past it, and stays inside the clip -->
+      <div class="clip-name" [style.left.px]="name.left" [style.width.px]="name.width">
+        <span [matTooltip]="name.summary" matTooltipShowDelay="400">{{ name.text }}</span>
+      </div>
+    }
+    @for (lock of locks(); track lock.id) {
+      <!-- the padlock in the top right corner, kept in view: closed on a locked clip, open on the clip under the pointer -->
+      <button
+        mat-icon-button
+        class="clip-lock"
+        [class.locked]="lock.locked"
+        [style.left.px]="lock.x"
+        [matTooltip]="(lock.locked ? 'clipLock.locked' : 'clipLock.unlocked') | t"
+        matTooltipShowDelay="400"
+        (pointerdown)="$event.stopPropagation()"
+        (dblclick)="$event.stopPropagation()"
+        (click)="edits.toggleClipLock(lock.id)"
+      >
+        <mat-icon>{{ lock.locked ? 'lock' : 'lock_open' }}</mat-icon>
+      </button>
+    }
+  `,
+  styles: `
+    :host {
+      display: block;
+      position: relative;
+      overflow: hidden;
+    }
+    canvas {
+      position: absolute;
+      inset: 0;
+    }
+    .clip-name {
+      position: absolute;
+      bottom: 3px;
+      display: flex;
+      /* clip, not hidden: no scroll container, so that the sticky name follows the lane */
+      overflow: clip;
+      pointer-events: none;
+    }
+    .clip-name span {
+      position: sticky;
+      left: 4px;
+      margin: 0 4px;
+      padding: 0 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      border-radius: 3px;
+      font: var(--mat-sys-label-small);
+      color: var(--mat-sys-on-surface);
+      background: color-mix(in srgb, var(--mat-sys-surface) 60%, transparent);
+      pointer-events: auto;
+    }
+    .clip-lock {
+      --mat-icon-button-state-layer-size: 20px;
+      --mat-icon-button-icon-size: 14px;
+      --mat-icon-button-icon-color: var(--mat-sys-on-surface-variant);
+      --mat-icon-button-container-shape: 3px;
+      position: absolute;
+      top: 3px;
+      padding: 0;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--mat-sys-surface) 60%, transparent);
+      &.locked {
+        --mat-icon-button-icon-color: var(--mat-sys-error);
+      }
+    }
+    :host(.silent) .clip-name {
+      opacity: 0.5;
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '[style.cursor]': 'cursor()', '(pointermove)': 'onHover($event)', '(pointerleave)': 'cursor.set(null)' },
+  host: {
+    '[style.cursor]': 'cursor()',
+    '[class.silent]': 'silent()',
+    '(pointermove)': 'onHover($event)',
+    '(pointerleave)': 'cursor.set(null); hovered.set(null)',
+  },
 })
 export class TrackLaneComponent {
   readonly track = input.required<Track>();
@@ -53,6 +152,8 @@ export class TrackLaneComponent {
   readonly activePoint = input<{ clipId: string; index: number } | null>(null);
 
   protected readonly cursor = signal<string | null>(null);
+  /** Clip under the pointer: its open padlock shows, to lock it. */
+  protected readonly hovered = signal<string | null>(null);
 
   private readonly timeline = inject(TimelineService);
   private readonly library = inject(AudioLibraryService);
@@ -60,12 +161,45 @@ export class TrackLaneComponent {
   private readonly tempos = inject(TempoService);
   private readonly montages = inject(MontageService);
   private readonly theme = inject(ThemeColorsService);
+  private readonly i18n = inject(I18nService);
+  private readonly summaries = inject(SourceSummaryService);
+  protected readonly edits = inject(EditService);
   private readonly canvas = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly size = observeSize();
 
   constructor() {
     effect(() => this.draw());
   }
+
+  /** Name of the file of each clip in view (only of the clips whose audio is there). */
+  protected readonly names = computed(() => {
+    const width = this.size().width;
+    const sources = this.montages.montage().sources;
+    return this.track().clips.flatMap((clip) => {
+      if (!this.library.ready(clip.sourceId)) return [];
+      const span = this.clipSpan(clip);
+      if (span.x1 <= 0 || span.x0 >= width) return [];
+      const left = Math.max(span.x0, -NAME_ROOM);
+      const right = Math.min(span.x1, width + NAME_ROOM);
+      const path = sources.find((s) => s.id === clip.sourceId)?.path ?? '';
+      return [{ id: clip.id, left, width: right - left, text: fileName(path), summary: this.summaries.summary(clip.sourceId) ?? '' }];
+    });
+  });
+
+  /** Padlocks shown: of the locked clips and of the clip under the pointer, in its top right corner inside the view. */
+  protected readonly locks = computed(() => {
+    const width = this.size().width;
+    const hovered = this.hovered();
+    return this.track().clips.flatMap((clip) => {
+      if (!clip.locked && clip.id !== hovered) return [];
+      const span = this.clipSpan(clip);
+      const x0 = Math.max(span.x0, 0);
+      const x1 = Math.min(span.x1, width);
+      // too narrow (or out of view): no room for it
+      if (x1 - x0 < LOCK_ROOM) return [];
+      return [{ id: clip.id, locked: !!clip.locked, x: x1 - LOCK_SIZE - 4 }];
+    });
+  });
 
   /** Clips in drawing order: the selected ones last, on top of the others (so their edges stay reachable). */
   private stacked(): Clip[] {
@@ -216,6 +350,13 @@ export class TrackLaneComponent {
     if (event.buttons) return;
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = event.clientX - rect.left;
+    this.hovered.set(this.clipAt(x)?.clip.id ?? null);
+    // a drag inside the selected range moves it
+    const range = this.timeline.range();
+    const time = this.timeline.xToTime(x);
+    const inRange = !!range && time >= range.start && time <= range.end;
+    // locked: the clips cannot be grabbed
+    if (this.montages.locked()) return this.cursor.set(inRange || !this.track().clips.length ? 'grab' : null);
     if (this.timeline.beatMarking()) {
       // precise pointer to place the 1, then move / stretch arrows on the bar
       const zone = this.markedBarAt(x);
@@ -228,10 +369,16 @@ export class TrackLaneComponent {
       this.cursor.set(this.pointAt(x, y) ? 'move' : this.curveHandleAt(x, y) ? 'ns-resize' : this.clipBodyAt(x) ? 'crosshair' : null);
       return;
     }
+    // an empty track pans the view
+    if (!this.track().clips.length) return this.cursor.set('grab');
     // Shift on a bar line: the bar map is stretched there
     if (event.shiftKey && this.barLineAt(x)) return this.cursor.set('col-resize');
-    const zone = this.clipAt(x)?.zone;
-    this.cursor.set(zone === 'body' ? 'grab' : zone ? 'ew-resize' : null);
+    // only a selected clip is dragged: from the others (and from a selection with a locked clip) a drag selects a range
+    const hit = this.clipAt(x);
+    if (hit && hit.zone !== 'body' && !hit.clip.locked) return this.cursor.set('ew-resize');
+    const selected = this.timeline.selectedClips();
+    const still = this.montages.montage().tracks.some((t) => t.clips.some((c) => c.locked && selected.has(c.id)));
+    this.cursor.set((hit && selected.has(hit.clip.id) && !still) || inRange ? 'grab' : null);
   }
 
   private draw(): void {
@@ -266,7 +413,10 @@ export class TrackLaneComponent {
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = palette.clipBorder;
       ctx.lineWidth = selected ? 2 : 1;
+      // a locked clip has a dashed border: it stands out from the others also at a glance
+      if (clip.locked) ctx.setLineDash(LOCKED_DASH);
       ctx.strokeRect(Math.round(x0) + 0.5, 1.5, Math.round(x1 - x0) - 1, size.height - 3);
+      ctx.setLineDash([]);
       ctx.lineWidth = 1;
 
       if (!audio) {
@@ -465,13 +615,13 @@ export class TrackLaneComponent {
 
   /**
    * Bars first: alternate bands, one per bar, with a strong line and its number on the
-   * downbeat; then the beats inside the bar, lighter. Bars pinned by hand have a mark on top,
-   * those placed by the bar tracking a small one at the bottom. Between x0 and x1 (lane px),
-   * faded by `alpha`.
+   * downbeat (and the meter where it changes); then the beats inside the bar, lighter, where the
+   * tracking found them. Bars pinned by hand have a mark on top, those placed by the bar tracking
+   * a small one at the bottom; doubtful bars have a dashed line in the error color. No grid in
+   * the free regions, a hatched band instead. Between x0 and x1 (lane px), faded by `alpha`.
    */
   private drawBarGrid(ctx: CanvasRenderingContext2D, colors: CanvasColors, clip: Clip, tempo: Tempo, x0: number, x1: number, height: number, alpha: number): void {
     if (x1 <= x0) return;
-    const meter = beatsPerBar(tempo);
     const sourceToX = (sourceTime: number) => this.sourceX(clip, sourceTime);
     // source times of the first and last visible pixels
     const fromSource = toSource(clip, this.timeline.xToTime(x0));
@@ -481,9 +631,16 @@ export class TrackLaneComponent {
     // too dense on average: no grid
     if ((x1 - x0) / Math.max(1, lastBar - firstBar) < 6) return;
     const base = ctx.globalAlpha;
+    const free = (tempo.regions ?? []).map((r) => [sourceToX(r.from), sourceToX(r.to)]).filter(([a, b]) => b > x0 && a < x1);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x0, 0, x1 - x0, height);
+    // the grid only outside the free regions
+    let open = x0;
+    for (const [a, b] of free) {
+      if (a > open) ctx.rect(open, 0, Math.min(a, x1) - open, height);
+      open = Math.max(open, b);
+    }
+    if (open < x1) ctx.rect(open, 0, x1 - open, height);
     ctx.clip();
     ctx.fillStyle = colors.beat;
     ctx.strokeStyle = colors.beat;
@@ -491,6 +648,9 @@ export class TrackLaneComponent {
     ctx.textBaseline = 'top';
     let left = sourceToX(barTime(tempo, firstBar));
     for (let b = firstBar; b <= lastBar && left <= x1; b++) {
+      const meter = barMeter(tempo, b);
+      const anchor = anchorOf(tempo, b);
+      const doubtful = !!anchor?.auto && anchor.confidence !== undefined && anchor.confidence < UNCERTAIN_BAR;
       const right = sourceToX(barTime(tempo, b + 1));
       const barPx = right - left;
       // alternate bands: the even bars (1, 3, …) shaded
@@ -503,11 +663,23 @@ export class TrackLaneComponent {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
-      ctx.stroke();
-      if (barPx >= 28 && b >= 0) ctx.fillText(String(b + 1), x + 3, 3);
-      const anchor = anchorOf(tempo, b);
+      if (doubtful) {
+        ctx.save();
+        ctx.strokeStyle = colors.error;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.restore();
+      } else ctx.stroke();
+      if (barPx >= 28 && b >= 0) {
+        // the meter where it changes, when it fits
+        const withMeter = `${b + 1}  ${meterName(meter)}`;
+        const changed = meter !== barMeter(tempo, b - 1) && ctx.measureText(withMeter).width + 6 <= barPx;
+        ctx.fillText(changed ? withMeter : String(b + 1), x + 3, 3);
+      }
       if (anchor) {
-        ctx.globalAlpha = base * alpha * (anchor.auto ? 0.5 : 1);
+        ctx.globalAlpha = base * alpha * (anchor.auto && !doubtful ? 0.5 : 1);
+        ctx.save();
+        if (doubtful) ctx.fillStyle = colors.error;
         ctx.beginPath();
         if (anchor.auto) ctx.rect(x - 1.5, height - 4, 3, 3);
         else {
@@ -516,13 +688,14 @@ export class TrackLaneComponent {
           ctx.lineTo(x, 7);
         }
         ctx.fill();
+        ctx.restore();
       }
       // beats inside the bar, only when far enough apart
       if (barPx / meter >= 6) {
         ctx.globalAlpha = base * alpha * 0.18;
         ctx.beginPath();
         for (let k = 1; k < meter; k++) {
-          const bx = Math.round(left + (k * barPx) / meter) + 0.5;
+          const bx = Math.round(sourceToX(barTime(tempo, b + k / meter))) + 0.5;
           ctx.moveTo(bx, height * 0.25);
           ctx.lineTo(bx, height * 0.75);
         }
@@ -531,7 +704,35 @@ export class TrackLaneComponent {
       left = right;
     }
     ctx.restore();
+    if (free.length) this.drawFree(ctx, colors, free, x0, x1, height, alpha);
     ctx.globalAlpha = base;
+  }
+
+  /** Free regions of the grid (no pulse): a light hatched band with its name. */
+  private drawFree(ctx: CanvasRenderingContext2D, colors: CanvasColors, free: number[][], x0: number, x1: number, height: number, alpha: number): void {
+    const base = ctx.globalAlpha;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, 0, x1 - x0, height);
+    ctx.clip();
+    ctx.strokeStyle = colors.beat;
+    ctx.fillStyle = colors.beat;
+    ctx.font = colors.font;
+    ctx.textBaseline = 'top';
+    const label = this.i18n.t('grid.free');
+    for (const [a, b] of free) {
+      ctx.globalAlpha = base * alpha * 0.12;
+      ctx.beginPath();
+      for (let x = Math.floor(a / 12) * 12 - height; x < b; x += 12) {
+        ctx.moveTo(Math.max(a, x), Math.max(a, x) - x);
+        ctx.lineTo(Math.min(b, x + height), Math.min(b, x + height) - x);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = base * alpha * 0.7;
+      const at = Math.max(a, x0) + 4;
+      if (Math.min(b, x1) - at >= ctx.measureText(label).width + 4) ctx.fillText(label, at, 3);
+    }
+    ctx.restore();
   }
 
   /**

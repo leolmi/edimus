@@ -34,10 +34,19 @@ function parseMontage(text: string, path: string): Montage {
   let montage = JSON.parse(text) as Montage;
   if (!Array.isArray(montage.tracks) || !Array.isArray(montage.sources)) throw new Error(`Unsupported montage format: ${path}`);
   if (montage.version === 1) montage = upgradeV1(montage);
-  // 2 → 3 only adds the effects: nothing to convert
-  if (montage.version === 2) montage = { ...montage, version: MONTAGE_VERSION };
+  // 2 → 3 only adds the effects, 3 → 4 the markers: nothing to convert
+  if (montage.version === 2 || montage.version === 3) montage = { ...montage, version: MONTAGE_VERSION };
   if (montage.version !== MONTAGE_VERSION) throw new Error(`Unsupported montage format: ${path}`);
-  return withValidEffects(montage);
+  return withValidMarkers(withValidEffects(montage));
+}
+
+/** Markers with a time and a name only (a hand-edited file may hold anything). */
+function withValidMarkers(montage: Montage): Montage {
+  const { markers, ...rest } = montage;
+  const valid = Array.isArray(markers)
+    ? markers.filter((m) => typeof m?.time === 'number' && m.time >= 0 && typeof m.name === 'string').map((m) => ({ id: String(m.id ?? crypto.randomUUID()), time: m.time, name: m.name }))
+    : [];
+  return valid.length ? { ...rest, markers: valid } : rest;
 }
 
 /** The effects of the tracks checked against their descriptors (unknown types dropped, values in range). */

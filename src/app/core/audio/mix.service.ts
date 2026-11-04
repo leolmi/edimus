@@ -2,7 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 import { EffectChain } from '../effects/effect-nodes';
 import { TrackEffect, effectsTail } from '../effects/effects';
 import { automate, clipEnvelopeOnTimeline, clipGainAt } from '../montage/envelope';
-import { Clip, Montage, Track, audibleTracks, clipRate, isProcessed, trackVolume } from '../montage/montage.model';
+import { Clip, Montage, Track, audibleTracks, clipRate, isProcessed, trackPan, trackVolume } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
 import { TimelineService } from '../timeline/timeline.service';
 import { AudioLibraryService } from './audio-library.service';
@@ -23,10 +23,51 @@ export interface AudibleRange {
 /** Tempo the echoes follow when the track has none. */
 const DEFAULT_BPM = 120;
 
-/** Nodes of a track in a scheduled mix, changed live (volume, effect values). */
+/** Nodes of a track in a scheduled mix, changed live (volume, pan, effect values). */
 interface ScheduledTrack {
   volume: GainNode;
+  pan: Balance;
   effects: EffectChain;
+}
+
+/** Gains of the two sides for a pan: the side the track moves away from is lowered (-3 dB at half way), the other stays. */
+function sideGains(pan: number): [number, number] {
+  const away = Math.cos((Math.abs(pan) * Math.PI) / 2);
+  return pan < 0 ? [1, away] : [away, 1];
+}
+
+/**
+ * Pan as a balance of the two sides: always stereo (a mono track is spread on both sides first),
+ * the centre leaves the sound as it is and no side is ever raised. A StereoPannerNode would move
+ * a side into the other, up to +6 dB on a full side.
+ */
+class Balance {
+  readonly input: GainNode;
+  readonly output: ChannelMergerNode;
+  private readonly sides: GainNode[];
+
+  constructor(ctx: BaseAudioContext, pan: number) {
+    this.input = new GainNode(ctx, { channelCount: 2, channelCountMode: 'explicit' });
+    const splitter = ctx.createChannelSplitter(2);
+    this.output = ctx.createChannelMerger(2);
+    this.input.connect(splitter);
+    this.sides = sideGains(pan).map((gain, channel) => {
+      const side = new GainNode(ctx, { gain });
+      splitter.connect(side, channel);
+      side.connect(this.output, 0, channel);
+      return side;
+    });
+  }
+
+  set(pan: number): void {
+    sideGains(pan).forEach((gain, i) => this.sides[i].gain.setTargetAtTime(gain, this.input.context.currentTime, 0.015));
+  }
+
+  disconnect(): void {
+    this.input.disconnect();
+    this.output.disconnect();
+    for (const side of this.sides) side.disconnect();
+  }
 }
 
 /** Nodes of a scheduled mix, to stop and release them. */
@@ -54,7 +95,7 @@ export function differsOnlyLive(a: Montage, b: Montage): boolean {
 /**
  * Builds the audio graph of the montage on a context: for each audible track, one buffer source
  * per clip (through a gain automated by the clip's envelope when it has one) into the chain of
- * its effects, then a gain node with its volume. Used by both the live
+ * its effects, then a gain node with its volume and the balance of its pan. Used by both the live
  * playback and the offline render of the export, so they sound the same.
  */
 @Injectable({ providedIn: 'root' })
@@ -67,18 +108,30 @@ export class MixService {
 
   /**
    * Schedules the montage from montage time `from` (up to `until`, default the end), played at
-   * context time `when`.
+   * context time `when`. `tap` gives, per track, a node that also receives its output (the
+   * level meters of the playback).
    */
-  schedule(ctx: BaseAudioContext, destination: AudioNode, from: number, when: number, until = Infinity): ScheduledMix {
+  schedule(
+    ctx: BaseAudioContext,
+    destination: AudioNode,
+    from: number,
+    when: number,
+    until = Infinity,
+    tap?: (trackId: string) => AudioNode | undefined,
+  ): ScheduledMix {
     const mix: ScheduledMix = { sources: [], gains: [], tracks: new Map() };
     for (const track of audibleTracks(this.montages.montage())) {
+      const pan = new Balance(ctx, trackPan(track));
+      pan.output.connect(destination);
+      const meter = tap?.(track.id);
+      if (meter) pan.output.connect(meter);
       const volume = ctx.createGain();
-      volume.connect(destination);
+      volume.connect(pan.input);
       volume.gain.value = trackVolume(track);
       mix.gains.push(volume);
       const effects = new EffectChain(ctx, track.effects ?? [], this.trackBpm(track));
       effects.output.connect(volume);
-      mix.tracks.set(track.id, { volume, effects });
+      mix.tracks.set(track.id, { volume, pan, effects });
       const input = effects.input;
       for (const clip of track.clips) {
         const buffer = this.bufferOf(clip);
@@ -130,6 +183,7 @@ export class MixService {
       const scheduled = mix.tracks.get(track.id);
       if (!scheduled) continue;
       scheduled.volume.gain.setTargetAtTime(trackVolume(track), scheduled.volume.context.currentTime, 0.015);
+      scheduled.pan.set(trackPan(track));
       scheduled.effects.update(track.effects ?? [], this.trackBpm(track));
     }
   }
@@ -224,6 +278,9 @@ export function releaseMix(mix: ScheduledMix): void {
     node.disconnect();
   }
   for (const gain of mix.gains) gain.disconnect();
-  for (const track of mix.tracks.values()) track.effects.disconnect();
+  for (const track of mix.tracks.values()) {
+    track.effects.disconnect();
+    track.pan.disconnect();
+  }
 }
 

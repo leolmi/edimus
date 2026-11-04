@@ -173,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.9.2' },
+  { name: 'edimus', version: '1.10.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -349,6 +349,13 @@ appTool('play', 'Play', 'Plays the montage from `from` (default: playhead), stop
 appTool('stop', 'Stop', 'Stops the playback (playhead stays where it is).', {});
 appTool('seek', 'Move playhead', 'Moves the playhead to a timeline time.', { time: z.number().min(0) });
 appTool(
+  'set_markers',
+  'Set markers',
+  'Replaces the markers of the timeline (named points the user sets on the ruler to find passages again; empty list = none). ' +
+    'get_state lists them. Allowed also on a locked montage.',
+  { markers: z.array(z.object({ name: z.string(), time: z.number().min(0).describe('Timeline seconds') })) },
+);
+appTool(
   'select',
   'Select',
   'Sets the selection shown in the window: clips (empty or omitted = none) and time range [from, to) (omitted = none). ' +
@@ -382,6 +389,14 @@ appTool(
   'Splits the clips crossing `time` in two (only clipIds if given). Returns the new clips.',
   { time: z.number().min(0), clipIds: z.array(z.string()).optional() },
 );
+appTool(
+  'lock_clip',
+  'Lock clip',
+  'Locks a clip against accidental edits (locked true, default) or unlocks it (false). A locked clip keeps its track, place, ' +
+    'length and timing: edits that would move, trim, split, retime or remove it (also delete_range, crop, align_tempo, delete_track) fail; ' +
+    'its envelope and the track effects stay editable. Allowed also on a locked montage.',
+  { clipId: z.string(), locked: z.boolean().optional() },
+);
 appTool('delete_clip', 'Delete clip', 'Removes a clip (and its track when it was the last clip).', { clipId: z.string() }, { destructiveHint: true });
 appTool(
   'delete_range',
@@ -397,12 +412,13 @@ appTool(
   { from: z.number().min(0), to: z.number().min(0) },
   { destructiveHint: true },
 );
-appTool('set_track', 'Track properties', 'Renames, mutes or solos a track, or sets the volume of the whole track (dB).', {
+appTool('set_track', 'Track properties', 'Renames, mutes or solos a track (mute and solo exclude each other: switching one on switches the other off), or sets the volume (dB) and the pan of the whole track.', {
   trackId: z.string(),
   name: z.string().optional(),
   muted: z.boolean().optional(),
   solo: z.boolean().optional(),
   volumeDb: z.number().max(6).optional().describe('Volume of the whole track in dB (0 = unchanged, max +6)'),
+  pan: z.number().min(-100).max(100).optional().describe('Stereo position: -100 left, 0 centre, 100 right'),
 });
 appTool(
   'set_effects',
@@ -492,7 +508,9 @@ appTool(
   'set_bar_map',
   'Bar map',
   'For sources whose tempo is not steady (badly recorded, no click): the bar grid follows a map of pinned bars. ' +
-    'action track: finds the start of every bar along the whole source from the bars pinned by hand (which stay); ' +
+    'action track: follows the beats one by one along the whole source, finds the free passages (no pulse: no grid there), ' +
+    'puts the downbeats on the accents (meter 3 or 4 bar by bar, or `meter` fixed; beat tempo near `bpm` if given, as heard in the clip), ' +
+    'keeps the bars pinned by hand (they force a downbeat) and returns the report (rhythm, as analyze_rhythm); ' +
     'pin: puts the start of bar `bar` (number as on the grid, from 1) at timeline second `time`, the bars between it and the pinned ones around stretch evenly; ' +
     'unpin: takes the pin away from bar `bar`; reset: removes all the pins, back to the steady grid the map started from; ' +
     'clearAuto: removes only the pins of the tracking, keeps those set by hand; steady: drops the map leaving a steady tempo equal to its average; ' +
@@ -504,7 +522,23 @@ appTool(
     action: z.enum(['track', 'pin', 'unpin', 'reset', 'clearAuto', 'steady', 'save', 'load']),
     bar: z.number().int().optional(),
     time: z.number().min(0).optional(),
+    meter: z.number().int().min(2).max(12).optional().describe('track: beats per bar for the whole source; default found bar by bar'),
+    bpm: z.number().positive().optional().describe('track: tempo of the beat to stay near (e.g. a bpmAlternative)'),
   },
+);
+appTool(
+  'analyze_rhythm',
+  'Rhythm analysis',
+  'What the bar tracking finds on the source of a clip, without changing the map: regions (free = no pulse, pulsed with bars, ' +
+    'BPM range, meters, meterAlternative, downbeatUncertain, confidence), bpmAlternatives (beat twice/half as fast), uncertainBars ' +
+    '(numbers as on the grid) and tempoCurve (local tempo every 2 s with the clarity of the pulse, 0-1). Times in timeline seconds, BPM as heard. ' +
+    'meter / bpm as in set_bar_map track, to compare readings before applying one.',
+  {
+    clipId: z.string(),
+    meter: z.number().int().min(2).max(12).optional(),
+    bpm: z.number().positive().optional(),
+  },
+  { readOnlyHint: true },
 );
 appTool(
   'align_tempo',
@@ -551,7 +585,8 @@ appTool(
   'get_beats',
   'Beats',
   'Beat times (timeline seconds) of a clip with a known tempo, in [from, to) (default: the whole clip, at most 400 beats); ' +
-    'downbeats carry their bar number (as on the grid) and, when pinned in the bar map, anchor manual/auto.',
+    'downbeats carry their bar number (as on the grid), when pinned in the bar map anchor manual/auto, meter when the bar ' +
+    'differs from the usual one, uncertain when the tracking doubts it; free lists the passages with no pulse (no beats there).',
   { clipId: z.string(), from: z.number().min(0).optional(), to: z.number().min(0).optional() },
   { readOnlyHint: true },
 );

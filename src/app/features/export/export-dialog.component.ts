@@ -1,16 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import type { ExportFormat, ExportOptions } from '../../core/audio/export.service';
 import { parseTime } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { AudioEnginePort } from '../../core/platform/audio-engine.port';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
+import { FieldComponent } from '../../shared/controls/field.component';
 
 export const FORMATS: { id: ExportFormat; label: string; extension: string }[] = [
   { id: 'wav', label: 'WAV', extension: 'wav' },
@@ -32,13 +30,10 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
 /** Choice of format and quality of the mixdown. Closes with the options, or nothing when cancelled. */
 @Component({
   selector: 'app-export-dialog',
-  imports: [
+  imports: [FieldComponent, 
     MatButtonModule,
-    MatButtonToggleModule,
     MatCheckboxModule,
     MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatSelectModule,
     ScaleSliderComponent,
     TranslatePipe,
@@ -46,37 +41,39 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
   template: `
     <h2 mat-dialog-title>{{ 'export.title' | t }}</h2>
     <mat-dialog-content class="content">
-      <mat-form-field>
-        <mat-label>{{ 'export.format' | t }}</mat-label>
+      <app-field>
+        <span fieldLabel>{{ 'export.format' | t }}</span>
         <mat-select [value]="format()" (valueChange)="setFormat($event)">
           @for (f of formats; track f.id) {
             <mat-option [value]="f.id">{{ f.label }}</mat-option>
           }
         </mat-select>
-      </mat-form-field>
+      </app-field>
 
       <div class="row">
         <span class="label">{{ 'export.channels' | t }}</span>
-        <mat-button-toggle-group [value]="channels()" (change)="channels.set($event.value)">
-          <mat-button-toggle [value]="1">{{ 'channels.1' | t }}</mat-button-toggle>
-          <mat-button-toggle [value]="2">{{ 'channels.2' | t }}</mat-button-toggle>
-        </mat-button-toggle-group>
+        <app-field class="channels">
+          <mat-select [value]="channels()" (selectionChange)="channels.set($event.value)">
+            <mat-option [value]="1">{{ 'channels.1' | t }}</mat-option>
+            <mat-option [value]="2">{{ 'channels.2' | t }}</mat-option>
+          </mat-select>
+        </app-field>
       </div>
 
       @if (format() !== 'opus') {
-        <mat-form-field>
-          <mat-label>{{ 'export.sampleRate' | t }}</mat-label>
+        <app-field>
+          <span fieldLabel>{{ 'export.sampleRate' | t }}</span>
           <mat-select [value]="sampleRate()" (valueChange)="sampleRate.set($event)">
             @for (rate of sampleRates; track rate) {
               <mat-option [value]="rate">{{ rate / 1000 }} kHz</mat-option>
             }
           </mat-select>
-        </mat-form-field>
+        </app-field>
       }
 
       @if (format() === 'wav' || format() === 'flac') {
-        <mat-form-field>
-          <mat-label>{{ 'export.bitDepth' | t }}</mat-label>
+        <app-field>
+          <span fieldLabel>{{ 'export.bitDepth' | t }}</span>
           <mat-select [value]="bitDepth()" (valueChange)="bitDepth.set($event)">
             <mat-option [value]="16">16 bit</mat-option>
             <mat-option [value]="24">24 bit</mat-option>
@@ -84,18 +81,18 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
               <mat-option [value]="32">32 bit float</mat-option>
             }
           </mat-select>
-        </mat-form-field>
+        </app-field>
       }
 
       @if (bitrates(); as list) {
-        <mat-form-field>
-          <mat-label>{{ 'export.bitrate' | t }}</mat-label>
+        <app-field>
+          <span fieldLabel>{{ 'export.bitrate' | t }}</span>
           <mat-select [value]="bitrate()" (valueChange)="bitrate.set($event)">
             @for (b of list; track b) {
               <mat-option [value]="b">{{ b }} kbps</mat-option>
             }
           </mat-select>
-        </mat-form-field>
+        </app-field>
       }
 
       @if (format() === 'ogg') {
@@ -119,15 +116,15 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
         {{ 'export.normalize' | t }}
       </mat-checkbox>
 
-      <mat-form-field class="silence">
-        <mat-label>{{ 'export.trailingSilence' | t }}</mat-label>
-        <input matInput placeholder="0,000" [value]="silenceText()" (input)="silenceText.set($any($event.target).value)" />
+      <app-field class="silence">
+        <span fieldLabel>{{ 'export.trailingSilence' | t }}</span>
+        <input placeholder="0,000" [value]="silenceText()" (input)="silenceText.set($any($event.target).value)" />
         @if (trailingSilence() === null) {
-          <mat-hint class="error">{{ 'export.trailingSilenceInvalid' | t }}</mat-hint>
+          <span fieldHint class="error">{{ 'export.trailingSilenceInvalid' | t }}</span>
         } @else {
-          <mat-hint>{{ 'export.trailingSilenceHint' | t }}</mat-hint>
+          <span fieldHint>{{ 'export.trailingSilenceHint' | t }}</span>
         }
-      </mat-form-field>
+      </app-field>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>{{ 'common.cancel' | t }}</button>
@@ -146,6 +143,9 @@ const SAMPLE_RATES = [22050, 32000, 44100, 48000, 88200, 96000];
       align-items: center;
       gap: 12px;
       margin-bottom: 16px;
+    }
+    .channels {
+      width: 160px;
     }
     .label {
       min-width: 90px;

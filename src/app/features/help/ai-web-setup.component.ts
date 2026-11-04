@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { AiBridgeService } from '../../core/ai/ai-bridge.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { SettingsService } from '../../core/settings.service';
+import { FieldComponent } from '../../shared/controls/field.component';
 
 /** Default port of the bridge of the MCP server (EDIMUS_MCP_PORT changes it). */
 const DEFAULT_PORT = 47816;
@@ -16,7 +15,7 @@ const DEFAULT_PORT = 47816;
  */
 @Component({
   selector: 'app-ai-web-setup',
-  imports: [MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, TranslatePipe],
+  imports: [FieldComponent, MatButtonModule, MatIconModule, TranslatePipe],
   template: `
     <p class="state" [class.on]="ai.connected()">
       <mat-icon>{{ ai.connected() ? 'link' : 'link_off' }}</mat-icon>
@@ -25,14 +24,14 @@ const DEFAULT_PORT = 47816;
     <p>{{ 'aiWeb.intro' | t }}</p>
     <p class="hint">{{ 'aiWeb.where' | t }}</p>
     <div class="fields">
-      <mat-form-field class="port">
-        <mat-label>{{ 'aiWeb.port' | t }}</mat-label>
-        <input matInput type="number" [value]="port()" (input)="port.set(+$any($event.target).value)" />
-      </mat-form-field>
-      <mat-form-field class="token">
-        <mat-label>{{ 'aiWeb.token' | t }}</mat-label>
-        <input matInput [value]="token()" (input)="token.set($any($event.target).value.trim())" />
-      </mat-form-field>
+      <app-field class="port">
+        <span fieldLabel>{{ 'aiWeb.port' | t }}</span>
+        <input type="number" [value]="port()" (input)="port.set(+$any($event.target).value)" />
+      </app-field>
+      <app-field class="token">
+        <span fieldLabel>{{ 'aiWeb.token' | t }}</span>
+        <input [value]="token()" (input)="token.set($any($event.target).value.trim())" />
+      </app-field>
     </div>
     <button mat-flat-button [disabled]="!port() || !token()" (click)="save()">
       <mat-icon>link</mat-icon>

@@ -7,10 +7,11 @@ import { ProcessedAudioService } from '../audio/processed-audio.service';
 import { BarFileService } from '../audio/bar-file.service';
 import { TempoService } from '../audio/tempo.service';
 import { beatsPerBar } from '../audio/tempo';
-import { anchorOf, gridPoints, isVariable, meanBpm, pinBar } from '../audio/tempo-map';
+import { anchorOf, barMeter, gridPoints, isVariable, meanBpm, pinBar } from '../audio/tempo-map';
+import { type RhythmReport, type TrackOptions, UNCERTAIN_BAR } from '../audio/rhythm';
 import { EFFECTS, TrackEffect, sanitizeEffects, setTrackEffects } from '../effects/effects';
 import { applyCrossfade, findCrossfade } from '../montage/crossfade';
-import { cropToRange, deleteRange, setClipTiming, splitAt, trimClip } from '../montage/edits';
+import { cropToRange, deleteRange, setClipTiming, splitAt, trimClip, withClipLocked } from '../montage/edits';
 import { EnvelopePoint, clipGainAt, withFade } from '../montage/envelope';
 import {
   MONTAGE_EXTENSION,
@@ -24,6 +25,7 @@ import {
   isProcessed,
   toSource,
   toTimeline,
+  trackPan,
   trackVolume,
   type Clip,
 } from '../montage/montage.model';
@@ -32,6 +34,7 @@ import { EditService } from '../edit.service';
 import { SourceFilesService } from '../montage/source-files.service';
 import { FileSystemPort } from '../platform/file-system.port';
 import { AlignOptions, alignTempo } from '../montage/tempo-align';
+import { sortedMarkers, withMarkers } from '../montage/markers';
 import { TimelineService } from '../timeline/timeline.service';
 
 type Params = Record<string, unknown>;
@@ -47,6 +50,31 @@ const fromDb = (db: number) => (db <= SILENCE_DB ? 0 : Math.min(2, Math.pow(10, 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Bends of the fade shapes (see envelope curve). */
+/** Commands refused while the user keeps the montage locked. */
+const LOCKED_COMMANDS = new Set([
+  'undo',
+  'redo',
+  'move_clip',
+  'trim_clip',
+  'split',
+  'delete_clip',
+  'delete_range',
+  'crop',
+  'set_track',
+  'set_effects',
+  'delete_track',
+  'set_envelope',
+  'fade',
+  'crossfade',
+  'set_clip_timing',
+  'set_tempo',
+  'align_tempo',
+  'set_bar_map',
+]);
+
+/** set_track changing only mute and solo: how the montage is heard, allowed while locked. */
+const onlyListening = (p: Params) => p['name'] === undefined && p['volumeDb'] === undefined && p['pan'] === undefined;
+
 const FADE_CURVES = { linear: 0, exponential: 4, logarithmic: -4, smooth: 2 } as const;
 
 /**
@@ -91,6 +119,8 @@ export class AiCommandsService {
         await this.montages.openMontage(montagePath);
       } else if (!paths.length) {
         // only relinked files
+      } else if (this.montages.locked()) {
+        throw new Error('The montage is locked against edits by the user: ask the user to unlock it to add files');
       } else if (p['trackId'] !== undefined) {
         const track = this.track(String(p['trackId']));
         const lengths = await Promise.all(paths.map(() => 0));
@@ -229,13 +259,16 @@ export class AiCommandsService {
     },
     set_track: async (p) => {
       const track = this.track(String(p['trackId']));
+      // mute and solo exclude each other, as in the window: switching one on switches the other off
+      if (p['muted'] && p['solo']) throw new Error('A track cannot be muted and soloed together');
       this.montages.updateTrack(track.id, (t) => ({
         ...t,
         name: p['name'] !== undefined ? String(p['name']) : t.name,
-        muted: p['muted'] !== undefined ? !!p['muted'] : t.muted,
-        solo: p['solo'] !== undefined ? !!p['solo'] : t.solo,
+        muted: p['muted'] !== undefined ? !!p['muted'] : p['solo'] ? false : t.muted,
+        solo: p['solo'] !== undefined ? !!p['solo'] : p['muted'] ? false : t.solo,
         volume: p['volumeDb'] !== undefined ? (Number(p['volumeDb']) === 0 ? undefined : fromDb(Number(p['volumeDb']))) : t.volume,
-      }));
+        pan: p['pan'] !== undefined ? Math.max(-1, Math.min(1, Number(p['pan']) / 100)) || undefined : t.pan,
+      }), onlyListening(p));
       return this.trackState(this.track(track.id));
     },
     set_effects: async (p) => {
@@ -428,8 +461,8 @@ export class AiCommandsService {
       const end = clip.start + this.length(clip);
       const from = Math.max(clip.start, Number(p['from'] ?? clip.start));
       const to = Math.min(end, Number(p['to'] ?? end));
-      const beats: { time: number; bar?: number; anchor?: 'manual' | 'auto' }[] = [];
-      for (const point of gridPoints(tempo, beatsPerBar(tempo), toSource(clip, from), toSource(clip, to))) {
+      const beats: { time: number; bar?: number; anchor?: 'manual' | 'auto'; meter?: number; uncertain?: true }[] = [];
+      for (const point of gridPoints(tempo, 'beat', toSource(clip, from), toSource(clip, to))) {
         const time = toTimeline(clip, point.time);
         if (time >= to || beats.length >= 400) break;
         if (point.index) {
@@ -438,9 +471,28 @@ export class AiCommandsService {
         }
         // downbeats carry the bar number shown on the grid (from 1) and whether they are pinned
         const anchor = anchorOf(tempo, point.bar);
-        beats.push({ time: round(time), bar: point.bar + 1, ...(anchor ? { anchor: anchor.auto ? 'auto' : 'manual' } : {}) });
+        const meter = barMeter(tempo, point.bar);
+        beats.push({
+          time: round(time),
+          bar: point.bar + 1,
+          ...(anchor ? { anchor: anchor.auto ? 'auto' : 'manual' } : {}),
+          ...(meter !== beatsPerBar(tempo) ? { meter } : {}),
+          ...(anchor?.confidence !== undefined && anchor.confidence < UNCERTAIN_BAR ? { uncertain: true as const } : {}),
+        });
       }
-      return { bpm: round(meanBpm(tempo) * rate, 2), variable: isVariable(tempo), beats };
+      // passages with no pulse: no beats there
+      const free = (tempo.regions ?? [])
+        .map((r) => ({ from: Math.max(from, round(toTimeline(clip, r.from))), to: Math.min(to, round(toTimeline(clip, r.to))) }))
+        .filter((r) => r.to > r.from);
+      return { bpm: round(meanBpm(tempo) * rate, 2), meter: beatsPerBar(tempo), variable: isVariable(tempo), ...(free.length ? { free } : {}), beats };
+    },
+    analyze_rhythm: async (p) => {
+      const { clip } = this.clip(String(p['clipId']));
+      await this.waitTempo([clip.sourceId]);
+      if (!this.tempos.sourceTempo(clip.sourceId)) throw new Error('The tempo of this clip is unknown: set it with set_tempo first');
+      const result = await this.edits.analyzeBars(clip.sourceId, this.trackOptions(clip, p));
+      if (!result) throw new Error('The rhythm of this clip cannot be analysed now (audio not ready, or a tracking in progress)');
+      return this.rhythmState(clip, result.report);
     },
     set_bar_map: async (p) => {
       const { clip } = this.clip(String(p['clipId']));
@@ -449,8 +501,10 @@ export class AiCommandsService {
       if (!tempo) throw new Error('The tempo of this clip is unknown: set it with set_tempo first');
       const bar = p['bar'] !== undefined ? Math.round(Number(p['bar'])) - 1 : undefined;
       switch (p['action']) {
-        case 'track':
-          return { ...this.sourceState(clip.sourceId), beatsOnAttacks: round((await this.edits.trackBars(clip.sourceId)) ?? 0, 2) };
+        case 'track': {
+          const report = await this.edits.trackBars(clip.sourceId, this.trackOptions(clip, p));
+          return { ...this.sourceState(clip.sourceId), ...(report ? { rhythm: this.rhythmState(clip, report) } : {}) };
+        }
         case 'pin': {
           if (bar === undefined || p['time'] === undefined) throw new Error('pin needs bar and time');
           const minBar = (60 / 400) * beatsPerBar(tempo);
@@ -487,15 +541,43 @@ export class AiCommandsService {
       return this.sourceState(clip.sourceId);
     },
     snapshot: async () => this.snapshot(),
+
+    // --- lock of a clip (it only protects: allowed also on a locked montage)
+    lock_clip: async (p) => {
+      const { clip } = this.clip(String(p['clipId']));
+      this.montages.update((m) => withClipLocked(m, clip.id, p['locked'] !== false), true);
+      return this.clipState(clip.id);
+    },
+
+    // --- markers (they only help finding passages: allowed also on a locked montage)
+    set_markers: async (p) => {
+      const given = (p['markers'] as { name?: unknown; time?: unknown }[] | undefined) ?? [];
+      const markers = given.map((m) => {
+        const time = Number(m.time);
+        if (!Number.isFinite(time) || time < 0) throw new Error('Every marker needs a time >= 0');
+        return { id: crypto.randomUUID(), time, name: String(m.name ?? '').trim() || `Marker ${round(time, 1)}` };
+      });
+      this.montages.update((m) => withMarkers(m, markers), true);
+      return { markers: this.markersState() };
+    },
   };
 
   /** Executes a command; throws with a message meant for the AI. */
   async execute(method: string, params: Params): Promise<unknown> {
     const handler = this.handlers[method];
     if (!handler) throw new Error(`Unknown command ${method}`);
+    // locked by the user: only reading, listening and mute / solo
+    if (this.montages.locked() && LOCKED_COMMANDS.has(method) && !(method === 'set_track' && onlyListening(params ?? {}))) {
+      throw new Error('The montage is locked against edits by the user (lock button in the toolbar): ask the user to unlock it');
+    }
     // a run of arrow moves in progress becomes its own undo step first
     this.edits.endNudge();
-    return handler(params ?? {});
+    const refusals = this.montages.clipLockRefusals();
+    const result = await handler(params ?? {});
+    if (this.montages.clipLockRefusals() !== refusals) {
+      throw new Error('The edit would move, cut or remove a clip locked by the user (locked: true in get_state): nothing changed. Ask the user, or unlock it with lock_clip');
+    }
+    return result;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -508,6 +590,8 @@ export class AiCommandsService {
     return {
       file: this.montages.path(),
       dirty: this.montages.dirty(),
+      // locked by the user: no edits until unlocked
+      locked: this.montages.locked(),
       channels: montage.channels,
       duration: round(this.timeline.duration()),
       // the mix without its leading and trailing silences (null while some audio is not ready)
@@ -519,7 +603,47 @@ export class AiCommandsService {
       canRedo: this.montages.canRedo(),
       sources: montage.sources.map((s) => this.sourceState(s.id)),
       tracks: montage.tracks.map((t) => ({ ...this.trackState(t), audible: audible.has(t.id) })),
+      markers: this.markersState(),
     };
+  }
+
+  /** Choices of the bar tracking from the parameters: meter, and BPM as heard in the clip. */
+  private trackOptions(clip: Clip, p: Record<string, unknown>): TrackOptions {
+    const meter = p['meter'] !== undefined ? Math.round(Number(p['meter'])) : undefined;
+    const bpm = p['bpm'] !== undefined ? Number(p['bpm']) / clipRate(clip) : undefined;
+    return { ...(meter && meter > 1 ? { meter } : {}), ...(bpm && bpm > 0 ? { bpm } : {}) };
+  }
+
+  /** What the bar tracking found, in timeline seconds and BPM heard in the clip, bars from 1. */
+  private rhythmState(clip: Clip, report: RhythmReport) {
+    const rate = clipRate(clip);
+    const end = clip.start + this.length(clip);
+    const at = (time: number) => round(toTimeline(clip, time));
+    const inside = (from: number, to: number) => at(to) > clip.start && at(from) < end;
+    const heard = (bpm: number) => round(bpm * rate, 1);
+    return {
+      confidence: report.confidence,
+      regions: report.regions
+        .filter((r) => inside(r.from, r.to))
+        .map((r) => ({
+          ...r,
+          from: Math.max(round(clip.start), at(r.from)),
+          to: Math.min(round(end), at(r.to)),
+          ...(r.firstBar !== undefined ? { firstBar: r.firstBar + 1, lastBar: r.lastBar! + 1 } : {}),
+          ...(r.bpm ? { bpm: { min: heard(r.bpm.min), max: heard(r.bpm.max), mean: heard(r.bpm.mean) } } : {}),
+        })),
+      bpmAlternatives: report.bpmAlternatives.map(heard),
+      uncertainBars: report.uncertainBars.slice(0, 100).map((bar) => bar + 1),
+      // every 2 s is enough to read the tempo changes
+      tempoCurve: report.tempoCurve
+        .filter((point, i) => i % 2 === 0 && inside(point.time, point.time))
+        .map((point) => ({ time: at(point.time), bpm: heard(point.bpm), clarity: point.clarity })),
+    };
+  }
+
+  /** Named points of the timeline set by the user, in time order. */
+  private markersState() {
+    return sortedMarkers(this.montages.montage()).map((m) => ({ name: m.name, time: round(m.time) }));
   }
 
   private sourceState(id: string) {
@@ -559,6 +683,7 @@ export class AiCommandsService {
       muted: !!track.muted,
       solo: !!track.solo,
       volumeDb: toDb(trackVolume(track)),
+      pan: Math.round(trackPan(track) * 100),
       effects: (track.effects ?? []).map((e) => ({ type: e.type, ...(e.bypass ? { bypass: true } : {}), params: e.params })),
       clips: track.clips.map((c) => this.clipState(c.id)),
     };
@@ -593,6 +718,8 @@ export class AiCommandsService {
       rate: clipRate(clip),
       pitch: clip.pitch ?? 0,
       mode: clip.varispeed ? 'varispeed' : 'stretch',
+      // locked by the user: it keeps place, length and timing
+      locked: !!clip.locked,
       bpm: tempo ? round(meanBpm(tempo) * clipRate(clip), 2) : null,
       status: render ? render.status : (source?.status ?? 'unknown'),
       // timeline seconds; points outside [start, end] are hidden by a trim but still shape the gain

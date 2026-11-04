@@ -1,4 +1,4 @@
-import type { BarAnchor, Tempo } from './tempo';
+import type { BarAnchor, Tempo, TempoRegion } from './tempo';
 
 /** Extension of the bar files, added to the name of the audio file (`song.mp3.edimusbars`). */
 export const BARS_EXTENSION = 'edimusbars';
@@ -18,14 +18,14 @@ export interface BarFile {
 
 /** Text of a bar file. */
 export function writeBarFile(audioName: string, file: BarFile): string {
-  const { bpm, offset, beatsPerBar, anchors } = file.tempo;
+  const { bpm, offset, beatsPerBar, anchors, regions } = file.tempo;
   return JSON.stringify(
     {
       kind: BARS_KIND,
       version: BARS_VERSION,
       audio: audioName,
       fingerprint: file.fingerprint,
-      tempo: { bpm, offset, beatsPerBar: beatsPerBar ?? 4, anchors },
+      tempo: { bpm, offset, beatsPerBar: beatsPerBar ?? 4, anchors, regions },
     },
     null,
     2,
@@ -42,8 +42,18 @@ export function readBarFile(text: string): BarFile {
   const anchors: BarAnchor[] | undefined = Array.isArray(tempo.anchors)
     ? tempo.anchors
         .filter((a: BarAnchor) => Number.isInteger(a?.bar) && Number.isFinite(a?.time))
-        .map((a: BarAnchor) => (a.auto ? { bar: a.bar, time: a.time, auto: true } : { bar: a.bar, time: a.time }))
+        .map((a: BarAnchor): BarAnchor => {
+          const anchor: BarAnchor = a.auto ? { bar: a.bar, time: a.time, auto: true } : { bar: a.bar, time: a.time };
+          if (Array.isArray(a.beats) && a.beats.every(Number.isFinite)) anchor.beats = a.beats;
+          if (a.auto && Number.isFinite(a.confidence)) anchor.confidence = Math.max(0, Math.min(1, a.confidence!));
+          return anchor;
+        })
         .sort((a: BarAnchor, b: BarAnchor) => a.bar - b.bar)
+    : undefined;
+  const regions: TempoRegion[] | undefined = Array.isArray(tempo.regions)
+    ? tempo.regions
+        .filter((r: TempoRegion) => r?.kind === 'free' && Number.isFinite(r.from) && Number.isFinite(r.to) && r.to > r.from)
+        .map((r: TempoRegion): TempoRegion => ({ from: r.from, to: r.to, kind: 'free' }))
     : undefined;
   return {
     fingerprint: typeof data.fingerprint === 'string' ? data.fingerprint : undefined,
@@ -53,6 +63,7 @@ export function readBarFile(text: string): BarFile {
       confidence: 1,
       beatsPerBar: Number.isInteger(tempo.beatsPerBar) && tempo.beatsPerBar > 0 ? tempo.beatsPerBar : 4,
       ...(anchors?.length ? { anchors } : {}),
+      ...(regions?.length ? { regions } : {}),
     },
   };
 }

@@ -2,16 +2,20 @@ import { Injectable, computed, effect, inject, signal, untracked } from '@angula
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ClipTiming, ClipTimingData, ClipTimingDialogComponent } from '../features/timeline/clip-timing-dialog.component';
+import { MarkerDialogComponent, MarkerDialogData } from '../features/timeline/marker-dialog.component';
 import { TempoDialogComponent, TempoDialogData, TempoDialogResult } from '../features/timeline/tempo-dialog.component';
 import { BarFileService } from './audio/bar-file.service';
 import { TempoService } from './audio/tempo.service';
-import { snapToOnsets } from './audio/tempo';
-import { clearAnchors, meanBpm, steadyTempo, trackBars, unpinBar } from './audio/tempo-map';
+import { type Tempo, snapToOnsets } from './audio/tempo';
+import { clearAnchors, meanBpm, steadyTempo, unpinBar } from './audio/tempo-map';
+import { RhythmReport, TrackOptions, trackRhythm } from './audio/rhythm';
 import { AlignClip, AlignDialogData, AlignTempoDialogComponent } from '../features/timeline/align-tempo-dialog.component';
 import { AlignContext, AlignOptions, alignTempo } from './montage/tempo-align';
 import { PlaybackService } from './audio/playback.service';
 import { applyCrossfade, findCrossfade } from './montage/crossfade';
-import { cropToRange, deleteRange, moveClips, setClipTiming, splitAt } from './montage/edits';
+import { cropToRange, deleteRange, moveClips, setClipTiming, splitAt, withClipLocked } from './montage/edits';
+import { addMarker, removeMarker, renameMarker, sortedMarkers, withMarkers } from './montage/markers';
+import { formatDuration } from './format';
 import { EffectPreset, EffectType, EffectValue, addEffect, applyPreset, moveEffect, newEffect, removeEffect, setEffectBypass, setEffectParams } from './effects/effects';
 import { Clip, Montage, clipRate } from './montage/montage.model';
 import { nextAnchorShift } from './timeline/edge-snap';
@@ -23,6 +27,9 @@ import { ShellPort } from './platform/shell.port';
 /** Tempo range of a bar stretched by hand. */
 const MIN_MARK_BPM = 20;
 const MAX_MARK_BPM = 400;
+
+/** Seconds after a marker within which Back, while playing, goes to the marker before it. */
+const PASSED_MARKER = 0.5;
 
 /** Pause (ms) after which the next arrow press starts a new undo step. */
 const NUDGE_PAUSE = 800;
@@ -68,6 +75,7 @@ export class EditService {
   });
   /** Something to delete: a range or some clips. */
   readonly canDelete = computed(() => this.hasRange() || this.timeline.selectedClipIds().length > 0);
+  readonly locked = this.montages.locked;
 
   constructor() {
     // a new montage clears the selection
@@ -105,6 +113,20 @@ export class EditService {
     });
   }
 
+  /**
+   * Locks or unlocks the montage against edits; locking leaves the editing modes (envelope, bar
+   * marking) and closes the effects panel, whose controls would do nothing.
+   */
+  toggleLock(): void {
+    const locked = !this.locked();
+    this.endNudge();
+    this.locked.set(locked);
+    if (!locked) return;
+    this.timeline.envelopeMode.set(false);
+    this.timeline.beatMarking.set(null);
+    this.timeline.selectedTrackId.set(null);
+  }
+
   /** Splits at the playhead the selected clips or, with no clip selected, every clip crossing it. */
   split(): void {
     const selected = this.timeline.selectedClips();
@@ -131,6 +153,7 @@ export class EditService {
    * the clips of a track, the track goes too: asked first, as with the remove button of a track.
    */
   async delete(): Promise<void> {
+    if (this.locked()) return;
     const range = this.timeline.range();
     if (range) {
       this.montages.edit((m) => deleteRange(m, range.start, range.end, this.length));
@@ -138,7 +161,7 @@ export class EditService {
       return this.playback.seek(range.start);
     }
     const ids = this.timeline.selectedClipIds();
-    if (!ids.length) return;
+    if (!ids.length || this.montages.refusesLocked({ clips: ids })) return;
     const selected = new Set(ids);
     const emptied = this.montages.montage().tracks.filter((t) => t.clips.length && t.clips.every((c) => selected.has(c.id)));
     if (emptied.length) {
@@ -163,7 +186,7 @@ export class EditService {
    */
   nudge(direction: 1 | -1, toAnchor: boolean): void {
     const ids = this.timeline.selectedClips();
-    if (!ids.size) return;
+    if (!ids.size || (!this.nudgeFrom && this.montages.refusesLocked({ clips: ids }))) return;
     const montage = this.montages.montage();
     const earliest = Math.min(...montage.tracks.flatMap((t) => t.clips.filter((c) => ids.has(c.id)).map((c) => c.start)));
     const shift = toAnchor
@@ -192,6 +215,18 @@ export class EditService {
     this.nudgeFrom = null;
   }
 
+  /**
+   * Locks a clip against accidental edits, or unlocks it: the selected clips with it when it is
+   * among them. Allowed on a locked montage too: it only protects.
+   */
+  toggleClipLock(clipId: string): void {
+    const clips = this.montages.montage().tracks.flatMap((t) => t.clips);
+    const locked = !clips.find((c) => c.id === clipId)?.locked;
+    const selected = this.timeline.selectedClips();
+    const ids = selected.has(clipId) ? [...selected] : [clipId];
+    this.montages.update((m) => ids.reduce((acc, id) => withClipLocked(acc, id, locked), m), true);
+  }
+
   /** Selects every clip of the montage. */
   selectAll(): void {
     this.timeline.selectedClipIds.set(this.montages.montage().tracks.flatMap((t) => t.clips.map((c) => c.id)));
@@ -208,6 +243,7 @@ export class EditService {
 
   /** Speed and pitch dialog of a clip, applying the values chosen. */
   async editTiming(clipId: string): Promise<void> {
+    if (this.locked()) return;
     const track = this.montages.montage().tracks.find((t) => t.clips.some((c) => c.id === clipId));
     const clip = track?.clips.find((c) => c.id === clipId);
     if (!track || !clip) return;
@@ -231,6 +267,7 @@ export class EditService {
 
   /** Tempo dialog of the source of a clip; the values set are saved on the source. */
   async editTempo(clipId: string): Promise<void> {
+    if (this.locked()) return;
     const track = this.montages.montage().tracks.find((t) => t.clips.some((c) => c.id === clipId));
     const clip = track?.clips.find((c) => c.id === clipId);
     if (!track || !clip) return;
@@ -246,6 +283,7 @@ export class EditService {
       fromFile: state?.status === 'ready' && !!state.fromFile,
       manual: !!source?.tempo,
       tracking: this.trackingSource() === clip.sourceId,
+      report: this.tempos.reports()[clip.sourceId] ?? null,
       playheadSourceTime: inside ? clip.offset + (position - clip.start) * rate : null,
       rate,
     };
@@ -256,7 +294,8 @@ export class EditService {
     const result = await firstValueFrom(ref.afterClosed());
     if (!result) return;
     if (result.mark) return this.startBeatMarking(clipId, result.mark.beatsPerBar, result.mark.bpm);
-    if (result.track) return void this.trackBars(clip.sourceId);
+    // the dialog opens again on what the tracking found
+    if (result.track) return void this.trackBars(clip.sourceId, result.track).then((report) => report && this.editTempo(clipId));
     if (result.steady) return this.steadyTempo(clip.sourceId);
     if (result.clear) return this.clearAnchors(clip.sourceId, result.clear === 'auto');
     if (result.file === 'save') return void this.barFiles.save(clip.sourceId);
@@ -269,7 +308,7 @@ export class EditService {
   /** Alignment of the tempo of several clips (speed and, optionally, position on the bars). */
   async alignTempo(): Promise<void> {
     const clips = this.tempoClips();
-    if (clips.length < 2) return;
+    if (this.locked() || clips.length < 2) return;
     // reference: the first selected clip with a tempo
     const selected = this.timeline.selectedClipIds().find((id) => clips.some((c) => c.id === id));
     const data: AlignDialogData = { clips, referenceId: selected ?? clips[0].id };
@@ -291,7 +330,7 @@ export class EditService {
   /** Starts marking a bar of a clip (see placeDownbeat and dragBar). */
   startBeatMarking(clipId: string, beatsPerBar: number, bpm: number): void {
     const clip = this.markingClip(clipId);
-    if (!clip) return;
+    if (!clip || this.locked()) return;
     this.timeline.selectClip(clipId);
     this.timeline.beatMarking.set({ clipId, sourceId: clip.sourceId, beatsPerBar, bpm, downbeat: null });
   }
@@ -371,22 +410,32 @@ export class EditService {
   readonly trackingSource = signal<string | null>(null);
 
   /**
-   * Follows the bars along the whole source (tempo not steady): an anchor on every bar, found on
-   * the attacks starting from the bars pinned by hand, which stay. Returns the share of beats
-   * found on an attack, null when the tempo or the audio is not known.
+   * Follows the bars along the whole source, beat by beat (see rhythm.ts): an anchor on every
+   * downbeat with the beats of its bar, the free regions without grid, the bars pinned by hand
+   * kept. Returns what the tracking found, null when the tempo or the audio is not known.
    */
-  async trackBars(sourceId: string): Promise<number | null> {
+  async trackBars(sourceId: string, options: TrackOptions = {}): Promise<RhythmReport | null> {
+    const result = await this.analyzeBars(sourceId, options);
+    if (!result) return null;
+    this.montages.setSourceTempo(sourceId, result.tempo);
+    this.timeline.beatGrid.set(true);
+    return result.report;
+  }
+
+  /** The tracking of the bars of a source without applying it (the map it would give, and its report). */
+  async analyzeBars(sourceId: string, options: TrackOptions = {}): Promise<{ tempo: Tempo; report: RhythmReport } | null> {
     const tempo = this.tempos.sourceTempo(sourceId);
     const length = this.timeline.sourceLength({ sourceId });
     if (!tempo || !length || this.trackingSource()) return null;
     this.trackingSource.set(sourceId);
     try {
-      const curve = await this.tempos.onsetCurve(sourceId);
-      if (!curve) return null;
-      const result = trackBars(tempo, curve, length);
-      this.montages.setSourceTempo(sourceId, result.tempo);
-      this.timeline.beatGrid.set(true);
-      return result.confidence;
+      const features = await this.tempos.onsetCurve(sourceId);
+      if (!features) return null;
+      // the heavy part runs after the spinner is shown
+      await new Promise((resolve) => setTimeout(resolve));
+      const result = trackRhythm(tempo, features, length, options);
+      this.tempos.reports.update((all) => ({ ...all, [sourceId]: result.report }));
+      return result;
     } finally {
       this.trackingSource.set(null);
     }
@@ -419,6 +468,58 @@ export class EditService {
     this.timeline.selectedTrackId.set(null);
   }
 
+  // --- markers -------------------------------------------------------------------------------
+  // they only help finding passages: they can be set also on a locked montage
+
+  /** Markers of the timeline, in time order. */
+  readonly markers = computed(() => sortedMarkers(this.montages.montage()));
+
+  /**
+   * Back: the playhead to the nearest marker on its left (the edges of the selected range count as
+   * markers), or to the start when there is none. While playing, a marker just passed is skipped
+   * (pressing again goes further back, as on players).
+   */
+  previousMarker(): void {
+    const position = this.playback.position();
+    const before = position - (this.playback.playing() ? PASSED_MARKER : 0.001);
+    const range = this.timeline.range();
+    const stops = [...this.markers().map((m) => m.time), ...(range ? [range.start, range.end] : [])];
+    this.playback.seek(Math.max(0, ...stops.filter((t) => t < before)));
+  }
+
+  /** New marker at a timeline time, named in a dialog ("Marker n" proposed). */
+  async addMarker(time: number): Promise<void> {
+    const at = Math.max(0, time);
+    const names = new Set(this.markers().map((m) => m.name));
+    let n = this.markers().length + 1;
+    while (names.has(this.i18n.t('marker.newName', { n }))) n++;
+    const name = await this.askMarkerName({ name: this.i18n.t('marker.newName', { n }), time: formatDuration(at), create: true });
+    if (name) this.montages.update((m) => addMarker(m, { id: crypto.randomUUID(), time: at, name }), true);
+  }
+
+  async renameMarker(id: string): Promise<void> {
+    const marker = this.markers().find((m) => m.id === id);
+    if (!marker) return;
+    const name = await this.askMarkerName({ name: marker.name, time: formatDuration(marker.time), create: false });
+    if (name) this.montages.update((m) => renameMarker(m, id, name), true);
+  }
+
+  removeMarker(id: string): void {
+    this.montages.update((m) => removeMarker(m, id), true);
+  }
+
+  /** Removes every marker, after a confirmation. */
+  async clearMarkers(): Promise<void> {
+    const n = this.markers().length;
+    if (!n || (await this.shell.ask(this.i18n.t('marker.clear'), this.i18n.t('marker.clearConfirm', { n }))) !== 'yes') return;
+    this.montages.update((m) => withMarkers(m, []), true);
+  }
+
+  private async askMarkerName(data: MarkerDialogData): Promise<string | undefined> {
+    const ref = this.dialogs.open<MarkerDialogComponent, MarkerDialogData, string>(MarkerDialogComponent, { data, autoFocus: 'dialog' });
+    return firstValueFrom(ref.afterClosed());
+  }
+
   // --- effects of a track ---------------------------------------------------------------------
 
   /** State before the effect value being dragged, for one undo step per gesture. */
@@ -426,6 +527,7 @@ export class EditService {
 
   /** Opens the effects panel of a track, or closes it when it already shows that track. */
   toggleEffectsPanel(trackId: string): void {
+    if (this.locked()) return;
     this.timeline.selectedTrackId.update((id) => (id === trackId ? null : trackId));
   }
 

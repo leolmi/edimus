@@ -5,10 +5,13 @@ Tipi in `src/app/core/montage/montage.model.ts`, `envelope.ts`, `src/app/core/au
 ## Montage
 
 ```ts
-Montage { version: 3; channels: 1 | 2; sources: AudioSource[]; tracks: Track[] }
+Montage { version: 4; channels: 1 | 2; sources: AudioSource[]; tracks: Track[]; markers?: Marker[] }
+Marker { id: string; time: number; name: string }
 ```
 
 - `channels`: canali del mix esportato.
+- `markers`: punti con nome della timeline (`time` in secondi di timeline), in ordine di tempo;
+  assente quando non ce ne sono. All'apertura si scartano quelli senza tempo o nome validi.
 - Un montaggio vuoto (nessuna traccia) è lo stato iniziale di ogni istanza.
 - Le sorgenti non più usate da nessuna clip vengono rimosse (`withoutUnusedSources`).
 
@@ -32,6 +35,7 @@ Formato, durata, canali e tempo rilevato **non** sono nel file: vengono ricavati
 | `clips` | clip della traccia (possono sovrapporsi; la selezionata è disegnata sopra) |
 | `muted?`, `solo?` | udibili = non mute e, se qualche traccia è in solo, in solo (`audibleTracks`) |
 | `volume?` | volume di tutta la traccia, gain lineare (0..`MAX_GAIN`); assente = 1 (`trackVolume`) |
+| `pan?` | posizione stereo dopo il volume, da -1 (sinistra) a 1 (destra), come bilanciamento: si abbassa il lato opposto; assente = 0, centro (`trackPan`) |
 | `effects?` | catena di effetti applicata in ordine alla somma delle clip, prima del volume; assente = nessun effetto (vedi *Effetti*) |
 
 ## Effetti
@@ -105,8 +109,9 @@ EnvelopePoint { time: number /* s sorgente della clip */; gain: number /* linear
 ## Tempo
 
 ```ts
-Tempo { bpm: number; offset: number /* s sorgente */; confidence: number /* 0..1, 1 = manuale */; beatsPerBar?: number /* default 4 */; anchors?: BarAnchor[] }
-BarAnchor { bar: number /* intero */; time: number /* s sorgente */; auto?: true }
+Tempo { bpm: number; offset: number /* s sorgente */; confidence: number /* 0..1, 1 = manuale */; beatsPerBar?: number /* default 4 */; anchors?: BarAnchor[]; regions?: TempoRegion[] }
+BarAnchor { bar: number /* intero */; time: number /* s sorgente */; auto?: true; beats?: number[] /* s sorgente */; confidence?: number /* 0..1 */ }
+TempoRegion { from: number; to: number /* s sorgente */; kind: 'free' }
 ```
 
 - Senza `anchors` la griglia è **costante**: battute ogni `beatsPerBar · 60/bpm` a partire da
@@ -115,9 +120,19 @@ BarAnchor { bar: number /* intero */; time: number /* s sorgente */; auto?: true
   alcune battute (numerate come sopra, ordinate per `bar`). Tra due ancore le battute hanno
   durata uniforme; fuori dall'intervallo delle ancore proseguono con la durata del tratto più
   vicino; con una sola ancora valgono la durata di `bpm` e la fase dell'ancora. Dentro una
-  battuta i battiti sono equidistanti. `barTime(k)` / `barAt(t)` convertono battuta ↔ tempo
-  (k frazionario = posizione dentro la battuta); `meanBpm` è il tempo medio tra prima e ultima
-  ancora.
+  battuta i battiti sono equidistanti, salvo che l'ancora abbia `beats`: i battiti dopo l'1 come
+  li ha trovati il tracciamento (devono stare tra l'1 e la battuta seguente, altrimenti si torna
+  equidistanti). `beats.length + 1` è il metro di quella battuta (`barMeter`, metri misti); senza
+  `beats` vale `beatsPerBar`. `barTime(k)` / `barAt(t)` convertono battuta ↔ tempo (k frazionario
+  = posizione dentro la battuta, sui suoi battiti); `meanBpm` è il tempo medio tra prima e ultima
+  ancora, contando i battiti di ogni battuta.
+- `confidence` di un'ancora automatica: affidabilità della battuta (battiti sugli attacchi e
+  regolari, 1 che spicca sugli altri movimenti); sotto 0,45 la battuta è incerta.
+- `regions`: tratti senza pulsazione trovati dal tracciamento (intro libera, rubato, silenzio):
+  lì niente griglia, niente punti per l'aggancio ai battiti né per `get_beats`
+  (`freeRegionAt`, `gridPoints`). Vanno via con le ancore automatiche e con "Tempo costante".
+- Fissare a mano una battuta (`pinBar`) toglie i `beats` della battuta prima, che non
+  corrisponderebbero più.
 - Ancore a mano (senza `auto`) e ancore del tracciamento automatico (`auto: true`, una per
   battuta, sostituite a ogni nuovo tracciamento; quelle a mano restano e lo vincolano).
 - `bpm` e `offset` restano quelli della griglia costante da cui la mappa è partita: tolte le
@@ -131,7 +146,7 @@ Tempo e mappa di un file audio, per riusarli in altri montaggi (`core/audio/bar-
 
 ```ts
 { kind: 'edimus-bars'; version: 1; audio: string /* nome del file */; fingerprint?: string;
-  tempo: { bpm; offset; beatsPerBar; anchors? } }
+  tempo: { bpm; offset; beatsPerBar; anchors? /* con beats e confidence */; regions? } }
 ```
 
 - `fingerprint` è l'impronta dell'audio (come `AudioSource.fingerprint`): un file delle battute
@@ -184,3 +199,4 @@ Migrazioni:
   in versione 2 al primo salvataggio.
 - **2 → 3**: aggiunge solo gli effetti di traccia, nulla da convertire. Le versioni dell'app che
   non conoscono gli effetti rifiutano i file in versione 3 invece di perderli al salvataggio.
+- **3 → 4**: aggiunge solo i marker e il pan delle tracce, nulla da convertire (stesso motivo dell'incremento).

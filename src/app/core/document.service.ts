@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ExportDialogComponent, FORMATS } from '../features/export/export-dialog.component';
@@ -71,6 +71,10 @@ export class DocumentService {
   readonly pendingDrop = signal<DropTarget | null>(null);
 
   constructor() {
+    // an edit refused by a locked clip says why nothing happened
+    effect(() => {
+      if (this.montages.clipLockRefusals()) untracked(() => this.notify({ key: 'clipLock.refused' }));
+    });
     effect(() => void this.shell.setTitle(`${this.title()}${this.montages.dirty() ? ' •' : ''} — edimus`));
     this.shell.onCloseRequest(() => void this.close());
     this.drops.drops.subscribe(async ({ files, handles, target }) => {
@@ -143,6 +147,8 @@ export class DocumentService {
       paths = paths.filter((p) => !relinked.includes(p));
       if (!paths.some(isAudioFile)) return this.message.set({ key: 'relink.done', params: { n: relinked.length } });
     }
+    // a locked montage takes no new files
+    if (this.montages.locked()) return this.message.set({ key: 'lock.blocked' });
     if (target.kind === 'track') {
       const start = Math.max(0, this.timeline.xToTime(target.x));
       const lengths = await Promise.all(paths.map((p) => this.engine.probe(p).then((i) => i.duration, () => 0)));

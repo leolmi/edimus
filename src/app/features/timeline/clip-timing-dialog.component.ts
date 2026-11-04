@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatSelectModule } from '@angular/material/select';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { parseTime } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { ScaleSliderComponent } from '../../shared/scale-slider.component';
+import { FieldComponent } from '../../shared/controls/field.component';
 
 export interface ClipTimingData {
   name: string;
@@ -41,33 +40,35 @@ function formatTime(seconds: number): string {
 /** Speed and pitch of a clip with their real values: lengths, difference from the original, ratios. */
 @Component({
   selector: 'app-clip-timing-dialog',
-  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, ScaleSliderComponent, TranslatePipe],
+  imports: [FieldComponent, MatButtonModule, MatSelectModule, MatDialogModule, MatIconModule, ScaleSliderComponent, TranslatePipe],
   template: `
     <h2 mat-dialog-title>{{ 'timing.title' | t }} — {{ data.name }}</h2>
     <mat-dialog-content class="content">
       <section>
         <h3>{{ 'timing.speed' | t }}</h3>
-        <mat-button-toggle-group class="mode" [value]="varispeed()" (change)="varispeed.set($event.value)">
-          <mat-button-toggle [value]="false">{{ 'timing.stretch' | t }}</mat-button-toggle>
-          <mat-button-toggle [value]="true">{{ 'timing.varispeed' | t }}</mat-button-toggle>
-        </mat-button-toggle-group>
+        <app-field class="mode">
+          <mat-select [value]="varispeed()" (selectionChange)="varispeed.set($event.value)">
+            <mat-option [value]="false">{{ 'timing.stretch' | t }}</mat-option>
+            <mat-option [value]="true">{{ 'timing.varispeed' | t }}</mat-option>
+          </mat-select>
+        </app-field>
         <p class="mode-hint">{{ (varispeed() ? 'timing.varispeedHint' : 'timing.stretchHint') | t }}</p>
         <div class="fields">
-          <mat-form-field>
-            <mat-label>{{ 'timing.rate' | t }}</mat-label>
-            <input matInput type="number" [min]="minRate" [max]="maxRate" step="0.01" [value]="rate().toFixed(4)" (change)="setRate(+$any($event.target).value)" />
-            <span matTextSuffix>×</span>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>{{ 'timing.percent' | t }}</mat-label>
-            <input matInput type="number" step="0.1" [value]="percent().toFixed(2)" (change)="setRate(1 + +$any($event.target).value / 100)" />
-            <span matTextSuffix>%</span>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>{{ 'timing.length' | t }}</mat-label>
-            <input matInput [value]="lengthText()" (change)="setLength($any($event.target))" />
-            <mat-hint>m:ss.mmm</mat-hint>
-          </mat-form-field>
+          <app-field>
+            <span fieldLabel>{{ 'timing.rate' | t }}</span>
+            <input type="number" [min]="minRate" [max]="maxRate" step="0.01" [value]="rate().toFixed(4)" (change)="setRate(+$any($event.target).value)" />
+            <span fieldSuffix>×</span>
+          </app-field>
+          <app-field>
+            <span fieldLabel>{{ 'timing.percent' | t }}</span>
+            <input type="number" step="0.1" [value]="percent().toFixed(2)" (change)="setRate(1 + +$any($event.target).value / 100)" />
+            <span fieldSuffix>%</span>
+          </app-field>
+          <app-field>
+            <span fieldLabel>{{ 'timing.length' | t }}</span>
+            <input [value]="lengthText()" (change)="setLength($any($event.target))" />
+            <span fieldHint>m:ss.mmm</span>
+          </app-field>
         </div>
         <app-scale-slider
           class="slider"
@@ -98,16 +99,16 @@ function formatTime(seconds: number): string {
           <p class="mode-hint">{{ 'timing.varispeedPitch' | t: { st: speedSemitones() } }}</p>
         }
         <div class="fields">
-          <mat-form-field>
-            <mat-label>{{ 'timing.semitones' | t }}</mat-label>
-            <input matInput type="number" [min]="-maxPitch" [max]="maxPitch" step="0.01" [value]="pitch()" (change)="setPitch(+$any($event.target).value)" />
-            <span matTextSuffix>st</span>
-          </mat-form-field>
-          <mat-form-field>
-            <mat-label>{{ 'timing.cents' | t }}</mat-label>
-            <input matInput type="number" step="1" [value]="Math.round(pitch() * 100)" (change)="setPitch(+$any($event.target).value / 100)" />
-            <span matTextSuffix>¢</span>
-          </mat-form-field>
+          <app-field>
+            <span fieldLabel>{{ 'timing.semitones' | t }}</span>
+            <input type="number" [min]="-maxPitch" [max]="maxPitch" step="0.01" [value]="pitch()" (change)="setPitch(+$any($event.target).value)" />
+            <span fieldSuffix>st</span>
+          </app-field>
+          <app-field>
+            <span fieldLabel>{{ 'timing.cents' | t }}</span>
+            <input type="number" step="1" [value]="Math.round(pitch() * 100)" (change)="setPitch(+$any($event.target).value / 100)" />
+            <span fieldSuffix>¢</span>
+          </app-field>
         </div>
         <app-scale-slider
           class="slider"
@@ -149,7 +150,7 @@ function formatTime(seconds: number): string {
     .fields {
       display: flex;
       gap: 12px;
-      mat-form-field {
+      app-field {
         flex: 1 1 0;
         min-width: 0;
       }
@@ -175,6 +176,7 @@ function formatTime(seconds: number): string {
       flex: 1 1 auto;
     }
     .mode {
+      width: 260px;
       margin-bottom: 4px;
     }
     .mode-hint {

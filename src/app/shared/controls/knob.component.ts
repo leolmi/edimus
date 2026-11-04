@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, input, output, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, booleanAttribute, computed, effect, input, output, signal, viewChild } from '@angular/core';
 import { ControlScale, fromPosition, keyPosition, toPosition } from './control-scale';
 
 /** Pixels of vertical drag for the whole range (Shift: ten times finer). */
 const DRAG_RANGE = 150;
 /** Pause after the last wheel or key step before it counts as done (one undo step). */
 const SETTLE = 500;
+/** Wait after a click on the dial before it counts as a click and not the first half of a double click. */
+const CLICK_DELAY = 300;
 /** Angle of the ends of the knob (degrees from the top). */
 const SWEEP = 135;
 
@@ -26,10 +28,12 @@ function arc(from: number, to: number, radius: number): string {
  * Rotary control of the effects: vertical drag (Shift = fine), wheel, arrows/PageUp/PageDown/
  * Home/End, double click back to the default; a click on the value lets it be typed. The ring
  * is lit from the origin (e.g. 0 dB) to the value. `valueChange` while it moves, `committed`
- * once at the end of the gesture.
+ * once at the end of the gesture; `clicked` for a click on the dial that is neither a drag nor
+ * part of a double click (e.g. the mute of the listening volume).
  */
 @Component({
   selector: 'app-knob',
+  host: { '[class.compact]': 'compact()' },
   template: `
     <div
       class="dial"
@@ -46,7 +50,7 @@ function arc(from: number, to: number, radius: number): string {
       (pointercancel)="onPointerUp($event)"
       (wheel)="onWheel($event)"
       (keydown)="onKey($event)"
-      (dblclick)="reset()"
+      (dblclick)="onDoubleClick()"
     >
       <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
         <path class="ring" [attr.d]="ringPath" />
@@ -65,7 +69,7 @@ function arc(from: number, to: number, radius: number): string {
         (blur)="typed(field.value)"
         (keydown)="$event.stopPropagation()"
       />
-    } @else {
+    } @else if (showValue()) {
       <span class="value" role="button" tabindex="-1" (click)="startEditing()">{{ text() }}</span>
     }
     <span class="label">{{ label() }}</span>
@@ -140,6 +144,16 @@ function arc(from: number, to: number, radius: number): string {
       text-overflow: ellipsis;
       max-width: 100%;
     }
+    :host(.compact) {
+      width: 48px;
+      gap: 0;
+      .label {
+        display: none;
+      }
+      .field {
+        width: 44px;
+      }
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -153,12 +167,17 @@ export class KnobComponent {
   /** Neutral value the lit ring starts from (e.g. 0 dB); default the minimum. */
   readonly origin = input<number>();
   readonly label = input('');
+  /** Narrower and without the label, only the value under the dial (e.g. volume and pan in the track header). */
+  readonly compact = input(false, { transform: booleanAttribute });
+  /** The value under the dial (with the label off, the dial alone: e.g. the listening volume in the toolbar). */
+  readonly showValue = input(true);
   readonly format = input<(value: number) => string>((v) => String(v));
   /** Rounds the values produced (to the precision of the unit). */
   readonly round = input<(value: number) => number>((v) => v);
 
   readonly valueChange = output<number>();
   readonly committed = output<number>();
+  readonly clicked = output<void>();
 
   protected readonly editing = signal(false);
   protected readonly ringPath = arc(-SWEEP, SWEEP, 15);
@@ -177,6 +196,7 @@ export class KnobComponent {
   private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
   private drag?: { y: number; position: number; moved: boolean };
   private settle = 0;
+  private click = 0;
 
   constructor() {
     // the field appears with its text selected, ready to be typed over
@@ -187,6 +207,7 @@ export class KnobComponent {
     if (event.button !== 0) return;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     (event.currentTarget as HTMLElement).focus();
+    clearTimeout(this.click);
     this.drag = { y: event.clientY, position: this.position(), moved: false };
   }
 
@@ -205,6 +226,7 @@ export class KnobComponent {
     const moved = this.drag.moved;
     this.drag = undefined;
     if (moved) this.committed.emit(this.value());
+    else this.click = window.setTimeout(() => this.clicked.emit(), CLICK_DELAY);
   }
 
   protected onWheel(event: WheelEvent): void {
@@ -219,6 +241,11 @@ export class KnobComponent {
     event.preventDefault();
     event.stopPropagation();
     this.step(position);
+  }
+
+  protected onDoubleClick(): void {
+    clearTimeout(this.click);
+    this.reset();
   }
 
   protected reset(): void {

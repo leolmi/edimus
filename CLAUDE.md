@@ -55,7 +55,7 @@ src/app/
       crossfade.ts        dissolvenza incrociata tra due clip
       tempo-align.ts      allineamento del tempo tra clip
       montage-file.ts     lettura/scrittura .edimus (percorsi relativi)
-    audio/              libreria buffer, picchi, tempo, render processato, mix, playback, export
+    audio/              libreria buffer, picchi, tempo e ritmo (rhythm.ts: tracciamento delle battute), render processato, mix, playback, export
     effects/            effetti di traccia: schede descrittive e operazioni pure (effects.ts), nodi Web Audio (effect-nodes.ts)
     platform/           porte verso la piattaforma: file system, motore audio, impostazioni, shell, capacità
     timeline/           TimelineService: zoom, scroll, selezione, modalità (inviluppo, griglia, marcatura)

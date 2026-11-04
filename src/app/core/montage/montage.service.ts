@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { AudioLibraryService } from '../audio/audio-library.service';
 import type { Tempo } from '../audio/tempo';
 import { FileSystemPort } from '../platform/file-system.port';
-import { withSourceTempo } from './edits';
+import { keepsLockedClips, withSourceTempo } from './edits';
 import { readMontage, writeMontage } from './montage-file';
 import {
   AudioSource,
@@ -62,8 +62,15 @@ export class MontageService {
   );
   /** A new, untouched montage: opening something can replace it in this instance. */
   readonly pristine = computed(() => this.path() === null && this.isEmpty() && !this.dirty());
-  readonly canUndo = computed(() => this.undoStack().length > 0);
-  readonly canRedo = computed(() => this.redoStack().length > 0);
+  /**
+   * Locked against accidental edits: the montage can be listened to (play, seek, mute, solo)
+   * but every edit is ignored, undo and redo included. A new montage starts unlocked.
+   */
+  readonly locked = signal(false);
+  readonly canUndo = computed(() => !this.locked() && this.undoStack().length > 0);
+  readonly canRedo = computed(() => !this.locked() && this.redoStack().length > 0);
+  /** Incremented every time an edit is refused because it would move, cut or remove a locked clip. */
+  readonly clipLockRefusals = signal(0);
 
   /** Replaces the current montage with the one in the file. */
   async openMontage(path: string): Promise<void> {
@@ -78,15 +85,21 @@ export class MontageService {
     this.pendingName.set(null);
     this.undoStack.set([]);
     this.redoStack.set([]);
+    this.locked.set(false);
     this.generation.update((g) => g + 1);
     void this.library.load(montage.sources);
   }
 
-  /** Applies an edit, recording the previous state for undo. */
-  update(edit: (montage: Montage) => Montage): void {
+  /**
+   * Applies an edit, recording the previous state for undo. Ignored while locked, unless it only
+   * changes how the montage is heard (`listening`: mute, solo, a source found again).
+   */
+  update(edit: (montage: Montage) => Montage, listening = false): void {
+    if (this.locked() && !listening) return;
     const current = this.montage();
     const next = edit(current);
     if (next === current) return;
+    if (!keepsLockedClips(current, next)) return this.clipLockRefusals.update((n) => n + 1);
     this.undoStack.update((stack) => [...stack.slice(-HISTORY_LIMIT + 1), current]);
     this.redoStack.set([]);
     this.apply(next);
@@ -97,11 +110,14 @@ export class MontageService {
    * them, `commit` records the whole gesture as one undo step from the state it started on.
    */
   preview(montage: Montage): void {
+    if (this.locked()) return;
+    // the gestures leave the locked clips alone: this only stops a step that would touch them
+    if (!keepsLockedClips(this.montage(), montage)) return this.clipLockRefusals.update((n) => n + 1);
     this.apply(montage);
   }
 
   commit(from: Montage): void {
-    if (this.montage() === from) return;
+    if (this.locked() || this.montage() === from) return;
     this.undoStack.update((stack) => [...stack.slice(-HISTORY_LIMIT + 1), from]);
     this.redoStack.set([]);
   }
@@ -154,10 +170,13 @@ export class MontageService {
 
   /** Points a source to another file (a missing source found again), decoding it. */
   relinkSource(sourceId: string, path: string, fingerprint?: string): void {
-    this.update((m) => ({
-      ...m,
-      sources: m.sources.map((s) => (s.id === sourceId ? { ...s, path, relativePath: undefined, fingerprint: fingerprint ?? s.fingerprint } : s)),
-    }));
+    this.update(
+      (m) => ({
+        ...m,
+        sources: m.sources.map((s) => (s.id === sourceId ? { ...s, path, relativePath: undefined, fingerprint: fingerprint ?? s.fingerprint } : s)),
+      }),
+      true,
+    );
     const source = this.montage().sources.find((s) => s.id === sourceId);
     if (source) void this.library.reload(source);
   }
@@ -167,9 +186,21 @@ export class MontageService {
     this.update((m) => withSourceTempo(m, sourceId, tempo));
   }
 
-  /** Replaces a track with the result of `edit`. */
-  updateTrack(id: string, edit: (track: Track) => Track): void {
-    this.update((m) => ({ ...m, tracks: m.tracks.map((t) => (t.id === id ? edit(t) : t)) }));
+  /**
+   * True (and the refusal signalled) when some of the clips, or of the clips of the tracks, are
+   * locked: checked before asking to confirm an edit that would then be refused.
+   */
+  refusesLocked(ids: { clips?: Iterable<string>; tracks?: Iterable<string> }): boolean {
+    const clips = new Set(ids.clips);
+    const tracks = new Set(ids.tracks);
+    const locked = this.montage().tracks.some((t) => t.clips.some((c) => c.locked && (clips.has(c.id) || tracks.has(t.id))));
+    if (locked) this.clipLockRefusals.update((n) => n + 1);
+    return locked;
+  }
+
+  /** Replaces a track with the result of `edit` (`listening`: see `update`). */
+  updateTrack(id: string, edit: (track: Track) => Track, listening = false): void {
+    this.update((m) => ({ ...m, tracks: m.tracks.map((t) => (t.id === id ? edit(t) : t)) }), listening);
   }
 
   /** Removes a track and the sources no longer used by any clip. */
@@ -197,7 +228,7 @@ export class MontageService {
 
   undo(): void {
     const stack = this.undoStack();
-    if (!stack.length) return;
+    if (this.locked() || !stack.length) return;
     this.redoStack.update((redo) => [...redo, this.montage()]);
     this.undoStack.set(stack.slice(0, -1));
     this.apply(stack[stack.length - 1]);
@@ -205,7 +236,7 @@ export class MontageService {
 
   redo(): void {
     const stack = this.redoStack();
-    if (!stack.length) return;
+    if (this.locked() || !stack.length) return;
     this.undoStack.update((undo) => [...undo, this.montage()]);
     this.redoStack.set(stack.slice(0, -1));
     this.apply(stack[stack.length - 1]);

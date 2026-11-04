@@ -1,5 +1,5 @@
-import { beatsPerBar, type Tempo } from '../audio/tempo';
-import { barLengthAt, gridPoints } from '../audio/tempo-map';
+import type { Tempo } from '../audio/tempo';
+import { barAt, barLengthAt, gridPoints, stepsInBar } from '../audio/tempo-map';
 import { Clip, Montage, clipRate } from '../montage/montage.model';
 import type { SnapStep } from '../settings.service';
 
@@ -15,12 +15,6 @@ export interface SnapContext {
 /** Seconds around the anchor where the grid points of the other clips are looked for. */
 const REACH = 4;
 
-/** Grid points per bar for a step: the bar, the beat or half a beat. */
-function perBar(tempo: Tempo, step: SnapStep): number {
-  const beats = beatsPerBar(tempo);
-  return step === 'bar' ? 1 : step === 'half' ? beats * 2 : beats;
-}
-
 /** Timeline times of the grid points of a clip (from its source bar map) in [from, to], inside the clip. */
 function gridOf(clip: Clip, tempo: Tempo, step: SnapStep, start: number, length: number, from: number, to: number): number[] {
   const rate = clipRate(clip);
@@ -28,7 +22,7 @@ function gridOf(clip: Clip, tempo: Tempo, step: SnapStep, start: number, length:
   const lo = Math.max(from, start);
   const hi = Math.min(to, start + length);
   if (hi < lo) return [];
-  return gridPoints(tempo, perBar(tempo, step), toSource(lo), toSource(hi)).map((p) => start + (p.time - clip.offset) / rate);
+  return gridPoints(tempo, step, toSource(lo), toSource(hi)).map((p) => start + (p.time - clip.offset) / rate);
 }
 
 /**
@@ -67,6 +61,7 @@ export function snapToBeats(montage: Montage, clipId: string, start: number, ori
   // no grid around: whole steps of the clip itself from where it was
   if (!tempo) return start;
   // the steps of the bar under the clip start
-  const step = barLengthAt(tempo, dragged.offset) / perBar(tempo, context.step) / clipRate(dragged);
+  const steps = stepsInBar(tempo, Math.floor(barAt(tempo, dragged.offset)), context.step);
+  const step = barLengthAt(tempo, dragged.offset) / steps / clipRate(dragged);
   return Math.max(0, originalStart + Math.round((start - originalStart) / step) * step);
 }

@@ -1,5 +1,5 @@
 :host {
-  --header-width: 240px;
+  --header-width: 256px;
   --track-height: 120px;
   display: flex;
   flex-direction: column;
@@ -83,6 +83,9 @@
   flex: 1 1 auto;
   min-width: 0;
   background: var(--stripes);
+  /* dragging pans the view */
+  cursor: grab;
+  touch-action: none;
 }
 
 .slot-hint {
@@ -97,6 +100,7 @@
   color: var(--mat-sys-on-surface-variant);
   box-sizing: border-box;
   transform: scale(0.94);
+  user-select: none;
 }
 
 .link {
@@ -256,12 +260,6 @@
   }
 }
 
-.track-actions {
-  display: flex;
-  align-items: center;
-  margin: -4px -8px;
-}
-
 .spacer {
   flex: 1 1 auto;
 }
@@ -296,13 +294,9 @@
   min-width: 0;
 }
 
-/* the track volume: a fader as tall as the track, on the right of the header */
-.track-fader {
-  flex: none;
-}
-
 .effect-chain {
-  align-self: flex-start;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header.selected {
@@ -372,4 +366,208 @@
   to {
     opacity: 0.65;
   }
+}
+
+/* invisible point the clip menu opens from (moved to the pointer) */
+.menu-anchor {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+
+.menu-locked {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 16px 8px;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-label-medium);
+}
+
+/* bottom edge of a track header: drag to change the height of the tracks */
+.header {
+  position: relative;
+}
+
+.height-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  z-index: 2;
+  cursor: row-resize;
+
+  &:hover {
+    background: color-mix(in srgb, var(--mat-sys-primary) 40%, transparent);
+  }
+}
+
+/* secondary markers: a line across the tracks, the name on the ruler */
+.marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--mat-sys-tertiary);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.marker-name {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 140px;
+  padding: 1px 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border-radius: 0 4px 4px 0;
+  background: var(--mat-sys-tertiary);
+  color: var(--mat-sys-on-tertiary);
+  font: var(--mat-sys-label-small);
+}
+
+.menu-title {
+  padding: 6px 16px 2px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+}
+
+.marker-item {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-width: 160px;
+}
+
+.marker-time {
+  color: var(--mat-sys-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+/* name of the track, then details and the button that removes it */
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+
+  .name {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .small {
+    flex: none;
+  }
+}
+
+.remove {
+  margin-right: -6px;
+}
+
+/* square toggles, then the volume and pan knobs */
+.mix-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+
+.toggles {
+  display: flex;
+  gap: 3px;
+}
+
+/*
+ * square buttons with a letter (or an icon): off on a darker background with no border, the
+ * border shows on hover; on, border and letter take the colour of the button
+ */
+.toggle {
+  --mat-icon-button-state-layer-size: 24px;
+  --mat-icon-button-icon-size: 14px;
+  --mat-icon-button-container-shape: 0;
+  --mat-icon-button-icon-color: var(--mat-sys-on-surface-variant);
+  --toggle-color: var(--mat-sys-on-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: var(--mat-sys-surface-dim);
+  font: var(--mat-sys-label-medium);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--mat-sys-on-surface-variant);
+
+  &:hover:not(:disabled) {
+    border-color: var(--mat-sys-outline);
+  }
+
+  &.mute {
+    --toggle-color: var(--mat-sys-tertiary);
+  }
+
+  &.solo {
+    --toggle-color: var(--mat-sys-primary);
+  }
+
+  &.fx {
+    --toggle-color: var(--mat-sys-secondary);
+  }
+
+  &.on,
+  &.on:hover {
+    color: var(--toggle-color);
+    border-color: var(--toggle-color);
+  }
+
+  /* the track has effects switched on: shown also when its panel is closed */
+  &.fx.has-effects:not(.on) {
+    color: var(--mat-sys-tertiary);
+  }
+
+  &.rec {
+    --mat-icon-button-icon-color: var(--mat-sys-error);
+  }
+
+  /* the capitals of Segoe UI sit half a pixel below the middle of their box */
+  &:not(.rec) {
+    padding-bottom: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.38;
+  }
+}
+
+.track-knob {
+  flex: none;
+}
+
+/* montage locked: volume and pan cannot be moved */
+.track-knob.locked {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.track-meter {
+  flex: none;
+}
+
+/* decoding progress of the track's file, along the top edge of the header */
+.header-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
 }

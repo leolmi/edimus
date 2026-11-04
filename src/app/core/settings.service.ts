@@ -8,10 +8,14 @@ export type Language = 'it' | 'en';
 /** Step of a clip dragged on the beat grid: a whole bar, a beat (quarter note) or half a beat (eighth). */
 export type SnapStep = 'bar' | 'beat' | 'half';
 
+/** Height (px) of the tracks: the initial one is also the smallest, up to three times as much. */
+export const MIN_TRACK_HEIGHT = 120;
+export const MAX_TRACK_HEIGHT = 3 * MIN_TRACK_HEIGHT;
+
 interface Settings {
   theme: ThemeMode;
   language: Language;
-  /** Listening volume of the playback (0–1); the export is not affected. */
+  /** Listening volume of the playback (linear gain, up to +6 dB); the export is not affected. */
   volume: number;
   muted: boolean;
   /** Output device of the playback (id and name), null = system default. */
@@ -21,6 +25,8 @@ interface Settings {
   /** Measured round-trip latency (s) of the recording, by input and output (see `latencyKey`). */
   recordingLatency: Record<string, number>;
   snapStep: SnapStep;
+  /** Height of the tracks of the timeline (px), the same for all. */
+  trackHeight: number;
   /** Opens the developer tools of the window at startup. */
   devTools: boolean;
   /** Saves the bar map of a source in its bar file at every change (only where files beside the sources can be written). */
@@ -48,6 +54,7 @@ const DEFAULTS: Settings = {
   audioInput: null,
   recordingLatency: {},
   snapStep: 'beat',
+  trackHeight: MIN_TRACK_HEIGHT,
   autoSaveBars: false,
   devTools: false,
   aiBridge: null,
@@ -55,6 +62,9 @@ const DEFAULTS: Settings = {
   updateRepo: DEFAULT_UPDATE_REPO,
   skippedVersion: null,
 };
+
+/** Highest listening volume (dB), as the volume of the tracks. */
+export const MAX_VOLUME_DB = 6;
 
 /** User preferences (theme, language, listening volume and output), persisted by the platform (`SettingsPort`). */
 @Injectable({ providedIn: 'root' })
@@ -70,6 +80,7 @@ export class SettingsService {
   readonly audioInput = signal<AudioDevice | null>(DEFAULTS.audioInput);
   readonly recordingLatency = signal<Record<string, number>>(DEFAULTS.recordingLatency);
   readonly snapStep = signal<SnapStep>(DEFAULTS.snapStep);
+  readonly trackHeight = signal(DEFAULTS.trackHeight);
   readonly autoSaveBars = signal(DEFAULTS.autoSaveBars);
   readonly devTools = signal(DEFAULTS.devTools);
   readonly aiBridge = signal<BridgeConfig | null>(DEFAULTS.aiBridge);
@@ -99,6 +110,7 @@ export class SettingsService {
       if (saved.audioInput?.id) this.audioInput.set(saved.audioInput);
       if (saved.recordingLatency && typeof saved.recordingLatency === 'object') this.recordingLatency.set(saved.recordingLatency);
       if (saved.snapStep === 'bar' || saved.snapStep === 'beat' || saved.snapStep === 'half') this.snapStep.set(saved.snapStep);
+      if (typeof saved.trackHeight === 'number') this.setTrackHeight(saved.trackHeight, false);
       if (typeof saved.autoSaveBars === 'boolean') this.autoSaveBars.set(saved.autoSaveBars);
       if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
       if (saved.aiBridge?.port && saved.aiBridge.token) this.aiBridge.set(saved.aiBridge);
@@ -120,9 +132,9 @@ export class SettingsService {
     void this.save();
   }
 
-  /** Sets the listening volume; `persist` false while dragging the slider (saved on release). */
+  /** Sets the listening volume; `persist` false while dragging the knob (saved on release). */
   setVolume(volume: number, persist = true): void {
-    this.volume.set(Math.min(1, Math.max(0, volume)));
+    this.volume.set(Math.min(10 ** (MAX_VOLUME_DB / 20), Math.max(0, volume)));
     this.muted.set(false);
     if (persist) void this.save();
   }
@@ -162,6 +174,12 @@ export class SettingsService {
   setSnapStep(step: SnapStep): void {
     this.snapStep.set(step);
     void this.save();
+  }
+
+  /** Sets the height of the tracks (kept in range); `persist` false while dragging (saved on release). */
+  setTrackHeight(height: number, persist = true): void {
+    this.trackHeight.set(Math.round(Math.min(MAX_TRACK_HEIGHT, Math.max(MIN_TRACK_HEIGHT, height))));
+    if (persist) void this.save();
   }
 
   setAutoSaveBars(on: boolean): void {
@@ -205,6 +223,7 @@ export class SettingsService {
       audioInput: this.audioInput(),
       recordingLatency: this.recordingLatency(),
       snapStep: this.snapStep(),
+      trackHeight: this.trackHeight(),
       autoSaveBars: this.autoSaveBars(),
       devTools: this.devTools(),
       aiBridge: this.aiBridge(),

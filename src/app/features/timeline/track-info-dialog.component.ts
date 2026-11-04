@@ -1,8 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { formatDuration } from '../../core/format';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
@@ -10,6 +8,7 @@ import { dirName, fileName } from '../../core/montage/montage.model';
 import { FileSystemPort } from '../../core/platform/file-system.port';
 import { PlatformInfo } from '../../core/platform/platform-info';
 import { ShellPort } from '../../core/platform/shell.port';
+import { FieldComponent } from '../../shared/controls/field.component';
 
 /** A source used by the track, with what is known about it. */
 export interface TrackInfoSource {
@@ -47,15 +46,15 @@ const formatSize = (bytes: number) =>
 /** Details of a track and of the files it uses, with a shortcut to show them in the file manager. */
 @Component({
   selector: 'app-track-info-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, TranslatePipe],
+  imports: [FieldComponent, MatButtonModule, MatDialogModule, MatIconModule, TranslatePipe],
   template: `
     <h2 mat-dialog-title>{{ 'trackInfo.title' | t }}</h2>
     <mat-dialog-content class="content">
-      <mat-form-field class="name-field">
-        <mat-label>{{ 'trackInfo.name' | t }}</mat-label>
-        <input #input matInput [value]="name()" (input)="name.set(input.value)" (keydown.enter)="close()" (focus)="input.select()" />
-        <mat-hint>{{ 'trackInfo.nameHint' | t }}</mat-hint>
-      </mat-form-field>
+      <app-field class="name-field">
+        <span fieldLabel>{{ 'trackInfo.name' | t }}</span>
+        <input #input [value]="name()" (input)="name.set(input.value)" (keydown.enter)="close()" (focus)="input.select()" />
+        <span fieldHint>{{ 'trackInfo.nameHint' | t }}</span>
+      </app-field>
       <table class="facts">
         <tr><td>{{ 'trackInfo.clips' | t }}</td><td>{{ data.clips }}</td></tr>
         <tr><td>{{ 'trackInfo.length' | t }}</td><td>{{ duration(data.length) }}</td></tr>

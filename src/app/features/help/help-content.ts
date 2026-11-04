@@ -99,6 +99,14 @@ const IT: HelpContent = {
           keys: ['Ctrl+Z', 'Ctrl+Shift+Z', 'Ctrl+Y'],
           text: ['Ogni modifica, anche fatta da un assistente AI, si può annullare e ripetere.'],
         },
+        {
+          title: 'Bloccare il montaggio',
+          keys: ['Ctrl+L'],
+          text: [
+            'Il lucchetto accanto al nome del montaggio lo blocca contro le modifiche accidentali: diventa rosso e il montaggio si può solo ascoltare. Restano play, stop, loop, cursore, selezione dell’intervallo, muto e solo delle tracce, zoom e griglia delle battute; spostare, tagliare, eliminare, inviluppi, effetti, volume delle tracce, aggiunta di file o tracce, registrazione, annulla e ripeti sono spenti, anche per un assistente AI.',
+            'Un altro clic sul lucchetto (o Ctrl+L) lo sblocca; un montaggio nuovo o aperto parte sbloccato.',
+          ],
+        },
       ],
     },
     {
@@ -115,7 +123,15 @@ const IT: HelpContent = {
         {
           title: 'Spostare il cursore e punto iniziale',
           text: [
-            'Un clic su un’area vuota delle tracce sposta il cursore. Un clic (o un trascinamento) sul righello dei tempi sposta il cursore e fissa il punto iniziale, segnato da una bandierina: da lì ogni stop riporta il cursore a quel punto. Uno stop quando il cursore è già sul punto iniziale lo annulla e riporta il cursore a zero.',
+            'Un clic su un’area vuota delle tracce sposta il cursore. Un clic (o un trascinamento) sul righello dei tempi sposta il cursore e fissa il punto iniziale, segnato da una bandierina: da lì ogni stop riporta il cursore a quel punto. Uno stop quando il cursore è già sul punto iniziale lo annulla e riporta il cursore a zero (premi stop due volte).',
+          ],
+        },
+        {
+          title: 'Marker',
+          keys: ['clic destro sul righello'],
+          text: [
+            'Il clic destro sul righello dei tempi crea un marker in quel punto, con il nome che scegli: una linea sulle tracce con il nome sul righello, salvata nel montaggio. Il clic destro su un marker lo fa partire da lì (Avvia da qui), lo rinomina o lo elimina.',
+            'Il clic destro ovunque nell’area delle tracce offre Vai al marker (porta il cursore sul marker scelto) ed Elimina tutti i marker. I marker si possono gestire anche con il montaggio bloccato.',
           ],
         },
         {
@@ -163,6 +179,13 @@ const IT: HelpContent = {
           text: [
             'La rotella sulle tracce o sul righello ingrandisce e riduce attorno al puntatore; Shift+rotella (o la rotella orizzontale) scorre il tempo; la rotella sulle intestazioni delle tracce le scorre in verticale.',
             'I pulsanti in alto a destra ingrandiscono, riducono e adattano la vista all’intero montaggio, o all’intervallo selezionato se c’è.',
+            'Sulle tracce vuote e sull’area vuota sotto le tracce, trascinando si sposta la vista a destra e a sinistra; un clic su una traccia vuota sposta il cursore.',
+          ],
+        },
+        {
+          title: 'Finestre strette',
+          text: [
+            'Quando la finestra si restringe, la barra in alto sposta i comandi meno usati nel menu Altri comandi (…): prima lo zoom, poi i comandi di modifica (e l’esportazione resta solo con l’icona), poi nuovo, salva con nome e il cursore del volume d’ascolto, infine annulla e ripeti.',
           ],
         },
         {
@@ -180,14 +203,24 @@ const IT: HelpContent = {
         {
           title: 'Tracce',
           text: [
-            'Nell’intestazione di ogni traccia: muto, solo (se una traccia è in solo si sentono solo quelle in solo), dettagli sui file usati (con il pulsante per mostrarli in Esplora risorse) ed eliminazione della traccia.',
+            'Nell’intestazione di ogni traccia: muto, solo (se una traccia è in solo si sentono solo quelle in solo), dettagli sui file usati (con il pulsante per mostrarli in Esplora risorse) e la × in fondo al nome per eliminare la traccia.',
+            'Ogni clip mostra in basso a sinistra il nome del suo file; passandoci sopra, un suggerimento ne riporta le caratteristiche (formato, frequenza, canali, bitrate, durata, tempo). Quando la clip esce a sinistra dalla vista il nome scorre restando dentro la clip.',
+            'Trascinando il bordo inferiore di un’intestazione cambia l’altezza di tutte le tracce (fino a tre volte quella iniziale); un doppio clic sul bordo torna all’altezza iniziale.',
+          ],
+        },
+        {
+          title: 'Menu contestuali',
+          keys: ['clic destro'],
+          text: [
+            'Il clic destro su una clip la seleziona (se non è già tra le selezionate) e apre il suo menu: tempo e battute, velocità e intonazione, allineamento del tempo, inviluppo, divisione al cursore, effetti e dettagli della traccia, eliminazione delle clip selezionate. Con il montaggio bloccato restano solo i dettagli.',
+            'Sotto, e ovunque nell’area delle tracce, il menu delle tracce: Vai al marker ed Elimina tutti i marker. Sul righello, il menu dei marker.',
           ],
         },
         {
           title: 'Selezionare e spostare una clip',
           keys: ['←', '→', 'Shift+← →'],
           text: [
-            'Una clip è una porzione di un file audio posata su una traccia. Clic per selezionarla, trascina per spostarla nel tempo o su un’altra traccia; trascinandola sotto l’ultima traccia ne crea una nuova.',
+            'Una clip è una porzione di un file audio posata su una traccia. Un clic (premi e rilascia nello stesso punto) la seleziona; poi trascinandola la sposti nel tempo o su un’altra traccia, e trascinandola sotto l’ultima traccia ne crea una nuova. Trascinando da una clip non selezionata si seleziona invece un intervallo di tempo.',
             'Inizio, fine e punti dell’inviluppo della clip si agganciano all’inizio, alla fine e ai punti dell’inviluppo delle altre clip, su qualsiasi traccia, quando ci passano vicino (anche con la griglia visibile). Con la griglia delle battute visibile la clip si sposta a passi (battuta, semiminima o croma, da scegliere nelle Impostazioni): il punto della griglia della clip sotto il puntatore si aggancia al più vicino delle altre clip. Tieni premuto Alt per spostarla liberamente.',
             'Con la tastiera, le frecce ← → spostano le clip selezionate di un pixel (più ingrandisci, più il passo è fine); con Shift saltano al punto di aggancio successivo: inizio, fine o punto d’inviluppo di un’altra clip, oppure il cursore. Tenendo premuta la freccia, o premendola più volte di seguito, lo spostamento è un solo passo di annulla.',
           ],
@@ -213,7 +246,7 @@ const IT: HelpContent = {
           title: 'Selezionare un intervallo di tempo',
           keys: ['Esc'],
           text: [
-            'Trascina su un’area vuota delle tracce: la fascia selezionata vale per tutte le tracce. Serve per ritagliare, eliminare o ripetere in loop un tratto. Esc toglie la selezione.',
+            'Trascina su un’area vuota delle tracce, o partendo da una clip non selezionata: la fascia selezionata vale per tutte le tracce. Serve per ritagliare, eliminare o ripetere in loop un tratto. Trascinando dentro la fascia la sposti (si sposta la selezione, non l’audio). Esc toglie la selezione.',
             'Sul righello dei tempi, Maiusc+trascina seleziona l’intervallo anche sopra le clip (utile con una traccia sola). Maiusc+clic estende l’intervallo fino al punto cliccato; senza intervallo seleziona dal cursore al punto.',
           ],
         },
@@ -251,7 +284,11 @@ const IT: HelpContent = {
         },
         {
           title: 'Volume della traccia',
-          text: ['Il fader verticale sul lato destro dell’intestazione della traccia regola il volume di tutta la traccia (da −30 a +6 dB): trascinalo o clicca lungo la guida, usa la rotellina o le frecce; doppio clic lo riporta a 0 dB.'],
+          text: [
+            'Il fader verticale sul lato destro dell’intestazione della traccia regola il volume di tutta la traccia (da −30 a +6 dB): trascinalo o clicca lungo la guida, usa la rotellina o le frecce; doppio clic lo riporta a 0 dB.',
+            'La manopola sotto i pulsanti è il bilanciamento (pan): sposta la traccia a sinistra (S) o a destra (D); trascinala in verticale, doppio clic la riporta al centro (C).',
+            'Accanto al fader, durante l’ascolto, il misuratore mostra il livello della traccia (due barre se è stereo): verde, arancio sopra −6 dB, rosso sopra 0 dB, quando il suono rischia di distorcere.',
+          ],
         },
       ],
     },
@@ -308,7 +345,8 @@ const IT: HelpContent = {
           text: [
             'Se il brano è stato registrato senza un tempo fisso, la griglia dopo qualche battuta non coincide più con la musica. Puoi far seguire alla griglia l’audio, senza modificarlo: la mappa delle battute appartiene al file, quindi vale per tutte le sue clip.',
             'A mano: con la griglia visibile tieni premuto Maiusc e trascina una linea di battuta sul colpo giusto (si aggancia all’attacco più vicino; Alt per muoverla liberamente). Quella battuta resta fissata, segnata da un triangolino: le battute tra lei e la battuta fissata precedente si allargano o stringono in modo uniforme, quelle successive prendono la nuova durata. Maiusc+clic destro su una battuta fissata la libera.',
-            'In automatico: nel dialogo del tempo “Rileva le battute” trova l’inizio di ogni battuta su tutto il file e ne fa un’ancora automatica, partendo dalla battuta segnata o da quelle fissate a mano, che restano. Dove la griglia sbaglia ancora, fissa a mano la battuta giusta e rilancia.',
+            'In automatico: nel dialogo del tempo “Rileva le battute” segue i battiti uno a uno su tutto il file (la musica suonata non è mai perfettamente regolare, nemmeno dentro la battuta), riconosce le parti senza pulsazione (un’intro libera o solo cantata, un rubato, i silenzi), che restano senza griglia e appaiono tratteggiate con la scritta “tempo libero”, e mette l’1 di ogni battuta sugli accenti (cassa, cambi di accordo). Con “Metro automatico” trova 3/4 o 4/4 battuta per battuta, anche misti (il nuovo metro è scritto accanto al numero della battuta); spento, usa il metro scelto. Le battute fissate a mano restano e vi impongono un 1. Dove la griglia sbaglia ancora, fissa a mano la battuta giusta e rilancia.',
+            'Dopo il rilevamento il dialogo si riapre con il resoconto: per ogni parte l’intervallo di tempo, le battute, il metro, i BPM e l’affidabilità, e i dubbi (“forse 3/4”, “1 incerto”); le battute incerte hanno sulla griglia la linea tratteggiata. Se il battito potrebbe essere il doppio o la metà, o il metro un altro, i pulsanti “Riprova a … BPM” e “Riprova in …” rilevano di nuovo con quella lettura. Se cambi i BPM nel dialogo prima di rilevare, il rilevamento resta vicino a quel tempo.',
             'Sempre nel dialogo: “Rimuovi ancore” toglie tutte le battute fissate e torna alla griglia costante di partenza; “Rimuovi ancore automatiche” toglie solo quelle trovate da “Rileva le battute” e tiene le tue; “Tempo costante” toglie la mappa lasciando un tempo costante pari alla sua media.',
             '“Salva le battute” scrive tempo e ancore in un file accanto all’audio, con lo stesso nome e l’estensione .edimusbars (per esempio brano.mp3.edimusbars): quando riapri quell’audio, anche in un altro montaggio, edimus lo usa al posto del tempo rilevato. “Carica le battute” lo ricarica a mano. Nelle Impostazioni puoi farlo salvare da solo a ogni modifica. Nella versione web il file si salva e si apre scegliendolo, e non viene letto da solo.',
             'Allineare il tempo di più clip cambia solo la velocità: non rende costante un brano che accelera o rallenta.',
@@ -379,7 +417,7 @@ const IT: HelpContent = {
       title: 'Spostare (tagliare e incollare) un pezzo di traccia',
       steps: [
         'Isola il pezzo dividendo la clip con S all’inizio e alla fine.',
-        'Trascina il pezzo dove serve, anche su un’altra traccia o sotto l’ultima per crearne una nuova.',
+        'Seleziona il pezzo con un clic e trascinalo dove serve, anche su un’altra traccia o sotto l’ultima per crearne una nuova.',
       ],
       note: 'Il copia e incolla (duplicare un pezzo) non c’è ancora: per riusare un tratto, aggiungi di nuovo lo stesso file e accorcialo dai bordi.',
     },
@@ -403,6 +441,7 @@ const IT: HelpContent = {
         'Attiva la griglia (B) e, se serve, segna la battuta all’inizio del brano (pulsante BPM, “Segna la battuta”).',
         'Nel dialogo del tempo premi “Rileva le battute”: la griglia segue il brano su tutto il file.',
         'Scorri il brano: dove una battuta non cade sul colpo, Maiusc+trascina la sua linea sul colpo giusto.',
+        'Leggi il resoconto che compare: se il tempo o il metro sono dubbi, prova la lettura proposta con “Riprova…”.',
         'Se le correzioni sono molte, premi di nuovo “Rileva le battute”: le battute fissate a mano restano e guidano la ricerca.',
         'Premi “Salva le battute” per ritrovarle la prossima volta che apri lo stesso audio.',
       ],
@@ -443,7 +482,7 @@ const IT: HelpContent = {
       title: 'Mettere un effetto solo su un pezzo di traccia',
       steps: [
         'Dividi la clip all’inizio e alla fine del pezzo (S).',
-        'Trascina il pezzo su una traccia vuota (le strisce in fondo): diventa una traccia nuova.',
+        'Seleziona il pezzo con un clic e trascinalo su una traccia vuota (le strisce in fondo): diventa una traccia nuova.',
         'Aggiungi gli effetti a quella traccia.',
       ],
     },
@@ -461,6 +500,10 @@ const IT: HelpContent = {
     {
       title: 'Ascoltare in loop un passaggio',
       steps: ['Seleziona il passaggio trascinando su un’area vuota delle tracce.', 'Attiva il loop (in basso a destra) e premi Spazio.'],
+    },
+    {
+      title: 'Ascoltare un montaggio senza rischiare di modificarlo',
+      steps: ['Clic sul lucchetto accanto al nome del montaggio (o Ctrl+L): diventa rosso.', 'Ascolta, sposta il cursore, usa muto, solo e loop: le clip non si possono toccare.', 'Per tornare a modificare, clic di nuovo sul lucchetto.'],
     },
     {
       title: 'Cambiare velocità senza cambiare intonazione',
@@ -573,6 +616,14 @@ const EN: HelpContent = {
           keys: ['Ctrl+Z', 'Ctrl+Shift+Z', 'Ctrl+Y'],
           text: ['Every edit, also one made by an AI assistant, can be undone and redone.'],
         },
+        {
+          title: 'Lock the montage',
+          keys: ['Ctrl+L'],
+          text: [
+            'The padlock next to the name of the montage locks it against accidental edits: it turns red and the montage can only be listened to. Play, stop, loop, playhead, range selection, track mute and solo, zoom and bar grid still work; moving, cutting, deleting, envelopes, effects, track volume, adding files or tracks, recording, undo and redo are off, also for an AI assistant.',
+            'Another click on the padlock (or Ctrl+L) unlocks it; a new or opened montage starts unlocked.',
+          ],
+        },
       ],
     },
     {
@@ -589,7 +640,15 @@ const EN: HelpContent = {
         {
           title: 'Moving the playhead and start point',
           text: [
-            'A click on an empty area of the tracks moves the playhead. A click (or a drag) on the time ruler moves the playhead and sets the start point, marked by a flag: from then on every stop brings the playhead back there. A stop when the playhead is already on the start point drops it and brings the playhead to zero.',
+            'A click on an empty area of the tracks moves the playhead. A click (or a drag) on the time ruler moves the playhead and sets the start point, marked by a flag: from then on every stop brings the playhead back there. A stop when the playhead is already on the start point drops it and brings the playhead to zero (press stop twice).',
+          ],
+        },
+        {
+          title: 'Markers',
+          keys: ['right click on the ruler'],
+          text: [
+            'A right click on the time ruler creates a marker there, with the name you choose: a line over the tracks with the name on the ruler, saved in the montage. A right click on a marker plays from there (Play from here), renames it or deletes it.',
+            'A right click anywhere in the tracks area offers Go to marker (brings the playhead to the chosen marker) and Delete all markers. Markers can be managed also with the montage locked.',
           ],
         },
         {
@@ -637,6 +696,13 @@ const EN: HelpContent = {
           text: [
             'The wheel on the tracks or on the ruler zooms around the pointer; Shift+wheel (or the horizontal wheel) scrolls the time; the wheel on the track headers scrolls them vertically.',
             'The buttons at the top right zoom in, zoom out and fit the whole montage in the view, or the selected range when there is one.',
+            'On empty tracks and on the empty area below the tracks, dragging pans the view left and right; a click on an empty track moves the playhead.',
+          ],
+        },
+        {
+          title: 'Narrow windows',
+          text: [
+            'As the window narrows, the bar at the top moves the less used commands into the More commands menu (…): first the zoom, then the editing commands (and the export keeps only its icon), then new, save as and the listening volume slider, last undo and redo.',
           ],
         },
         {
@@ -652,14 +718,24 @@ const EN: HelpContent = {
         {
           title: 'Tracks',
           text: [
-            'In the header of each track: mute, solo (when a track is soloed only the soloed tracks are heard), details of the files used (with a button to show them in File Explorer) and track removal.',
+            'In the header of each track: mute, solo (when a track is soloed only the soloed tracks are heard), details of the files used (with a button to show them in File Explorer) and the × at the end of the name to remove the track.',
+            'Each clip shows the name of its file at the bottom left; hovering it, a tooltip gives the details of the file (format, rate, channels, bitrate, length, tempo). When the clip runs out of the view on the left the name slides along, staying inside the clip.',
+            'Dragging the bottom edge of a header changes the height of all the tracks (up to three times the initial one); a double click on the edge goes back to the initial height.',
+          ],
+        },
+        {
+          title: 'Context menus',
+          keys: ['right click'],
+          text: [
+            'A right click on a clip selects it (unless it is already selected) and opens its menu: tempo and bars, speed and pitch, tempo alignment, envelope, split at the playhead, track effects and details, deletion of the selected clips. With the montage locked only the details are left.',
+            'Below it, and anywhere in the tracks area, the tracks menu: Go to marker and Delete all markers. On the ruler, the markers menu.',
           ],
         },
         {
           title: 'Select and move a clip',
           keys: ['←', '→', 'Shift+← →'],
           text: [
-            'A clip is a portion of an audio file placed on a track. Click to select it, drag to move it in time or to another track; dragging it below the last track creates a new one.',
+            'A clip is a portion of an audio file placed on a track. A click (press and release on the same spot) selects it; then dragging it moves it in time or to another track, and dragging it below the last track creates a new one. Dragging from a clip not selected selects a time range instead.',
             'The start, end and envelope points of the clip snap to the start, end and envelope points of the other clips, on any track, when they pass close by (also with the grid shown). With the bar grid shown the clip moves by steps (bar, quarter or eighth note, chosen in the Settings): the grid point of the clip under the pointer snaps to the nearest one of the other clips. Hold Alt to move it freely.',
             'With the keyboard, the arrows ← → move the selected clips by one pixel (the more you zoom in, the finer the step); with Shift they jump to the next snap point: start, end or envelope point of another clip, or the playhead. Holding the arrow down, or pressing it several times in a row, makes the move a single undo step.',
           ],
@@ -685,7 +761,7 @@ const EN: HelpContent = {
           title: 'Select a time range',
           keys: ['Esc'],
           text: [
-            'Drag on an empty area of the tracks: the selected band applies to all the tracks. Use it to crop, delete or loop a stretch. Esc clears the selection.',
+            'Drag on an empty area of the tracks, or starting from a clip not selected: the selected band applies to all the tracks. Use it to crop, delete or loop a stretch. Dragging inside the band moves it (the selection moves, not the audio). Esc clears the selection.',
             'On the time ruler, Shift+drag selects the range over the clips too (handy with a single track). Shift+click extends the range to the clicked point; with no range it selects from the playhead to the point.',
           ],
         },
@@ -723,7 +799,11 @@ const EN: HelpContent = {
         },
         {
           title: 'Track volume',
-          text: ['The vertical fader on the right of the track header sets the volume of the whole track (from −30 to +6 dB): drag it or click along the rail, use the wheel or the arrow keys; a double click brings it back to 0 dB.'],
+          text: [
+            'The vertical fader on the right of the track header sets the volume of the whole track (from −30 to +6 dB): drag it or click along the rail, use the wheel or the arrow keys; a double click brings it back to 0 dB.',
+            'The knob under the buttons is the pan: it moves the track to the left (L) or to the right (R); drag it vertically, a double click brings it back to the centre (C).',
+            'Beside the fader, while playing, the meter shows the level of the track (two bars when stereo): green, orange above −6 dB, red above 0 dB, when the sound risks distorting.',
+          ],
         },
       ],
     },
@@ -778,7 +858,8 @@ const EN: HelpContent = {
           text: [
             'When a song was recorded without a steady tempo, after a few bars the grid no longer matches the music. You can make the grid follow the audio, without changing it: the bar map belongs to the file, so it holds for all its clips.',
             'By hand: with the grid shown hold Shift and drag a bar line onto the right hit (it snaps to the nearest attack; Alt to move it freely). That bar stays pinned, marked by a small triangle: the bars between it and the previous pinned bar stretch or shrink evenly, the following ones take the new length. Shift+right click on a pinned bar unpins it.',
-            'Automatically: in the tempo dialog “Detect bars” finds the start of every bar along the whole file and makes it an automatic anchor, starting from the marked bar or the bars pinned by hand, which stay. Where the grid is still wrong, pin the right bar by hand and run it again.',
+            'Automatically: in the tempo dialog “Detect bars” follows the beats one by one along the whole file (played music is never perfectly even, not even inside the bar), recognizes the parts with no pulse (a free or sung-only intro, a rubato, the silences), which stay without grid and are hatched with the words “free tempo”, and puts the 1 of each bar on the accents (kick, chord changes). With “Automatic meter” it finds 3/4 or 4/4 bar by bar, also mixed (the new meter is written next to the bar number); off, it uses the meter chosen. The bars pinned by hand stay and force a 1 there. Where the grid is still wrong, pin the right bar by hand and run it again.',
+            'After the detection the dialog opens again with the report: for each part its time span, bars, meter, BPM and reliability, and the doubts (“maybe 3/4”, “uncertain 1”); uncertain bars have a dashed line on the grid. When the beat could be twice or half as fast, or the meter another one, the buttons “Try again at … BPM” and “Try again in …” detect again with that reading. If you change the BPM in the dialog before detecting, the detection stays near that tempo.',
             'In the same dialog: “Remove anchors” removes all the pinned bars and goes back to the steady grid the map started from; “Remove automatic anchors” removes only those found by “Detect bars” and keeps yours; “Steady tempo” drops the map leaving a steady tempo equal to its average.',
             '“Save bars” writes tempo and anchors to a file next to the audio, with the same name and the .edimusbars extension (for example song.mp3.edimusbars): when you open that audio again, even in another montage, edimus uses it instead of the detected tempo. “Load bars” loads it by hand. In the Settings you can have it saved by itself at every change. In the web version the file is saved and opened by choosing it, and it is not read by itself.',
             'Aligning the tempo of several clips changes only their speed: it does not make a song that speeds up or slows down steady.',
@@ -847,7 +928,7 @@ const EN: HelpContent = {
     },
     {
       title: 'Move (cut and paste) a piece of a track',
-      steps: ['Isolate the piece by splitting the clip with S at its start and end.', 'Drag the piece where you need it, also to another track or below the last one to create a new track.'],
+      steps: ['Isolate the piece by splitting the clip with S at its start and end.', 'Select the piece with a click and drag it where you need it, also to another track or below the last one to create a new track.'],
       note: 'Copy and paste (duplicating a piece) is not available yet: to reuse a stretch, add the same file again and trim it from its edges.',
     },
     {
@@ -870,6 +951,7 @@ const EN: HelpContent = {
         'Switch on the grid (B) and, if needed, mark the bar at the start of the song (BPM button, “Mark a bar”).',
         'In the tempo dialog press “Detect bars”: the grid follows the song along the whole file.',
         'Scroll through the song: where a bar does not fall on the hit, Shift+drag its line onto the right hit.',
+        'Read the report that appears: if tempo or meter are doubtful, try the reading offered with “Try again…”.',
         'If there are many corrections, press “Detect bars” again: the bars pinned by hand stay and guide the search.',
         'Press “Save bars” to find them again the next time you open the same audio.',
       ],
@@ -910,7 +992,7 @@ const EN: HelpContent = {
       title: 'Put an effect on part of a track only',
       steps: [
         'Split the clip at the start and at the end of the part (S).',
-        'Drag the part onto an empty track (the strips at the bottom): it becomes a new track.',
+        'Select the part with a click and drag it onto an empty track (the strips at the bottom): it becomes a new track.',
         'Add the effects to that track.',
       ],
     },
@@ -928,6 +1010,10 @@ const EN: HelpContent = {
     {
       title: 'Loop a passage',
       steps: ['Select the passage by dragging on an empty area of the tracks.', 'Switch on the loop (bottom right) and press Space.'],
+    },
+    {
+      title: 'Listen to a montage with no risk of changing it',
+      steps: ['Click the padlock next to the name of the montage (or Ctrl+L): it turns red.', 'Listen, move the playhead, use mute, solo and loop: the clips cannot be touched.', 'To edit again, click the padlock once more.'],
     },
     {
       title: 'Change speed without changing pitch',

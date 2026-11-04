@@ -13,16 +13,17 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import type { AudioInfo } from '../../core/platform/audio-engine.port';
 import { AudioLibraryService, SourceState } from '../../core/audio/audio-library.service';
 import { PlaybackService } from '../../core/audio/playback.service';
 import { RecordingService } from '../../core/audio/recording.service';
 import { OnsetCurve, Tempo, beatsPerBar, snapToOnsets } from '../../core/audio/tempo';
-import { isVariable, meanBpm, pinBar } from '../../core/audio/tempo-map';
+import { meanBpm, pinBar } from '../../core/audio/tempo-map';
 import { TempoService } from '../../core/audio/tempo.service';
 import { DocumentService } from '../../core/document.service';
 import { EditService } from '../../core/edit.service';
@@ -32,10 +33,11 @@ import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { moveClips, trimClip, withSourceTempo } from '../../core/montage/edits';
 import { ShellPort } from '../../core/platform/shell.port';
 import { EnvelopePoint, MAX_GAIN, curveThroughMidpoint, insertPoint, movePoint, setCurve } from '../../core/montage/envelope';
-import { FaderComponent } from '../../shared/controls/fader.component';
-import { Clip, Montage, Track, audibleTracks, copyName, fileName, toSource, trackVolume } from '../../core/montage/montage.model';
+import { KnobComponent } from '../../shared/controls/knob.component';
+import { TrackMeterComponent } from './track-meter.component';
+import { Clip, Marker, Montage, Track, audibleTracks, copyName, fileName, toSource, trackPan, trackVolume } from '../../core/montage/montage.model';
 import { MontageService } from '../../core/montage/montage.service';
-import { SettingsService } from '../../core/settings.service';
+import { MIN_TRACK_HEIGHT, SettingsService } from '../../core/settings.service';
 import { snapToBeats } from '../../core/timeline/beat-snap';
 import { snapAnchors, snapTime, snapToEdges } from '../../core/timeline/edge-snap';
 import { BarMarking, TimelineService } from '../../core/timeline/timeline.service';
@@ -81,6 +83,8 @@ const RANGE_THRESHOLD = 3;
 const EDGE_SNAP = 10;
 /** Vertical distance (px) within which a dragged envelope point snaps to unity gain (0 dB). */
 const UNITY_SNAP = 6;
+/** Distance (px) within which a right click on the ruler is on a marker. */
+const MARKER_GRAB = 6;
 /** Seconds within which a dragged bar line lands on an attack. */
 const BAR_ONSET_SNAP = 0.05;
 /** Shortest beat a stretched bar map may get (seconds: 400 BPM). */
@@ -92,18 +96,22 @@ const MIN_BEAT = 60 / 400;
   imports: [
     MatButtonModule,
     MatIconModule,
+    MatMenuModule,
+    MatDividerModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     TranslatePipe,
     RulerComponent,
-    FaderComponent,
+    KnobComponent,
+    TrackMeterComponent,
     TrackLaneComponent,
     EffectChainComponent,
   ],
   templateUrl: './timeline.component.html',
   styleUrl: './timeline.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[style.--track-height]': "settings.trackHeight() + 'px'" },
 })
 export class TimelineComponent {
   protected readonly montages = inject(MontageService);
@@ -115,13 +123,46 @@ export class TimelineComponent {
   private readonly tempos = inject(TempoService);
   private readonly dialogs = inject(MatDialog);
   private readonly theme = inject(ThemeColorsService);
-  private readonly settings = inject(SettingsService);
+  protected readonly settings = inject(SettingsService);
   private readonly i18n = inject(I18nService);
   private readonly shell = inject(ShellPort);
   protected readonly recorder = inject(RecordingService);
 
   private readonly lanes = viewChild.required<ElementRef<HTMLElement>>('lanes');
   private readonly scroller = viewChild.required<ElementRef<HTMLElement>>('scroller');
+  private readonly menuAnchor = viewChild.required<ElementRef<HTMLElement>>('menuAnchor');
+  private readonly menuTrigger = viewChild.required<MatMenuTrigger>('menuTrigger');
+
+  /**
+   * What the context menu was opened on: the ruler (at a time, maybe on a marker) or the tracks
+   * area (maybe on a clip, with its track).
+   */
+  protected readonly menu = signal<
+    | { kind: 'ruler'; time: number; marker: Marker | null }
+    | {
+        kind: 'tracks';
+        /** On a clip: `locked` the clip itself, `stuck` some clip of the selection it is in (they do not move nor go). */
+        clip: { clipId: string; track: Track; count: number; atPlayhead: boolean; locked: boolean; stuck: boolean } | null;
+      }
+    | null
+  >(null);
+
+  protected readonly rulerMenu = computed(() => {
+    const menu = this.menu();
+    return menu?.kind === 'ruler' ? menu : null;
+  });
+  protected readonly tracksMenu = computed(() => {
+    const menu = this.menu();
+    return menu?.kind === 'tracks' ? menu : null;
+  });
+
+  /** Markers in view, with their x inside the lanes. */
+  protected readonly visibleMarkers = computed(() =>
+    this.edits.markers().flatMap((marker) => {
+      const x = this.visibleX(marker.time);
+      return x === null ? [] : [{ marker, x }];
+    }),
+  );
 
   /** Selected range in lanes coordinates (clipped to the view), null when none or out of view. */
   protected readonly rangeBox = computed(() => {
@@ -189,7 +230,22 @@ export class TimelineComponent {
         /** Attacks of the source, to land the bar line on a hit (once computed). */
         curve: OnsetCurve | null;
       }
-    | { kind: 'curve'; from: Montage; clipId: string; points: EnvelopePoint[]; index: number; lane: TrackLaneComponent };
+    | { kind: 'curve'; from: Montage; clipId: string; points: EnvelopePoint[]; index: number; lane: TrackLaneComponent }
+    | {
+        kind: 'pan';
+        pointerX: number;
+        scroll: number;
+        moved: boolean;
+        /** Where a click without moving puts the playhead (none on the empty strips). */
+        seek: number | null;
+      }
+    /** Press on a clip not selected: a click selects it, a drag selects a time range from there. */
+    | { kind: 'press'; clipId: string; anchor: number; anchorX: number }
+    /**
+     * Press inside the selected range (not on a selected clip): a drag moves the range, a click
+     * is a plain click there (selects the clip under the pointer, or moves the playhead).
+     */
+    | { kind: 'shift'; from: { start: number; end: number }; pointerTime: number; pointerX: number; moved: boolean; clipId: string | null };
 
   /** Envelope point being dragged. */
   protected readonly activePoint = signal<{ clipId: string; index: number } | null>(null);
@@ -260,8 +316,9 @@ export class TimelineComponent {
   }
 
   /**
-   * On a clip: selects it and moves it (or trims it when grabbed on an edge);
-   * elsewhere: moves the playhead there and, dragging, selects a time range.
+   * A click on a clip selects it; dragging a selected clip moves the selection, dragging an edge
+   * trims the clip. Elsewhere (also from a clip not selected) a drag selects a time range, and a
+   * drag inside the selected range moves it; a click away from the clips moves the playhead.
    */
   protected onLaneDown(event: PointerEvent, lane: TrackLaneComponent, trackIndex: number): void {
     const target = event.currentTarget as HTMLElement;
@@ -279,41 +336,60 @@ export class TimelineComponent {
       }
       return;
     }
-    if (this.timeline.envelopeMode()) return this.onEnvelopeDown(event, lane, target);
+    // locked: the clips cannot be touched, the lanes only move the playhead and select ranges
+    const locked = this.montages.locked();
+    if (this.timeline.envelopeMode() && !locked) return this.onEnvelopeDown(event, lane, target);
     // Shift on a bar line of the grid: drag to pin the bar there, right click to unpin it
-    const barLine = event.shiftKey ? lane.barLineAt(this.xAt(event)) : undefined;
+    const barLine = event.shiftKey && !locked ? lane.barLineAt(this.xAt(event)) : undefined;
     if (barLine) return this.onBarLineDown(event, barLine, target);
     if (event.button !== 0) return;
     this.edits.endNudge();
     target.setPointerCapture(event.pointerId);
+    // an empty track: dragging pans the view, a click moves the playhead
+    if (!lane.track().clips.length) return this.startPan(event, target, this.timeAt(event));
     // the view stays still under the pointer until the release
     this.timeline.holdExtent();
-    const hit = lane.clipAt(this.xAt(event));
+    const time = this.timeAt(event);
+    const found = locked ? undefined : lane.clipAt(this.xAt(event));
+    // a locked clip is only selected: its edges do not trim it
+    const hit = found?.clip.locked ? { ...found, zone: 'body' as const } : found;
     const from = this.montages.montage();
-    if (!hit) {
-      const time = this.timeAt(event);
+    // Ctrl+click adds the clip to the selection or takes it away
+    if (hit && (event.ctrlKey || event.metaKey)) return this.timeline.toggleClip(hit.clip.id);
+    if (hit && hit.zone !== 'body') {
+      this.timeline.selectClip(hit.clip.id);
+      this.gesture = { kind: 'trim', from, clip: hit.clip, edge: hit.zone };
+      return;
+    }
+    const selected = this.timeline.selectedClips();
+    // a selection with a locked clip does not move: as from a clip not selected
+    const still = !!hit && from.tracks.some((t) => t.clips.some((c) => c.locked && selected.has(c.id)));
+    if (!hit || !selected.has(hit.clip.id) || still) {
+      // inside the selected range a drag moves the range
+      const range = this.timeline.range();
+      if (range && time >= range.start && time <= range.end) {
+        target.style.cursor = 'grabbing';
+        this.gesture = { kind: 'shift', from: range, pointerTime: time, pointerX: event.clientX, moved: false, clipId: hit?.clip.id ?? null };
+        return;
+      }
+      // a clip not selected: selected by a click, a drag selects a range
+      if (hit) {
+        this.gesture = { kind: 'press', clipId: hit.clip.id, anchor: time, anchorX: event.clientX };
+        return;
+      }
       this.timeline.selectClip(null);
       this.timeline.range.set(null);
       this.playback.seek(time);
       this.gesture = { kind: 'range', anchor: time, anchorX: event.clientX };
       return;
     }
-    // Ctrl+click adds the clip to the selection or takes it away
-    if (event.ctrlKey || event.metaKey) return this.timeline.toggleClip(hit.clip.id);
-    if (hit.zone !== 'body') {
-      this.timeline.selectClip(hit.clip.id);
-      this.gesture = { kind: 'trim', from, clip: hit.clip, edge: hit.zone };
-      return;
-    }
     // grabbing a selected clip moves the whole selection
-    const selected = this.timeline.selectedClips();
-    if (!selected.has(hit.clip.id)) this.timeline.selectClip(hit.clip.id);
     target.style.cursor = 'grabbing';
     this.gesture = {
       kind: 'move',
       from,
       clipId: hit.clip.id,
-      group: selected.has(hit.clip.id) ? selected : new Set([hit.clip.id]),
+      group: selected,
       trackIndex,
       clipStart: hit.clip.start,
       pointerTime: this.timeAt(event),
@@ -408,6 +484,26 @@ export class TimelineComponent {
         const points = setCurve(gesture.points, gesture.index, curveThroughMidpoint(fraction));
         return this.montages.preview(withClipEnvelope(gesture.from, gesture.clipId, points));
       }
+      case 'press': {
+        if (Math.abs(event.clientX - gesture.anchorX) < RANGE_THRESHOLD) return;
+        // the press becomes a range selection from where it started
+        this.timeline.selectClip(null);
+        this.gesture = { kind: 'range', anchor: gesture.anchor, anchorX: gesture.anchorX };
+        return this.onLaneMove(event);
+      }
+      case 'shift': {
+        if (!gesture.moved && Math.abs(event.clientX - gesture.pointerX) < RANGE_THRESHOLD) return;
+        gesture.moved = true;
+        const delta = Math.max(-gesture.from.start, time - gesture.pointerTime);
+        this.timeline.range.set({ start: gesture.from.start + delta, end: gesture.from.end + delta });
+        return this.playback.seek(gesture.from.start + delta);
+      }
+      case 'pan': {
+        const dx = event.clientX - gesture.pointerX;
+        if (!gesture.moved && Math.abs(dx) < RANGE_THRESHOLD) return;
+        gesture.moved = true;
+        return this.timeline.setScroll(gesture.scroll - dx / this.timeline.pxPerSec());
+      }
       case 'range': {
         if (Math.abs(event.clientX - gesture.anchorX) < RANGE_THRESHOLD) return this.timeline.range.set(null);
         const end = Math.max(0, time);
@@ -430,7 +526,143 @@ export class TimelineComponent {
       this.montages.preview(gesture.from);
       this.timeline.selectClip(gesture.clipId);
     }
+    if (gesture?.kind === 'press') return this.timeline.selectClip(gesture.clipId);
+    if (gesture?.kind === 'shift') {
+      if (gesture.moved) return;
+      // a click inside the range: as anywhere else
+      if (gesture.clipId) return this.timeline.selectClip(gesture.clipId);
+      this.timeline.selectClip(null);
+      this.timeline.range.set(null);
+      return this.playback.seek(gesture.pointerTime);
+    }
+    if (gesture?.kind === 'pan') {
+      if (!gesture.moved && gesture.seek !== null) {
+        this.timeline.selectClip(null);
+        this.timeline.range.set(null);
+        this.playback.seek(gesture.seek);
+      }
+      return;
+    }
     if (gesture && gesture.kind !== 'range' && gesture.kind !== 'mark') this.montages.commit(gesture.from);
+  }
+
+  /** Empty strips below the tracks: dragging pans the view (the browse link keeps its click). */
+  protected onPanDown(event: PointerEvent): void {
+    if (event.button !== 0 || (event.target instanceof Element && event.target.closest('a'))) return;
+    const target = event.currentTarget as HTMLElement;
+    target.setPointerCapture(event.pointerId);
+    this.startPan(event, target, null);
+  }
+
+  private startPan(event: PointerEvent, target: HTMLElement, seek: number | null): void {
+    target.style.cursor = 'grabbing';
+    this.gesture = { kind: 'pan', pointerX: event.clientX, scroll: this.timeline.scroll(), moved: false, seek };
+  }
+
+  /**
+   * Right click in the tracks area: the menu of the tracks (markers) and, on a clip, the menu of
+   * the clip before it; the clip is selected unless it is in the selection already. Not while
+   * marking a bar, nor on an envelope point or a bar line with Shift: there the right click has
+   * its own meaning.
+   */
+  protected onLaneContextMenu(event: MouseEvent, lane: TrackLaneComponent): void {
+    event.preventDefault();
+    if (this.timeline.beatMarking() || this.gesture) return;
+    const x = event.clientX - this.lanes().nativeElement.getBoundingClientRect().left;
+    const y = event.clientY - (event.currentTarget as HTMLElement).getBoundingClientRect().top;
+    if (this.timeline.envelopeMode() && lane.pointAt(x, y)) return;
+    if (event.shiftKey && lane.barLineAt(x)) return;
+    const hit = lane.clipAt(x);
+    if (!hit) return this.openMenu(event, { kind: 'tracks', clip: null });
+    if (!this.timeline.selectedClips().has(hit.clip.id)) this.timeline.selectClip(hit.clip.id);
+    const position = this.playback.position();
+    this.openMenu(event, {
+      kind: 'tracks',
+      clip: {
+        clipId: hit.clip.id,
+        track: lane.track(),
+        count: this.timeline.selectedClipIds().length,
+        atPlayhead: position > hit.clip.start && position < hit.clip.start + this.length(hit.clip),
+        locked: !!hit.clip.locked,
+        stuck: this.montages.montage().tracks.some((t) => t.clips.some((c) => c.locked && this.timeline.selectedClips().has(c.id))),
+      },
+    });
+  }
+
+  /** Right click on the empty strips below the tracks: the menu of the tracks. */
+  protected onSlotsContextMenu(event: MouseEvent): void {
+    event.preventDefault();
+    if (!this.montages.isEmpty()) this.openMenu(event, { kind: 'tracks', clip: null });
+  }
+
+  /** Right click on the ruler: new marker there, or the commands of the marker under the pointer. */
+  protected onRulerContextMenu(event: MouseEvent): void {
+    event.preventDefault();
+    if (this.montages.isEmpty()) return;
+    const x = event.clientX - this.lanes().nativeElement.getBoundingClientRect().left;
+    let marker: Marker | null = null;
+    let distance: number = MARKER_GRAB;
+    for (const { marker: m, x: mx } of this.visibleMarkers()) {
+      if (Math.abs(mx - x) <= distance) {
+        marker = m;
+        distance = Math.abs(mx - x);
+      }
+    }
+    this.openMenu(event, { kind: 'ruler', time: Math.max(0, this.timeline.xToTime(x)), marker });
+  }
+
+  private openMenu(event: MouseEvent, menu: NonNullable<ReturnType<typeof this.menu>>): void {
+    this.menu.set(menu);
+    const anchor = this.menuAnchor().nativeElement;
+    anchor.style.left = `${event.clientX}px`;
+    anchor.style.top = `${event.clientY}px`;
+    this.menuTrigger().openMenu();
+  }
+
+  /** Moves the playhead to a marker (the view follows it). */
+  protected goToMarker(marker: Marker): void {
+    this.playback.seek(marker.time);
+    this.timeline.centerOn(marker.time);
+  }
+
+  protected readonly formatTime = formatDuration;
+
+  /** Track height being dragged from the bottom edge of a header. */
+  private resizing?: { pointerY: number; height: number; rows: number };
+
+  /**
+   * Bottom edge of a track header: dragging it changes the height of all the tracks; the edge
+   * dragged stays under the pointer (all the tracks above it grow too).
+   */
+  protected onResizeDown(event: PointerEvent, index: number): void {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.resizing = { pointerY: event.clientY, height: this.settings.trackHeight(), rows: index + 1 };
+  }
+
+  protected onResizeMove(event: PointerEvent): void {
+    const resizing = this.resizing;
+    if (resizing) this.settings.setTrackHeight(resizing.height + (event.clientY - resizing.pointerY) / resizing.rows, false);
+  }
+
+  protected onResizeUp(event: PointerEvent): void {
+    const target = event.currentTarget as HTMLElement;
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
+    if (!this.resizing) return;
+    this.resizing = undefined;
+    this.settings.setTrackHeight(this.settings.trackHeight());
+  }
+
+  /** Back to the initial height. */
+  protected resetTrackHeight(): void {
+    this.settings.setTrackHeight(MIN_TRACK_HEIGHT);
+  }
+
+  /** Deletes the selected clips (not the time range, which the Delete key would take first). */
+  protected deleteSelectedClips(): void {
+    this.timeline.range.set(null);
+    void this.edits.delete();
   }
 
 
@@ -494,6 +726,7 @@ export class TimelineComponent {
 
   /** Double click on a clip: speed and pitch dialog; on an envelope bend handle: straight segment. */
   protected onLaneDoubleClick(event: MouseEvent, lane: TrackLaneComponent): void {
+    if (this.montages.locked()) return;
     if (this.timeline.envelopeMode()) {
       const y = event.clientY - (event.currentTarget as HTMLElement).getBoundingClientRect().top;
       const handle = lane.curveHandleAt(event.clientX - this.lanes().nativeElement.getBoundingClientRect().left, y);
@@ -507,10 +740,36 @@ export class TimelineComponent {
 
   /** State before the track volume being dragged, for one undo step per gesture. */
   private volumeFrom?: Montage;
+  /** Same for the pan. */
+  private panFrom?: Montage;
+
+  /** Pan shown in % from -100 (left) to 100 (right): C, L 30, R 45. */
+  protected readonly panLabel = (value: number) =>
+    value === 0 ? this.i18n.t('pan.center') : this.i18n.t(value < 0 ? 'pan.left' : 'pan.right', { v: Math.abs(value) });
+  protected readonly wholePan = (value: number) => Math.round(value);
+
+  protected panValue(track: Track): number {
+    return Math.round(trackPan(track) * 100);
+  }
+
+  private withPan(montage: Montage, trackId: string, value: number): Montage {
+    const pan = value === 0 ? undefined : Math.max(-1, Math.min(1, value / 100));
+    return { ...montage, tracks: montage.tracks.map((t) => (t.id === trackId ? { ...t, pan } : t)) };
+  }
+
+  protected previewPan(track: Track, value: number): void {
+    this.panFrom ??= this.montages.montage();
+    this.montages.preview(this.withPan(this.panFrom, track.id, value));
+  }
+
+  protected commitPan(track: Track, value: number): void {
+    const from = this.panFrom ?? this.montages.montage();
+    this.panFrom = undefined;
+    this.montages.preview(this.withPan(from, track.id, value));
+    this.montages.commit(from);
+  }
 
   protected readonly dbLabel = (db: number) => `${db > 0 ? '+' : ''}${db.toFixed(1)} dB`;
-  /** Scale of the track volume fader (dB). */
-  protected readonly volumeMarks = [-24, -18, -12, -6, 6];
   /** Steps of the track volume (0.5 dB). */
   protected readonly halfDb = (db: number) => Math.round(db * 2) / 2;
 
@@ -609,6 +868,7 @@ export class TimelineComponent {
 
   /** Removes a track after a confirmation. */
   protected async removeTrack(track: Track): Promise<void> {
+    if (this.montages.refusesLocked({ tracks: [track.id] })) return;
     const choice = await this.shell.ask(
       this.i18n.t('track.remove'),
       this.i18n.t('track.removeConfirm', { name: track.name, n: track.clips.length }),
@@ -616,12 +876,13 @@ export class TimelineComponent {
     if (choice === 'yes') this.montages.removeTrack(track.id);
   }
 
+  /** Mute and solo exclude each other: switching one on switches the other off (a muted soloed track would stay silent). */
   protected toggleMute(track: Track): void {
-    this.montages.updateTrack(track.id, (t) => ({ ...t, muted: !t.muted }));
+    this.montages.updateTrack(track.id, (t) => ({ ...t, muted: !t.muted, solo: t.muted ? t.solo : false }), true);
   }
 
   protected toggleSolo(track: Track): void {
-    this.montages.updateTrack(track.id, (t) => ({ ...t, solo: !t.solo }));
+    this.montages.updateTrack(track.id, (t) => ({ ...t, solo: !t.solo, muted: t.solo ? t.muted : false }), true);
   }
 
   /**
@@ -743,30 +1004,13 @@ export class TimelineComponent {
     return index < 0 ? null : sourceColors(index, this.theme.colors().dark).clipBorder;
   }
 
-  /** Tempo of the source of the track's first clip, for the header. */
-  protected tempoLabel(track: Track): string | null {
-    const sourceId = track.clips[0]?.sourceId;
-    if (!sourceId) return null;
-    if (this.tempos.isDetecting(sourceId)) return this.i18n.t('tempo.detecting');
-    if (this.edits.trackingSource() === sourceId) return this.i18n.t('tempo.tracking');
-    const tempo = this.tempos.sourceTempo(sourceId);
-    if (tempo === undefined) return null;
-    if (tempo === null) return this.i18n.t('tempo.unknown');
-    if (isVariable(tempo)) return this.i18n.t('tempo.variableValue', { bpm: meanBpm(tempo).toFixed(1) });
-    const state = this.tempos.detected()[sourceId];
-    if (state?.status === 'ready' && state.fromFile && tempo === state.tempo) return this.i18n.t('tempo.fileValue', { bpm: tempo.bpm.toFixed(1) });
-    return this.i18n.t('tempo.value', { bpm: tempo.bpm.toFixed(1), confidence: Math.round(tempo.confidence * 100) });
-  }
-
-  protected describe(info: AudioInfo): string {
-    const parts = [
-      info.codec,
-      `${(info.sampleRate / 1000).toLocaleString(this.settings.language())} kHz`,
-      this.i18n.t(`channels.${info.channels}`),
-    ];
-    if (info.bitRate) parts.push(`${Math.round(info.bitRate / 1000)} kbps`);
-    parts.push(formatDuration(info.duration));
-    return parts.join(' · ');
+  /** The track plays stereo audio: its meter has two bars. */
+  protected isStereo(track: Track): boolean {
+    const sources = this.library.sources();
+    return track.clips.some((c) => {
+      const state = sources[c.sourceId];
+      return !!state && 'info' in state && (state.info?.channels ?? 0) > 1;
+    });
   }
 
   protected readonly fileName = fileName;

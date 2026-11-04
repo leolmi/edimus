@@ -6,8 +6,8 @@ import type { EnvelopePoint } from './envelope';
 export const MONTAGE_EXTENSION = 'edimus';
 /** Montage and copies of its sources in one zip file. */
 export const BUNDLE_EXTENSION = 'edimuspack';
-/** 2: volume envelopes on the clips (in source time) and a single volume per track; 3: effects per track. */
-export const MONTAGE_VERSION = 3;
+/** 2: volume envelopes on the clips (in source time) and a single volume per track; 3: effects per track; 4: markers, track pan and locked clips. */
+export const MONTAGE_VERSION = 4;
 
 export const AUDIO_EXTENSIONS = ['wav', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'aif', 'aiff', 'wma'];
 
@@ -51,6 +51,11 @@ export interface Clip {
    * with the clip; none = unity gain.
    */
   envelope?: EnvelopePoint[];
+  /**
+   * Locked against accidental edits: it keeps its place, length and timing (envelope and
+   * track effects stay editable); an edit that would move, cut or remove it is refused.
+   */
+  locked?: boolean;
 }
 
 /** Speed factor of a clip. */
@@ -73,12 +78,17 @@ export interface Track {
   solo?: boolean;
   /** Volume of the whole track (linear gain, up to MAX_GAIN); default 1. */
   volume?: number;
+  /** Stereo position of the track, -1 (left) to 1 (right), after the volume; default 0 (centre). */
+  pan?: number;
   /** Effects applied in order to the sum of the clips, before the volume (see effects.ts). */
   effects?: TrackEffect[];
 }
 
 /** Volume of a track (linear gain). */
 export const trackVolume = (track: Track) => track.volume ?? 1;
+
+/** Stereo position of a track (-1 left, 0 centre, 1 right). */
+export const trackPan = (track: Track) => Math.max(-1, Math.min(1, track.pan ?? 0));
 
 /** Tracks heard in the mix: not muted and, when some track is soloed, soloed. */
 export function audibleTracks(montage: Montage): Track[] {
@@ -93,6 +103,16 @@ export interface Montage {
   channels: 1 | 2;
   sources: AudioSource[];
   tracks: Track[];
+  /** Named points of the timeline set by the user, to find passages again (none when absent). */
+  markers?: Marker[];
+}
+
+/** A named point of the timeline (secondary marker: the start point of the stops is the primary one). */
+export interface Marker {
+  id: string;
+  /** Timeline seconds. */
+  time: number;
+  name: string;
 }
 
 export function fileExtension(path: string): string {

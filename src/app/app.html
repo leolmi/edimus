@@ -1,32 +1,55 @@
+<!-- narrower windows move the less used commands into the "more" menu, group by group (see `compact`) -->
+@let level = compact();
 <mat-toolbar class="toolbar">
-  <mat-icon class="logo">graphic_eq</mat-icon>
+  @if (level < 4) {
+    <mat-icon class="logo">graphic_eq</mat-icon>
+  }
   <span class="title" role="button" tabindex="0" (click)="documents.rename()" (keydown.enter)="documents.rename()" [matTooltip]="'rename.tooltip' | t">
-    {{ documents.title() }}
+    <span class="title-text">{{ documents.title() }}</span>
     @if (montages.dirty()) {
-      <span class="dirty" [matTooltip]="'montage.dirty' | t">•</span>
+      <span class="dirty" [matTooltip]="'montage.dirty' | t"></span>
     }
   </span>
+  @if (!montages.isEmpty()) {
+    <!-- the lock: red while the montage can only be listened to -->
+    <button
+      mat-icon-button
+      class="lock"
+      [class.locked]="montages.locked()"
+      [disabled]="recorder.state() !== 'idle'"
+      (click)="toggleLock()"
+      [matTooltip]="(montages.locked() ? 'lock.on' : 'lock.off') | t"
+    >
+      <mat-icon>{{ montages.locked() ? 'lock' : 'lock_open' }}</mat-icon>
+    </button>
+  }
 
-  <button mat-icon-button (click)="documents.reset()" [disabled]="montages.pristine()" [matTooltip]="'action.reset' | t">
-    <mat-icon>note_add</mat-icon>
-  </button>
+  @if (level < 3) {
+    <button mat-icon-button (click)="documents.reset()" [disabled]="montages.pristine()" [matTooltip]="'action.reset' | t">
+      <mat-icon>note_add</mat-icon>
+    </button>
+  }
   <button mat-icon-button (click)="documents.openDialog()" [matTooltip]="'action.open' | t">
     <mat-icon>folder_open</mat-icon>
   </button>
   <button mat-icon-button (click)="documents.save()" [disabled]="montages.isEmpty()" [matTooltip]="'action.save' | t">
     <mat-icon>save</mat-icon>
   </button>
-  <button mat-icon-button (click)="documents.saveAs()" [disabled]="montages.isEmpty()" [matTooltip]="'action.saveAs' | t">
-    <mat-icon>save_as</mat-icon>
-  </button>
-  <span class="divider"></span>
-  <button mat-icon-button (click)="montages.undo()" [disabled]="!montages.canUndo()" [matTooltip]="'action.undo' | t">
-    <mat-icon>undo</mat-icon>
-  </button>
-  <button mat-icon-button (click)="montages.redo()" [disabled]="!montages.canRedo()" [matTooltip]="'action.redo' | t">
-    <mat-icon>redo</mat-icon>
-  </button>
-  @if (!montages.isEmpty()) {
+  @if (level < 3) {
+    <button mat-icon-button (click)="documents.saveAs()" [disabled]="montages.isEmpty()" [matTooltip]="'action.saveAs' | t">
+      <mat-icon>save_as</mat-icon>
+    </button>
+  }
+  @if (level < 4) {
+    <span class="divider"></span>
+    <button mat-icon-button (click)="montages.undo()" [disabled]="!montages.canUndo()" [matTooltip]="'action.undo' | t">
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button mat-icon-button (click)="montages.redo()" [disabled]="!montages.canRedo()" [matTooltip]="'action.redo' | t">
+      <mat-icon>redo</mat-icon>
+    </button>
+  }
+  @if (!montages.isEmpty() && level < 2) {
     <span class="divider"></span>
     <button
       mat-icon-button
@@ -36,56 +59,61 @@
     >
       <mat-icon>music_note</mat-icon>
     </button>
-    <button mat-icon-button (click)="edits.alignTempo()" [disabled]="!edits.canAlign()" [matTooltip]="'align.title' | t">
+    <button mat-icon-button (click)="edits.alignTempo()" [disabled]="!edits.canAlign() || montages.locked()" [matTooltip]="'align.title' | t">
       <mat-icon>sync_alt</mat-icon>
     </button>
     <button
       mat-icon-button
       [class.toggled]="timeline.envelopeMode()"
+      [disabled]="montages.locked()"
       (click)="timeline.envelopeMode.set(!timeline.envelopeMode())"
       [matTooltip]="'edit.envelope' | t"
     >
       <mat-icon>show_chart</mat-icon>
     </button>
-    <button mat-icon-button (click)="edits.split()" [matTooltip]="'edit.split' | t">
+    <button mat-icon-button (click)="edits.split()" [disabled]="montages.locked()" [matTooltip]="'edit.split' | t">
       <mat-icon>content_cut</mat-icon>
     </button>
-    <button mat-icon-button (click)="edits.crossfade()" [disabled]="!edits.crossfadeAt()" [matTooltip]="'edit.crossfade' | t">
+    <button mat-icon-button (click)="edits.crossfade()" [disabled]="!edits.crossfadeAt() || montages.locked()" [matTooltip]="'edit.crossfade' | t">
       <mat-icon>join</mat-icon>
     </button>
-    <button mat-icon-button (click)="edits.crop()" [disabled]="!edits.hasRange()" [matTooltip]="'edit.crop' | t">
+    <button mat-icon-button (click)="edits.crop()" [disabled]="!edits.hasRange() || montages.locked()" [matTooltip]="'edit.crop' | t">
       <mat-icon>crop</mat-icon>
     </button>
-    <button mat-icon-button (click)="edits.delete()" [disabled]="!edits.canDelete()" [matTooltip]="'edit.delete' | t">
+    <button mat-icon-button (click)="edits.delete()" [disabled]="!edits.canDelete() || montages.locked()" [matTooltip]="'edit.delete' | t">
       <mat-icon>delete</mat-icon>
     </button>
   }
 
   @if (!montages.isEmpty()) {
     <span class="divider"></span>
-    <button mat-icon-button (click)="settings.toggleMuted()" [matTooltip]="'volume.mute' | t">
-      <mat-icon>{{ volumeIcon() }}</mat-icon>
-    </button>
-    <app-scale-slider
-      class="volume"
+    <app-knob
       compact
-      [min]="0"
-      [max]="100"
-      [step]="1"
-      [majorTicks]="25"
-      [minorTicks]="4"
-      [format]="percentLabel"
-      [disabled]="settings.muted()"
-      [ariaLabel]="'volume.listening' | t"
-      [value]="settings.volume() * 100"
-      (valueChange)="settings.setVolume($event / 100, false)"
-      (committed)="settings.setVolume($event / 100)"
+      class="volume"
+      [showValue]="false"
+      [class.muted]="settings.muted()"
+      [label]="'volume.listening' | t"
+      [min]="minVolumeDb"
+      [max]="maxVolumeDb"
+      [default]="0"
+      [origin]="0"
+      [format]="volumeLabel()"
+      [round]="halfDb"
+      [value]="volumeDb()"
+      (valueChange)="setVolumeDb($event, false)"
+      (committed)="setVolumeDb($event)"
+      (clicked)="settings.toggleMuted()"
+      [matTooltip]="volumeTooltip()"
+      matTooltipShowDelay="600"
     />
+    @if (level < 3) {
+      <app-track-meter class="mix-meter" [class.narrow]="level > 0" horizontal />
+    }
   }
 
   <span class="spacer"></span>
 
-  @if (!montages.isEmpty()) {
+  @if (!montages.isEmpty() && level < 1) {
     <button mat-icon-button (click)="timeline.zoomBy(1 / 1.5)" [matTooltip]="'zoom.out' | t">
       <mat-icon>zoom_out</mat-icon>
     </button>
@@ -97,12 +125,24 @@
     </button>
     <span class="divider"></span>
   }
+  @if (level >= 3 || (level >= 1 && !montages.isEmpty())) {
+    <button mat-icon-button [matMenuTriggerFor]="more" [matTooltip]="'toolbar.more' | t">
+      <mat-icon>more_horiz</mat-icon>
+    </button>
+    <span class="divider"></span>
+  }
 
-  <!-- the goal of the work: set apart and labelled so it is found at a glance -->
-  <button matButton="tonal" (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
-    <mat-icon svgIcon="save-audio" />
-    {{ 'action.exportLabel' | t }}
-  </button>
+  <!-- the goal of the work: set apart and labelled so it is found at a glance (only the icon when narrow) -->
+  @if (level < 2) {
+    <button matButton="tonal" class="export" (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
+      <mat-icon svgIcon="save-audio" />
+      {{ 'action.exportLabel' | t }}
+    </button>
+  } @else {
+    <button mat-icon-button class="export-icon" (click)="documents.exportDialog()" [disabled]="montages.isEmpty() || !!exporter.progress()" [matTooltip]="'action.export' | t">
+      <mat-icon svgIcon="save-audio" />
+    </button>
+  }
   <span class="divider"></span>
   <button mat-icon-button (click)="showSettings()" [matTooltip]="'settings.tooltip' | t">
     <mat-icon>settings</mat-icon>
@@ -111,6 +151,68 @@
     <mat-icon>help</mat-icon>
   </button>
 </mat-toolbar>
+
+<!-- commands left out of the toolbar by a narrow window -->
+<mat-menu #more="matMenu">
+  @if (level >= 3) {
+    <button mat-menu-item (click)="documents.reset()" [disabled]="montages.pristine()">
+      <mat-icon>note_add</mat-icon>{{ 'action.reset' | t }}
+    </button>
+    <button mat-menu-item (click)="documents.saveAs()" [disabled]="montages.isEmpty()">
+      <mat-icon>save_as</mat-icon>{{ 'action.saveAs' | t }}
+    </button>
+  }
+  @if (level >= 4) {
+    <button mat-menu-item (click)="montages.undo()" [disabled]="!montages.canUndo()">
+      <mat-icon>undo</mat-icon>{{ 'action.undo' | t }}
+    </button>
+    <button mat-menu-item (click)="montages.redo()" [disabled]="!montages.canRedo()">
+      <mat-icon>redo</mat-icon>{{ 'action.redo' | t }}
+    </button>
+  }
+  @if (!montages.isEmpty()) {
+    @if (level >= 2) {
+      @if (level >= 3) {
+        <mat-divider />
+      }
+      <button mat-menu-item (click)="timeline.beatGrid.set(!timeline.beatGrid())">
+        <mat-icon>{{ timeline.beatGrid() ? 'check' : 'music_note' }}</mat-icon>{{ 'menu.grid' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.alignTempo()" [disabled]="!edits.canAlign() || montages.locked()">
+        <mat-icon>sync_alt</mat-icon>{{ 'align.title' | t }}
+      </button>
+      <button mat-menu-item [disabled]="montages.locked()" (click)="timeline.envelopeMode.set(!timeline.envelopeMode())">
+        <mat-icon>{{ timeline.envelopeMode() ? 'check' : 'show_chart' }}</mat-icon>{{ 'menu.envelope' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.split()" [disabled]="montages.locked()">
+        <mat-icon>content_cut</mat-icon>{{ 'edit.split' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.crossfade()" [disabled]="!edits.crossfadeAt() || montages.locked()">
+        <mat-icon>join</mat-icon>{{ 'menu.crossfade' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.crop()" [disabled]="!edits.hasRange() || montages.locked()">
+        <mat-icon>crop</mat-icon>{{ 'edit.crop' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.delete()" [disabled]="!edits.canDelete() || montages.locked()">
+        <mat-icon>delete</mat-icon>{{ 'edit.delete' | t }}
+      </button>
+    }
+    @if (level >= 1) {
+      @if (level >= 2) {
+        <mat-divider />
+      }
+      <button mat-menu-item (click)="timeline.zoomBy(1 / 1.5)">
+        <mat-icon>zoom_out</mat-icon>{{ 'zoom.out' | t }}
+      </button>
+      <button mat-menu-item (click)="timeline.zoomBy(1.5)">
+        <mat-icon>zoom_in</mat-icon>{{ 'zoom.in' | t }}
+      </button>
+      <button mat-menu-item (click)="timeline.fit()">
+        <mat-icon>fit_screen</mat-icon>{{ 'zoom.fit' | t }}
+      </button>
+    }
+  }
+</mat-menu>
 
 <main class="workspace">
   <div class="work-area">
@@ -130,7 +232,7 @@
     <span>{{ (progress.stage === 'render' ? 'export.rendering' : 'export.encoding') | t: { p: (progress.progress * 100).toFixed(0) } }}</span>
     <mat-progress-bar mode="determinate" [value]="progress.progress * 100" />
   } @else {
-    {{ documents.status() }}
+    <span class="status-text">{{ documents.status() }}</span>
   }
   @if (!montages.isEmpty()) {
     <span class="spacer"></span>
@@ -147,16 +249,36 @@
       >
         <mat-icon>repeat</mat-icon>
       </button>
+      <button mat-icon-button [disabled]="recorder.busy()" (click)="edits.previousMarker()" [matTooltip]="'transport.previousMarker' | t">
+        <mat-icon>skip_previous</mat-icon>
+      </button>
       <button mat-icon-button class="square stop" [disabled]="recorder.busy()" (click)="playback.stop()" [matTooltip]="'transport.stop' | t">
         <mat-icon>stop</mat-icon>
       </button>
       <button mat-icon-button class="square" [class.play]="!playback.playing()" [class.pause]="playback.playing()" [disabled]="recorder.busy()" (click)="playback.toggle()" [matTooltip]="(playback.playing() ? 'transport.pause' : 'transport.play') | t">
         <mat-icon>{{ playback.playing() ? 'pause' : 'play_arrow' }}</mat-icon>
       </button>
-      @if (audible(); as audible) {
-        <button mat-button class="audible" (click)="selectAudible()" [matTooltip]="audible.tooltip">{{ audible.label }}</button>
-      }
-      <span class="time">{{ time() }}</span>
+      <!-- lengths in small, the playhead in large: it is what is read while playing -->
+      <div class="lengths">
+        @let heard = audible();
+        <span
+          class="length audible"
+          [class.disabled]="!heard"
+          role="button"
+          tabindex="0"
+          (click)="selectAudible()"
+          (keydown.enter)="selectAudible()"
+          [matTooltip]="heard?.tooltip ?? ''"
+        >
+          <span class="length-label">{{ 'length.audible' | t }}</span>
+          <span class="length-value">{{ heard?.value ?? '–' }}</span>
+        </span>
+        <span class="length" [matTooltip]="'length.effectiveTooltip' | t">
+          <span class="length-label">{{ 'length.effective' | t }}</span>
+          <span class="length-value">{{ length() }}</span>
+        </span>
+      </div>
+      <span class="clock">{{ clock() }}</span>
     </div>
   }
 </footer>

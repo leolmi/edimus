@@ -80,11 +80,11 @@ export function moveClips(montage: Montage, clipIds: ReadonlySet<string>, delta:
   };
 }
 
-/** Splits the clips crossing `time` in two (only `clipIds` when given). */
+/** Splits the clips crossing `time` in two (only `clipIds` when given; never the locked ones). */
 export function splitAt(montage: Montage, time: number, length: ClipLength, clipIds?: Set<string>): Montage {
   return mapClips(montage, (clip) => {
     const len = length(clip);
-    if (clipIds && !clipIds.has(clip.id)) return [clip];
+    if ((clipIds && !clipIds.has(clip.id)) || clip.locked) return [clip];
     if (time <= clip.start + EPSILON || time >= clip.start + len - EPSILON) return [clip];
     return [portion(clip, len, clip.start, time, clip.start)!, portion(clip, len, time, clip.start + len, time)!];
   });
@@ -142,4 +142,47 @@ export function setClipTiming(
 /** Sets (or, with null, removes) the tempo given by hand to a source. */
 export function withSourceTempo(montage: Montage, sourceId: string, tempo: Tempo | null): Montage {
   return { ...montage, sources: montage.sources.map((s) => (s.id === sourceId ? { ...s, tempo: tempo ?? undefined } : s)) };
+}
+
+/** Clips locked against edits (see `Clip.locked`), by id, with the id of their track. */
+function lockedClips(montage: Montage): Map<string, { clip: Clip; track: string }> {
+  const locked = new Map<string, { clip: Clip; track: string }>();
+  montage.tracks.forEach((track) => track.clips.forEach((clip) => clip.locked && locked.set(clip.id, { clip, track: track.id })));
+  return locked;
+}
+
+/**
+ * True when `next` leaves every clip locked in `current` where it was: same track, place,
+ * portion of the source and timing (the envelope may change, and the lock itself).
+ */
+export function keepsLockedClips(current: Montage, next: Montage): boolean {
+  const before = lockedClips(current);
+  if (!before.size) return true;
+  const after = new Map(next.tracks.flatMap((track) => track.clips.map((clip) => [clip.id, { clip, track: track.id }] as const)));
+  for (const [id, { clip, track }] of before) {
+    const now = after.get(id);
+    if (!now) return false;
+    const c = now.clip;
+    if (c === clip) {
+      if (now.track !== track) return false;
+      continue;
+    }
+    if (
+      now.track !== track ||
+      c.sourceId !== clip.sourceId ||
+      c.start !== clip.start ||
+      c.offset !== clip.offset ||
+      c.duration !== clip.duration ||
+      clipRate(c) !== clipRate(clip) ||
+      (c.pitch ?? 0) !== (clip.pitch ?? 0) ||
+      !!c.varispeed !== !!clip.varispeed
+    )
+      return false;
+  }
+  return true;
+}
+
+/** Locks a clip against edits, or unlocks it. */
+export function withClipLocked(montage: Montage, clipId: string, locked: boolean): Montage {
+  return mapClips(montage, (clip) => (clip.id !== clipId || !!clip.locked === locked ? [clip] : [{ ...clip, locked: locked || undefined }]));
 }

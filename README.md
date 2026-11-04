@@ -83,7 +83,11 @@ comandi della sezione [Sviluppo](#sviluppo) e ottenere lo stesso programma.
 
 **Editing**
 - Clip trascinabili tra le tracce, trim dei bordi, divisione, ritaglio ed eliminazione di un
-  intervallo su tutte le tracce, mute e solo per traccia.
+  intervallo su tutte le tracce, mute e solo per traccia; menu contestuale della clip (clic destro).
+- Lucchetto contro le modifiche accidentali: il montaggio si ascolta ma non si modifica.
+- Marker con nome sul righello (clic destro), per ritrovare e riascoltare i passaggi.
+- Altezza delle tracce regolabile trascinando il bordo inferiore dell'intestazione.
+- Pan e misuratore di picco (stereo) per traccia; nome del file sulla clip, con i dettagli in un tooltip.
 - Aggancio alla griglia delle battute, ai bordi e ai punti d'inviluppo delle altre clip;
   spostamento fine da tastiera.
 - Forma d'onda per canale, con zoom dal singolo campione all'intero brano.

@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatSelectModule } from '@angular/material/select';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import type { AlignOptions, AlignTarget } from '../../core/montage/tempo-align';
+import { FieldComponent } from '../../shared/controls/field.component';
 
 /** Clip with a known tempo, as listed by the dialog. */
 export interface AlignClip {
@@ -26,13 +25,11 @@ export interface AlignDialogData {
 /** Choice of the reference clip, of the clips to adapt and of how (target tempo, stretch mode, bars). */
 @Component({
   selector: 'app-align-tempo-dialog',
-  imports: [
+  imports: [FieldComponent, 
     MatButtonModule,
-    MatButtonToggleModule,
+    MatSelectModule,
     MatCheckboxModule,
     MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatRadioModule,
     TranslatePipe,
   ],
@@ -65,24 +62,28 @@ export interface AlignDialogData {
       </table>
 
       <h3>{{ 'align.targetTempo' | t }}</h3>
-      <mat-button-toggle-group [value]="target()" (change)="target.set($event.value)">
-        <mat-button-toggle value="reference">{{ 'align.toReference' | t }}</mat-button-toggle>
-        <mat-button-toggle value="middle">{{ 'align.toMiddle' | t }}</mat-button-toggle>
-        <mat-button-toggle value="custom">{{ 'align.toCustom' | t }}</mat-button-toggle>
-      </mat-button-toggle-group>
+      <app-field class="choice">
+        <mat-select [value]="target()" (selectionChange)="target.set($event.value)">
+          <mat-option value="reference">{{ 'align.toReference' | t }}</mat-option>
+          <mat-option value="middle">{{ 'align.toMiddle' | t }}</mat-option>
+          <mat-option value="custom">{{ 'align.toCustom' | t }}</mat-option>
+        </mat-select>
+      </app-field>
       @if (target() === 'custom') {
-        <mat-form-field class="custom">
-          <mat-label>BPM</mat-label>
-          <input matInput type="number" step="0.01" min="20" max="400" [value]="customBpm()" (change)="customBpm.set(+$any($event.target).value)" />
-        </mat-form-field>
+        <app-field class="custom">
+          <span fieldLabel>BPM</span>
+          <input type="number" step="0.01" min="20" max="400" [value]="customBpm()" (change)="customBpm.set(+$any($event.target).value)" />
+        </app-field>
       }
       <p class="hint">{{ 'align.targetHint' | t: { bpm: bpm()?.toFixed(2) ?? '—' } }}</p>
 
       <h3>{{ 'align.how' | t }}</h3>
-      <mat-button-toggle-group [value]="varispeed()" (change)="varispeed.set($event.value)">
-        <mat-button-toggle [value]="false">{{ 'timing.stretch' | t }}</mat-button-toggle>
-        <mat-button-toggle [value]="true">{{ 'timing.varispeed' | t }}</mat-button-toggle>
-      </mat-button-toggle-group>
+      <app-field class="choice">
+        <mat-select [value]="varispeed()" (selectionChange)="varispeed.set($event.value)">
+          <mat-option [value]="false">{{ 'timing.stretch' | t }}</mat-option>
+          <mat-option [value]="true">{{ 'timing.varispeed' | t }}</mat-option>
+        </mat-select>
+      </app-field>
       <p class="hint">{{ (varispeed() ? 'timing.varispeedHint' : 'timing.stretchHint') | t }}</p>
 
       <mat-checkbox [checked]="alignBars()" (change)="alignBars.set($event.checked)">{{ 'align.bars' | t }}</mat-checkbox>
@@ -137,6 +138,9 @@ export interface AlignDialogData {
       color: var(--mat-sys-on-surface-variant);
       font: var(--mat-sys-body-small);
       margin: 6px 0 0;
+    }
+    .choice {
+      width: 260px;
     }
     .custom {
       margin-top: 8px;

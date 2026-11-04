@@ -1,14 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatSelectModule } from '@angular/material/select';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import type { Tempo } from '../../core/audio/tempo';
+import { type Tempo, meterName } from '../../core/audio/tempo';
 import { isVariable, meanBpm } from '../../core/audio/tempo-map';
+import type { RhythmReport, TrackOptions } from '../../core/audio/rhythm';
+import { formatDuration } from '../../core/format';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import { FieldComponent } from '../../shared/controls/field.component';
+import { SwitchComponent } from '../../shared/controls/switch.component';
 
 export interface TempoDialogData {
   name: string;
@@ -25,6 +28,8 @@ export interface TempoDialogData {
   rate: number;
   /** Bar tracking of this source in progress. */
   tracking?: boolean;
+  /** What the last bar tracking of this source found. */
+  report?: RhythmReport | null;
 }
 
 /**
@@ -34,7 +39,7 @@ export interface TempoDialogData {
 export type TempoDialogResult = {
   tempo: Tempo | null;
   mark?: { beatsPerBar: number; bpm: number };
-  track?: boolean;
+  track?: TrackOptions;
   steady?: boolean;
   /** Removes all the anchors, or only those of the bar tracking. */
   clear?: 'all' | 'auto';
@@ -50,7 +55,7 @@ const TAP_RESET = 2000;
 /** Tempo of a source: BPM (typed, halved/doubled, tapped) and position of the first beat. */
 @Component({
   selector: 'app-tempo-dialog',
-  imports: [MatButtonModule, MatButtonToggleModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatTooltipModule, TranslatePipe],
+  imports: [FieldComponent, MatButtonModule, MatSelectModule, MatDialogModule, MatIconModule, MatTooltipModule, SwitchComponent, TranslatePipe],
   template: `
     <h2 mat-dialog-title>{{ 'tempo.title' | t }} — {{ data.name }}</h2>
     <mat-dialog-content class="content">
@@ -69,11 +74,13 @@ const TAP_RESET = 2000;
 
       <div class="row meter">
         <span class="label">{{ 'tempo.meter' | t }}</span>
-        <mat-button-toggle-group [value]="meter()" (change)="meter.set($event.value)">
-          @for (m of meters; track m.beats) {
-            <mat-button-toggle [value]="m.beats">{{ m.label }}</mat-button-toggle>
-          }
-        </mat-button-toggle-group>
+        <app-field class="choice">
+          <mat-select [value]="meter()" (selectionChange)="meter.set($event.value)">
+            @for (m of meters; track m.beats) {
+              <mat-option [value]="m.beats">{{ m.label }}</mat-option>
+            }
+          </mat-select>
+        </app-field>
       </div>
       <div class="mark">
         <button mat-flat-button (click)="mark()">
@@ -88,6 +95,9 @@ const TAP_RESET = 2000;
           <mat-icon>timeline</mat-icon>
           {{ 'tempo.track' | t }}
         </button>
+        <app-switch class="auto-meter" [checked]="autoMeter()" (checkedChange)="autoMeter.set($event)" [matTooltip]="'tempo.autoMeterHint' | t">
+          {{ 'tempo.autoMeter' | t }}
+        </app-switch>
         <span class="hint">
           @if (data.tracking) {
             {{ 'tempo.tracking' | t }}
@@ -98,6 +108,29 @@ const TAP_RESET = 2000;
           }
         </span>
       </div>
+      @if (data.report; as report) {
+        <div class="report">
+          <p class="hint">{{ 'tempo.reportTitle' | t: { confidence: (report.confidence * 100).toFixed(0) } }}</p>
+          <ul>
+            @for (line of reportLines(); track $index) {
+              <li [class.free]="line.free">{{ line.text }}</li>
+            }
+          </ul>
+          @if (report.uncertainBars.length) {
+            <p class="hint">{{ 'tempo.uncertainBars' | t: { n: report.uncertainBars.length } }}</p>
+          }
+          @if (alternatives().length) {
+            <div class="anchors">
+              @for (alt of alternatives(); track alt.label) {
+                <button mat-stroked-button [disabled]="data.tracking" (click)="retry(alt.options)" [matTooltip]="'tempo.retryHint' | t">
+                  <mat-icon>replay</mat-icon>
+                  {{ alt.label }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
       @if (anchors()) {
         <div class="anchors">
           <button mat-button (click)="clear('all')" [matTooltip]="'tempo.clearHint' | t">
@@ -130,11 +163,11 @@ const TAP_RESET = 2000;
         </button>
       </div>
 
-      <div class="row">
-        <mat-form-field class="bpm">
-          <mat-label>BPM</mat-label>
-          <input matInput type="number" step="0.01" [min]="minBpm" [max]="maxBpm" [value]="bpm().toFixed(2)" (change)="setBpm(+$any($event.target).value)" />
-        </mat-form-field>
+      <div class="row field-row">
+        <app-field class="bpm">
+          <span fieldLabel>BPM</span>
+          <input type="number" step="0.01" [min]="minBpm" [max]="maxBpm" [value]="bpm().toFixed(2)" (change)="setBpm(+$any($event.target).value)" />
+        </app-field>
         <button mat-stroked-button (click)="setBpm(bpm() / 2)" [matTooltip]="'tempo.half' | t">÷2</button>
         <button mat-stroked-button (click)="setBpm(bpm() * 2)" [matTooltip]="'tempo.double' | t">×2</button>
         <button mat-flat-button class="tap" (click)="tap()" [matTooltip]="'tempo.tapHint' | t">
@@ -146,12 +179,12 @@ const TAP_RESET = 2000;
         <p class="hint">{{ 'tempo.heard' | t: { bpm: (bpm() * data.rate).toFixed(2), rate: data.rate } }}</p>
       }
 
-      <div class="row">
-        <mat-form-field class="offset">
-          <mat-label>{{ 'tempo.firstBeat' | t }}</mat-label>
-          <input matInput type="number" step="0.001" min="0" [value]="offset().toFixed(3)" (change)="setOffset(+$any($event.target).value)" />
-          <span matTextSuffix>s</span>
-        </mat-form-field>
+      <div class="row field-row">
+        <app-field class="offset">
+          <span fieldLabel>{{ 'tempo.firstBeat' | t }}</span>
+          <input type="number" step="0.001" min="0" [value]="offset().toFixed(3)" (change)="setOffset(+$any($event.target).value)" />
+          <span fieldSuffix>s</span>
+        </app-field>
         <button mat-stroked-button (click)="nudge(-1)" [matTooltip]="'tempo.prevBeat' | t"><mat-icon>chevron_left</mat-icon></button>
         <button mat-stroked-button (click)="nudge(1)" [matTooltip]="'tempo.nextBeat' | t"><mat-icon>chevron_right</mat-icon></button>
         <button mat-stroked-button [disabled]="data.playheadSourceTime === null" (click)="atPlayhead()" [matTooltip]="'tempo.atPlayheadHint' | t">
@@ -183,7 +216,7 @@ const TAP_RESET = 2000;
     }
     .row {
       display: flex;
-      align-items: baseline;
+      align-items: flex-end;
       flex-wrap: wrap;
       gap: 8px;
     }
@@ -202,6 +235,9 @@ const TAP_RESET = 2000;
     .meter {
       align-items: center;
       margin-bottom: 12px;
+    }
+    .choice {
+      width: 120px;
     }
     .label {
       min-width: 60px;
@@ -232,6 +268,23 @@ const TAP_RESET = 2000;
         white-space: nowrap;
       }
     }
+    .auto-meter {
+      flex: 0 0 auto;
+    }
+    .report {
+      margin: -8px 0 16px;
+      ul {
+        margin: 0 0 8px;
+        padding-left: 20px;
+        font: var(--mat-sys-body-small);
+      }
+      .free {
+        color: var(--mat-sys-on-surface-variant);
+      }
+      .anchors {
+        margin: 0;
+      }
+    }
     .spacer {
       flex: 1 1 auto;
     }
@@ -242,6 +295,7 @@ const TAP_RESET = 2000;
 export class TempoDialogComponent {
   protected readonly data = inject<TempoDialogData>(MAT_DIALOG_DATA);
   private readonly dialog = inject(MatDialogRef<TempoDialogComponent, TempoDialogResult>);
+  private readonly i18n = inject(I18nService);
 
   protected readonly minBpm = MIN_BPM;
   protected readonly maxBpm = MAX_BPM;
@@ -260,6 +314,41 @@ export class TempoDialogComponent {
   protected readonly autoAnchors = computed(() => this.anchors() - this.manualAnchors());
   protected readonly variable = signal(!!this.data.tempo && isVariable(this.data.tempo));
   protected readonly meanBpm = signal(this.data.tempo ? meanBpm(this.data.tempo) : 0);
+
+  /** Tracking with the meter found bar by bar (3 or 4, also mixed) or the one chosen above. */
+  protected readonly autoMeter = signal(true);
+
+  /** One line per region of the last tracking: free passages, and the bars with their tempo and doubts. */
+  protected readonly reportLines = computed(() =>
+    (this.data.report?.regions ?? []).map((region) => {
+      const span = `${formatDuration(region.from)}–${formatDuration(region.to)}`;
+      if (region.kind === 'free') return { free: true, text: `${span} · ${this.i18n.t('tempo.regionFree')}` };
+      const bpm = region.bpm!;
+      const parts = [
+        span,
+        this.i18n.t('tempo.regionBars', { from: region.firstBar! + 1, to: region.lastBar! + 1 }),
+        (region.meters ?? []).map(meterName).join(' + '),
+        bpm.max - bpm.min >= 1 ? `${bpm.min.toFixed(0)}–${bpm.max.toFixed(0)} BPM` : `${bpm.mean.toFixed(1)} BPM`,
+        `${((region.confidence ?? 0) * 100).toFixed(0)}%`,
+      ];
+      if (region.meterAlternative) parts.push(this.i18n.t('tempo.regionMeterAlt', { meter: meterName(region.meterAlternative) }));
+      if (region.downbeatUncertain) parts.push(this.i18n.t('tempo.regionDownbeat'));
+      return { free: false, text: parts.join(' · ') };
+    }),
+  );
+
+  /** Other readings the tracking found nearly as good: the beat twice or half as fast, another meter. */
+  protected readonly alternatives = computed(() => {
+    const report = this.data.report;
+    if (!report) return [];
+    const result: { label: string; options: TrackOptions }[] = report.bpmAlternatives.map((bpm) => ({
+      label: this.i18n.t('tempo.retryBpm', { bpm: bpm.toFixed(0) }),
+      options: { bpm },
+    }));
+    const meters = new Set(report.regions.map((r) => r.meterAlternative).filter((m): m is number => !!m));
+    for (const meter of meters) result.push({ label: this.i18n.t('tempo.retryMeter', { meter: meterName(meter) }), options: { meter } });
+    return result;
+  });
 
   private tapTimes: number[] = [];
   protected readonly taps = signal(0);
@@ -307,9 +396,21 @@ export class TempoDialogComponent {
     this.dialog.close({ tempo: null, mark: { beatsPerBar: this.meter(), bpm: this.bpm() } });
   }
 
-  /** Closes to follow the bars along the whole source. */
+  /**
+   * Closes to follow the bars along the whole source: near the BPM shown when it was changed
+   * here, else from the tempo marked by hand or, without one, at the beat level it finds.
+   */
   protected track(): void {
-    this.dialog.close({ tempo: null, track: true });
+    this.dialog.close({ tempo: null, track: { ...this.chosenBpm(), ...(this.autoMeter() ? {} : { meter: this.meter() }) } });
+  }
+
+  /** Tracks again with another reading (tempo or meter). */
+  protected retry(options: TrackOptions): void {
+    this.dialog.close({ tempo: null, track: { ...this.chosenBpm(), ...(this.autoMeter() ? {} : { meter: this.meter() }), ...options } });
+  }
+
+  private chosenBpm(): TrackOptions {
+    return this.bpm() !== this.data.tempo?.bpm ? { bpm: this.bpm() } : {};
   }
 
   protected file(action: 'save' | 'load'): void {
