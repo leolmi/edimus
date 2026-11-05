@@ -55,7 +55,7 @@ src/app/
       crossfade.ts        dissolvenza incrociata tra due clip
       tempo-align.ts      allineamento del tempo tra clip
       montage-file.ts     lettura/scrittura .edimus (percorsi relativi)
-    audio/              libreria buffer, picchi, tempo e ritmo (rhythm.ts: tracciamento delle battute), render processato, mix, playback, export
+    audio/              libreria buffer, picchi, tempo e ritmo (rhythm.ts: tracciamento delle battute; bar-doubts.ts: dubbi da decidere), render processato, mix, playback, export
     effects/            effetti di traccia: schede descrittive e operazioni pure (effects.ts), nodi Web Audio (effect-nodes.ts)
     platform/           porte verso la piattaforma: file system, motore audio, impostazioni, shell, capacità
     timeline/           TimelineService: zoom, scroll, selezione, modalità (inviluppo, griglia, marcatura)
@@ -64,7 +64,7 @@ src/app/
     ai/                 bridge WebSocket verso mcp/server.mjs ed esecuzione dei comandi
     i18n/               it.ts / en.ts + pipe `t`
     settings, theme-colors, instance, drop-target, ...
-  features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi), track-panel (pannello laterale della traccia: schede Info ed Effetti), effects (scheda degli effetti), export, rename, settings,
+  features/             componenti UI: timeline (lane, ruler, clip-bar, dialoghi, pannello "Segna gli 1"), track-panel (pannello laterale della traccia: schede Info ed Effetti), effects (scheda degli effetti), export, rename, settings,
                         help (Aiuto: guida, come fare, assistente AI, info e licenze)
   shared/               componenti riusabili (scale-slider; controls/: manopola, fader, interruttore, selettore, indicatore)
 src/platform/           implementazioni delle porte: neutralino/ (ffmpeg, dialoghi, drop, reveal);

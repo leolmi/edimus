@@ -101,9 +101,10 @@ comandi della sezione [Sviluppo](#sviluppo) e ottenere lo stesso programma.
 - **Durata udibile**: quanto dura il mix senza i silenzi iniziale e finale, selezionabile con un clic.
 
 **Tempo**
-- Rilevamento dei BPM, correzione con tap o segnando una battuta sulla forma d'onda, mappa delle
-  battute per i brani a tempo non costante, salvata accanto all'audio (`.edimusbars`) e
-  riutilizzata da ogni montaggio.
+- Rilevamento dei BPM, correzione con tap, mappa delle battute per i brani a tempo non costante:
+  basta segnare sulla forma d'onda pochi 1 fondamentali, il rilevamento segue il resto del brano
+  e propone i punti dubbi da decidere (battute di un altro metro, 1 incerti). La mappa si salva
+  accanto all'audio (`.edimusbars`) e viene riutilizzata da ogni montaggio.
 - Allineamento automatico del tempo tra più clip.
 
 **Assistente AI**

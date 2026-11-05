@@ -89,7 +89,11 @@ without leading and trailing silences; null while some audio is not ready.
   the user says, a listen with \`play\`) and \`track\` again with \`meter\` (beats per bar, fixed)
   or \`bpm\` (beat tempo to stay near, e.g. one of bpmAlternatives); \`analyze_rhythm\` gives the
   same report without changing the map, to compare readings first. Tell the user what stays doubtful.
-  Where it is still off, \`pin\` the bar on its hit {bar, time} (and \`track\` again: pins stay and force a 1 there);
+  Where it is still off, \`pin\` the bar on its hit {bar, time} and \`track\` again: a pin says "a 1 is
+  about here", the tracking looks for it on the audio within 0.1 s, forces a downbeat there and
+  moves the pin onto the beat found. Pins on two neighbouring bars also fix how long a bar is (and
+  so the beat level, against a beat taken twice or half as fast). Pin only the key 1s: the start,
+  a weak intro, where the tempo or the meter changes, a bar the report doubts;
   \`reset\` removes every pin (back to the starting steady grid), \`clearAuto\` only the tracked ones.
   Keep the work for other montages: \`save\` writes the bar file next to the audio (\`song.mp3.edimusbars\`),
   used by itself when the audio is opened again on the desktop; \`load\` reads it.

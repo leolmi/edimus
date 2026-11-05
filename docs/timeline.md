@@ -13,14 +13,16 @@ Componenti in `src/app/features/timeline/`; stato di vista in `TimelineService`.
   sopra la lane compare un indicatore (indeterminato, poi con la percentuale di decodifica);
   per i file destinati a tracce nuove compare nell'area vuota finché la traccia non esiste.
 - `TrackLaneComponent`: disegna una traccia su `<canvas>` e offre gli hit test
-  (`clipAt`, `pointAt`, `curveHandleAt`, `markedBarAt`) usati dai gesti. Sopra il canvas, in DOM,
+  (`clipAt`, `pointAt`, `curveHandleAt`, `markAt`, `markingBarAt`) usati dai gesti. Sopra il canvas, in DOM,
   il nome del file di ogni clip in basso a sinistra, con le caratteristiche del file in un tooltip
   (`SourceSummaryService`: formato, frequenza, canali, bitrate, durata, tempo): sta in un
   contenitore largo quanto la clip (`overflow: clip`) con `position: sticky`, così quando la clip
   esce a sinistra dalla vista il nome scorre verso destra restando dentro la clip.
 - `RulerComponent`: righello dei tempi.
 - `ClipBarComponent`: barra della clip selezionata (BPM → dialogo tempo, velocità/pitch);
-  durante la marcatura della battuta mostra istruzioni e Ricomincia/Annulla/Conferma.
+  durante la marcatura degli 1 mostra quanti ne sono segnati e Ricomincia/Fine/Rileva le battute.
+- `BarMarkingPanelComponent`: pannello laterale della marcatura degli 1 (al posto del pannello
+  della traccia): istruzioni ed elenco dei dubbi del rilevamento (vedi "Segna gli 1").
 
 Il disegno è un `effect()` che rilegge i signal usati: ogni cambio di zoom, scroll, montaggio,
 tema o modalità ridisegna. Il canvas va preparato con `prepareCanvas()` (device pixel ratio)
@@ -35,10 +37,10 @@ Nell'ordine:
    della traccia** (si vede il livello ascoltato); oltre lo zoom dei campioni diventa una
    polilinea; le clip in render mostrano l'avanzamento; le clip senza audio (file mancante o in
    caricamento) sono un riquadro tratteggiato con il nome del file, rosso se il file manca;
-3. griglia delle battute (se attiva), esclusa la clip in marcatura;
+3. griglia delle battute (se attiva);
 4. linee verticali tratteggiate sui punti d'inviluppo di tutte le clip del montaggio, su tutte le
    tracce (`envelopeAnchors`): sono punti di aggancio per le clip spostate;
-5. battuta in marcatura (vedi sotto);
+5. gli 1 in marcatura e la battuta mostrata dall'elenco dei dubbi (vedi sotto);
 6. inviluppo di volume di ogni clip, dentro i suoi bordi (sempre se ha punti; in modalità
    inviluppo anche senza, con punti e maniglie; i punti nascosti da un trim non si vedono).
 
@@ -87,6 +89,8 @@ degli effetti (colore e sigla per tipo, `effectColor`; un clic apre il pannello)
 | bordo inferiore dell'intestazione di traccia | trascina / doppio clic | altezza di tutte le tracce (`SettingsService.trackHeight`, da 120 a 360 px, salvata nelle impostazioni; il bordo trascinato resta sotto il puntatore) / torna a 120 px |
 | bordo clip (6 px) | trascina | trim dell'inizio o della fine |
 | linea di battuta, con la griglia | Maiusc+trascina / Maiusc+clic destro | fissa la battuta lì (stretch della mappa) / la libera |
+| marcatura degli 1, sulla clip | clic / trascina un 1 | nuovo 1 (agganciato all'attacco più vicino, ±70 ms) / lo sposta (agganciato al rilascio) |
+| marcatura degli 1, sulla clip | clic destro | menu della battuta sotto il puntatore (vedi "Segna gli 1") |
 | corpo clip | doppio clic | dialogo velocità/pitch |
 | modalità inviluppo | clic / trascina su una clip | aggiunge un punto all'inviluppo della clip più in alto sotto il puntatore e lo sposta; su un punto lo sposta. Il punto resta dentro la clip e si aggancia (10 px) ai bordi di tutte le clip e ai punti degli inviluppi delle altre clip, in verticale a 0 dB (6 px); Alt per lo spostamento libero |
 | modalità inviluppo | trascina maniglia | piega il segmento (doppio clic: lo raddrizza) |
@@ -149,8 +153,9 @@ il contenuto scelto da `TimelineComponent.menu`:
   il solo file della clip), elimina le clip selezionate (toglie prima
   l'intervallo, che Canc eliminerebbe al loro posto).
 
-Niente menu durante la marcatura della battuta, su un punto d'inviluppo in modalità inviluppo e
-su una linea di battuta con Maiusc: lì il tasto destro ha già un significato.
+Durante la marcatura degli 1 il clic destro apre solo il menu della battuta (vedi "Segna gli 1").
+Niente menu su un punto d'inviluppo in modalità inviluppo e su una linea di battuta con Maiusc:
+lì il tasto destro ha già un significato.
 
 ## Marker
 
@@ -205,7 +210,9 @@ Da lì ogni **stop** (non la pausa) riporta il playhead a quel punto; uno stop q
 playhead è già sul punto iniziale lo annulla e riporta il playhead a zero. Senza punto
 iniziale lo stop porta a zero. I clic sulle lane spostano il playhead ma non il punto iniziale.
 
-Durante la marcatura della battuta: Invio conferma, Backspace ricomincia dall'1, Esc annulla.
+Durante la marcatura degli 1: Invio rileva le battute, Canc o Backspace elimina l'1 selezionato,
+Esc chiude la marcatura. Con un menu contestuale aperto i tasti vanno al menu (Esc chiude solo
+quello).
 
 ## Griglia delle battute
 
@@ -239,8 +246,8 @@ scendere sotto un battito di 150 ms (400 BPM). Un gesto = un passo di annulla.
 
 ### Tracciamento delle battute
 
-`trackRhythm()` (`core/audio/rhythm.ts`), dal dialogo Tempo ("Rileva le battute") o da
-`set_bar_map` / `analyze_rhythm`. La battuta si determina **progressivamente su tutto il brano**,
+`trackRhythm()` (`core/audio/rhythm.ts`), dal dialogo Tempo ("Rileva le battute"), dalla
+marcatura degli 1 o da `set_bar_map` / `analyze_rhythm`. La battuta si determina **progressivamente su tutto il brano**,
 battito per battito, non su un tratto poi ripetuto: la musica suonata non è regolare, nemmeno
 dentro la battuta.
 
@@ -259,20 +266,35 @@ dentro la battuta.
 4. **Battiti**: programmazione dinamica su tutto il file (Ellis 2007): la catena di battiti sugli
    attacchi in cui ognuno cade circa un periodo locale dopo il precedente. La scelta è globale:
    ogni battito dipende dalla musica dopo quanto da quella prima, quindi una intro debole prende
-   il tempo dalla parte che segue (a ritroso). Le battute fissate a mano forzano un battito lì.
+   il tempo dalla parte che segue (a ritroso). Le ancore a mano dicono solo "qui c'è un 1, più o
+   meno": l'utente lo legge dalla forma d'onda, quindi ognuna è una **finestra di ±0,1 s**
+   (`MARK_REACH`, mai più larga di un quarto di battito, così contiene un battito solo) in cui un
+   battito c'è per forza; dove, lo decidono gli attacchi e la regolarità della catena, con una
+   leggera preferenza per il centro (`MARK_PULL`). Due ancore a meno di 0,2 s sono una sola.
 5. **Regioni**: finestre con chiarezza del pulso sotto 0,4 × il 75° percentile (minimo 0,05)
-   sono libere; buchi sotto 4 s riempiti, isole sotto 6 s tolte; le finestre delle battute
-   fissate a mano hanno sempre un pulso. I bordi si spostano poi sui battiti: un battito è dentro
-   se il disegno degli attacchi attorno (due battiti per parte) somiglia a quello tipico della
-   regione, cosa che le note irregolari di un passo libero non fanno.
+   sono libere; buchi sotto 4 s riempiti, isole sotto 6 s tolte; le finestre delle ancore a mano
+   hanno sempre un pulso. I bordi si spostano poi sui battiti: un battito è dentro se il disegno
+   degli attacchi attorno (due battiti per parte) somiglia a quello tipico della regione, cosa che
+   le note irregolari di un passo libero non fanno. Infine ogni regione si allarga fino a
+   contenere gli 1 segnati vicini (`withMarkedBeats`): dove l'utente ha segnato un 1 c'è un pulso,
+   anche in una intro che da sola sembrerebbe libera.
 6. **Battute**: per ogni regione l'accento di ogni battito (bassi, cambio d'accordo, attacco;
    i medi, dove il rullante batte il 2 e il 4, in negativo) e un secondo Viterbi che divide i
    battiti in battute di 3 o 4 (o del metro fisso), con un costo per cambiare metro: gli 1 cadono
-   sugli accenti. I battiti prima del primo 1 sono un'anacrusi.
+   sugli accenti. I battiti prima del primo 1 sono un'anacrusi. I battiti degli 1 segnati sono
+   1 per forza; se i battiti tra due di essi non fanno battute intere si ammette una battuta con
+   un battito in più o in meno (`MARK_ODD_BAR`), che tiene i battiti trovati (è la musica, per
+   esempio un 3/4 in un 4/4 imposto); se nemmeno così, in quella regione gli 1 segnati si
+   ignorano.
+   **Livello del battito**: con il metro automatico, se gli 1 segnati obbligano a battute da 2 o
+   da 5 il battito scelto è probabilmente la metà o il doppio di quello vero; il tracciamento si
+   ripete con il tempo raddoppiato e dimezzato e vince la lettura che tiene più 1 segnati, poi
+   quella con meno battute storte, poi la più affidabile.
 7. **Numerazione e ancore**: battuta 0 al primo 1 trovato; attraverso un passo libero tante
    battute quante ne starebbero al tempo di prima. Un'ancora `auto` per ogni 1 con i suoi
-   battiti e l'affidabilità, una che chiude ogni regione; le battute a mano tengono il loro
-   tempo e prendono il numero contato.
+   battiti e l'affidabilità, una che chiude ogni regione; ogni 1 segnato diventa un'ancora a mano
+   sul battito trovato (non dove era stato messo) e prende il numero contato; quelli che il
+   tracciamento non raggiunge restano dove erano, se ci stanno tra le altre ancore.
 
 Il resoconto (`RhythmReport`, tenuto in memoria da `TempoService.reports`, non salvato): regioni
 libere e con pulso (battute, BPM tra il 10° e il 90° percentile, metri, `meterAlternative` se
@@ -307,29 +329,46 @@ della clip stessa. Alt disattiva l'aggancio.
 battito (±1 battito, "al playhead"), ritorno al tempo rilevato. Il risultato è salvato sulla
 sorgente (`MontageService.setSourceTempo`) e accende la griglia.
 
-### Segna la battuta
+### Segna gli 1
 
-Dal dialogo, "Segna la battuta" chiude il dialogo e avvia la marcatura
-(`TimelineService.beatMarking: BarMarking`, metodi in `EditService`):
+Dal dialogo, "Segna gli 1" chiude il dialogo e avvia la marcatura
+(`TimelineService.beatMarking: BarMarking`, metodi in `EditService`). L'utente segna **solo gli 1
+fondamentali** (dove inizia il brano, in un'intro o un passaggio dove il tempo si sente poco, dove
+cambia il tempo o il metro), il resto lo trova il tracciamento. Si parte dalle ancore a mano già
+presenti sulla sorgente.
 
-1. l'utente clicca **solo l'1** di una battuta sulla forma d'onda della clip; il punto viene
-   agganciato all'attacco più vicino (`snapToOnsets`, ±70 ms);
-2. compare la griglia di **una battuta** con `beatsPerBar` colonne numerate, larga quanto il
-   BPM corrente; sul resto della clip la griglia prosegue sfumata, per controllare la
-   coincidenza con la musica lontano dalla battuta segnata;
-3. trascinando il corpo la battuta si sposta; trascinando un bordo la battuta si allarga o
-   stringe (il bordo opposto resta fermo) e cambia il BPM, entro 20–400 BPM;
-   un clic fuori dalla battuta riposiziona l'1;
-4. Conferma salva `bpm` e `offset` (normalizzato al primo 1 della sorgente) con
-   `confidence: 1`.
+- **Gesti** sulla clip: un clic aggiunge un 1, agganciato all'attacco più vicino (`snapToOnsets`,
+  ±70 ms; un clic su un 1 già presente lo seleziona); trascinando un 1 (la linea o il riquadro
+  "1" alla sua sinistra) lo si sposta, con l'aggancio al rilascio; Canc o Backspace eliminano
+  l'1 selezionato. Disegno: linea piena con il riquadro "1", pieno se selezionato; la griglia
+  della sorgente resta visibile.
+- **Rileva le battute** (pulsante o Invio, `detectBars`): gli 1 diventano le ancore a mano (numeri
+  della griglia corrente, solo per l'ordine) e il tracciamento riparte con le scelte del dialogo
+  (metro automatico o fisso, BPM se cambiati); la marcatura resta aperta con gli 1 dove il
+  tracciamento li ha trovati.
+- **Pannello laterale** (`BarMarkingPanelComponent`): istruzioni ed elenco "Da decidere" con i
+  dubbi del tracciamento ancora aperti (`barDoubts()`, `core/audio/bar-doubts.ts`): battute di un
+  metro diverso da quello della loro regione ("Va bene così" segna il loro 1 e il successivo;
+  "È in 4/4" ne cambia la lunghezza), battute incerte ("L'1 è giusto" segna il loro 1), regioni
+  dove l'1 non si distingue dagli altri movimenti, regioni con un metro alternativo ("Riprova
+  in …"). Una battuta con l'1 e il successivo segnati è decisa e non compare più. Un clic su un
+  dubbio porta la vista sulla battuta (con una prima e una dopo, `showSpan`) e la evidenzia
+  sulla forma d'onda (`BarMarking.focus`). Il battito doppio o dimezzato ("Riprova a … BPM") è
+  nascosto per ora (`SHOW_BPM_ALTERNATIVES`): gli 1 segnati decidono già il livello del battito.
+- **Menu della battuta** (clic destro sulla clip): per i dubbi che il tracciamento non ha visto.
+  "Di 2…6 movimenti" segna l'1 della battuta e quello dopo n battiti (`setBarMeter`); "L'1 è un
+  movimento prima / dopo" sposta l'1 sul battito vicino (`shiftDownbeat`); "La battuta è giusta"
+  segna il suo 1 e il successivo (`keepBar`); su un 1, "Elimina questo 1". Ogni scelta rilancia
+  il rilevamento.
+- **Fine** (o Esc) chiude la marcatura; gli 1 aggiunti dopo l'ultimo rilevamento non vengono
+  salvati. Ricomincia toglie tutti gli 1 (la mappa cambia solo al rilevamento successivo).
 
-La battuta segnata diventa un'ancora a mano: è il punto fermo dei successivi stretch e del
-tracciamento. Il dialogo mostra anche lo stato della mappa e "Rileva le battute", con
+Il dialogo mostra anche lo stato della mappa e "Rileva le battute", con
 l'interruttore "Metro automatico" (acceso: 3/4 o 4/4 battuta per battuta; spento: il metro
 scelto sopra) e i BPM passati come riferimento solo se cambiati nel dialogo. Finito il
-tracciamento il dialogo si riapre con il resoconto: una riga per regione (intervallo, battute,
-metri, BPM, affidabilità, dubbi), il numero di battute incerte e i pulsanti "Riprova a … BPM" /
-"Riprova in …" per le letture alternative. Con almeno
+tracciamento si apre la marcatura degli 1 con l'elenco dei dubbi; riaprendo il dialogo c'è il
+resoconto: una riga per regione (intervallo, battute, metri, BPM, affidabilità, dubbi), il numero
+di battute incerte e i pulsanti "Riprova in …" per il metro alternativo. Con almeno
 un'ancora, "Rimuovi ancore" (`clearAnchors`: torna alla griglia costante di partenza, `bpm` e
 `offset`, che la mappa non modifica), "Rimuovi ancore automatiche" (con ancore di entrambi i
 tipi: tiene quelle a mano) e, con la mappa variabile, "Tempo costante" (`steadyTempo`: toglie

@@ -9,8 +9,9 @@ import { AudioLibraryService } from './audio/audio-library.service';
 import { BarFileService } from './audio/bar-file.service';
 import { TempoService } from './audio/tempo.service';
 import { type Tempo, snapToOnsets } from './audio/tempo';
-import { clearAnchors, meanBpm, steadyTempo, unpinBar } from './audio/tempo-map';
+import { barAt, barMeter, barTime, clearAnchors, meanBpm, steadyTempo, unpinBar } from './audio/tempo-map';
 import { RhythmReport, TrackOptions, trackRhythm } from './audio/rhythm';
+import { BarDoubt, barDoubts, beatsFrom } from './audio/bar-doubts';
 import { AlignClip, AlignDialogData, AlignTempoDialogComponent } from '../features/timeline/align-tempo-dialog.component';
 import { AlignContext, AlignOptions, alignTempo } from './montage/tempo-align';
 import { PlaybackService } from './audio/playback.service';
@@ -19,16 +20,17 @@ import { cropToRange, deleteRange, moveClips, setClipTiming, splitAt, withClipLo
 import { addMarker, removeMarker, renameMarker, sortedMarkers, withMarkers } from './montage/markers';
 import { formatDuration } from './format';
 import { EffectPreset, EffectType, EffectValue, addEffect, applyPreset, moveEffect, newEffect, removeEffect, setEffectBypass, setEffectParams } from './effects/effects';
-import { Clip, Montage, TrackInput, clipRate } from './montage/montage.model';
+import { Clip, Montage, TrackInput, clipRate, toSource, toTimeline } from './montage/montage.model';
 import { nextAnchorShift } from './timeline/edge-snap';
 import { MontageService } from './montage/montage.service';
-import { BarMarking, TimelineService, TrackPanelTab } from './timeline/timeline.service';
+import { TimelineService, TrackPanelTab } from './timeline/timeline.service';
 import { I18nService } from './i18n/i18n.service';
 import { ShellPort } from './platform/shell.port';
 
-/** Tempo range of a bar stretched by hand. */
-const MIN_MARK_BPM = 20;
-const MAX_MARK_BPM = 400;
+/** Seconds within which a 1 put by hand lands on an attack (the tracking looks further anyway). */
+const MARK_ONSET_SNAP = 0.07;
+/** Two 1s closer than this (seconds) are the same one. */
+const MARK_MIN_GAP = 0.2;
 
 /** Seconds after a marker within which Back, while playing, goes to the marker before it. */
 const PASSED_MARKER = 0.5;
@@ -297,9 +299,9 @@ export class EditService {
     });
     const result = await firstValueFrom(ref.afterClosed());
     if (!result) return;
-    if (result.mark) return this.startBeatMarking(clipId, result.mark.beatsPerBar, result.mark.bpm);
-    // the dialog opens again on what the tracking found
-    if (result.track) return void this.trackBars(clip.sourceId, result.track).then((report) => report && this.editTempo(clipId));
+    if (result.mark) return this.startBeatMarking(clipId, result.mark);
+    // what the tracking found, with its doubts, in the marking of the 1s
+    if (result.track) return void this.trackBars(clip.sourceId, result.track).then((report) => report && this.startBeatMarking(clipId, result.track));
     if (result.steady) return this.steadyTempo(clip.sourceId);
     if (result.clear) return this.clearAnchors(clip.sourceId, result.clear === 'auto');
     if (result.file === 'save') return void this.barFiles.save(clip.sourceId);
@@ -331,83 +333,189 @@ export class EditService {
     this.timeline.beatGrid.set(true);
   }
 
-  /** Starts marking a bar of a clip (see placeDownbeat and dragBar). */
-  startBeatMarking(clipId: string, beatsPerBar: number, bpm: number): void {
+  /**
+   * Starts marking the 1s of a clip, from those already set by hand on its source: a few
+   * downbeats put by the user, the bar tracking follows the rest (see detectBars).
+   */
+  startBeatMarking(clipId: string, options: TrackOptions = {}): void {
     const clip = this.markingClip(clipId);
     if (!clip || this.locked()) return;
     this.timeline.selectClip(clipId);
-    this.timeline.beatMarking.set({ clipId, sourceId: clip.sourceId, beatsPerBar, bpm, downbeat: null });
+    this.timeline.beatGrid.set(true);
+    this.timeline.beatMarking.set({ clipId, sourceId: clip.sourceId, marks: this.handMarks(clip.sourceId), selected: null, options, focus: null });
   }
 
   private markingClip(clipId: string): Clip | undefined {
     return this.montages.montage().tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
   }
 
-  /** The 1 of the bar at a timeline time inside the clip being marked, moved to the nearest attack. */
-  async placeDownbeat(time: number): Promise<void> {
+  /** Downbeats set by hand in the bar map of a source. */
+  private handMarks(sourceId: string): number[] {
+    return (this.tempos.sourceTempo(sourceId)?.anchors ?? [])
+      .filter((a) => !a.auto)
+      .map((a) => a.time)
+      .sort((a, b) => a - b);
+  }
+
+  /** Replaces the 1s being marked, in time order, `selected` the one at that time. */
+  private setMarks(marks: number[], selected: number | null = null): void {
+    const marking = this.timeline.beatMarking();
+    if (!marking) return;
+    const sorted = [...marks].sort((a, b) => a - b);
+    this.timeline.beatMarking.set({ ...marking, marks: sorted, selected: selected === null ? null : sorted.indexOf(selected) });
+  }
+
+  /** A 1 at a timeline time inside the clip being marked, on the nearest attack. */
+  async addMark(time: number): Promise<void> {
     const marking = this.timeline.beatMarking();
     const clip = marking && this.markingClip(marking.clipId);
     if (!marking || !clip || time < clip.start || time > clip.start + this.length(clip)) return;
-    const sourceTime = clip.offset + (time - clip.start) * clipRate(clip);
-    this.timeline.beatMarking.set({ ...marking, downbeat: sourceTime });
+    let at = toSource(clip, time);
     const curve = await this.tempos.onsetCurve(marking.sourceId);
+    if (curve) at = snapToOnsets(curve, [at], MARK_ONSET_SNAP)[0];
     // the user may have moved on in the meantime
     const current = this.timeline.beatMarking();
-    if (curve && current?.downbeat === sourceTime) this.timeline.beatMarking.set({ ...current, downbeat: snapToOnsets(curve, [sourceTime])[0] });
+    if (current?.clipId !== marking.clipId) return;
+    // on a 1 already there: that one is selected
+    const near = current.marks.findIndex((m) => Math.abs(m - at) < MARK_MIN_GAP);
+    if (near >= 0) return this.timeline.beatMarking.set({ ...current, selected: near });
+    this.setMarks([...current.marks, at], at);
   }
 
-  /**
-   * Moves (body) or stretches (start / end edge) the marked bar by `delta` timeline seconds from
-   * the state `from` it had when the drag began; stretching keeps the opposite edge still.
-   */
-  dragBar(from: BarMarking, zone: 'start' | 'end' | 'body', delta: number): void {
-    const clip = this.markingClip(from.clipId);
-    if (!clip || from.downbeat === null) return;
-    const shift = delta * clipRate(clip);
-    const bar = (60 * from.beatsPerBar) / from.bpm;
-    const bpmOf = (length: number) => (60 * from.beatsPerBar) / length;
-    // shortest and longest bar allowed by the tempo range
-    const minBar = bar * (from.bpm / MAX_MARK_BPM);
-    const maxBar = bar * (from.bpm / MIN_MARK_BPM);
-    let { downbeat, bpm } = from;
-    if (zone === 'body') downbeat = from.downbeat + shift;
-    else if (zone === 'end') bpm = bpmOf(Math.min(maxBar, Math.max(minBar, bar + shift)));
-    else {
-      const length = Math.min(maxBar, Math.max(minBar, bar - shift));
-      downbeat = from.downbeat + bar - length;
-      bpm = bpmOf(length);
-    }
-    this.timeline.beatMarking.set({ ...from, downbeat, bpm });
+  /** Moves the 1 `index` of `from` (the marks as the drag began) to a timeline time, inside the clip. */
+  moveMark(from: number[], index: number, time: number): void {
+    const clip = this.timeline.beatMarking() && this.markingClip(this.timeline.beatMarking()!.clipId);
+    if (!clip || index < 0 || index >= from.length) return;
+    const at = toSource(clip, Math.min(clip.start + this.length(clip), Math.max(clip.start, time)));
+    this.setMarks(
+      from.map((m, i) => (i === index ? at : m)),
+      at,
+    );
   }
 
-  /** Starts the marking again from the click on the 1. */
-  undoBeatMark(): void {
+  /** The 1 just dropped onto the nearest attack (two 1s on the same beat become one). */
+  async settleMark(): Promise<void> {
     const marking = this.timeline.beatMarking();
-    if (marking?.downbeat !== null && marking) this.timeline.beatMarking.set({ ...marking, downbeat: null });
+    const index = marking?.selected ?? null;
+    if (!marking || index === null) return;
+    const time = marking.marks[index];
+    const curve = await this.tempos.onsetCurve(marking.sourceId);
+    const current = this.timeline.beatMarking();
+    if (!current || current.marks[index] !== time) return;
+    const at = curve ? snapToOnsets(curve, [time], MARK_ONSET_SNAP)[0] : time;
+    const others = current.marks.filter((_, i) => i !== index && Math.abs(current.marks[i] - at) >= MARK_MIN_GAP);
+    this.setMarks([...others, at], at);
+  }
+
+  /** Removes a 1 (default: the selected one). */
+  removeMark(index = this.timeline.beatMarking()?.selected ?? -1): void {
+    const marking = this.timeline.beatMarking();
+    if (!marking || index < 0 || index >= marking.marks.length) return;
+    this.setMarks(marking.marks.filter((_, i) => i !== index));
+  }
+
+  /** Removes all the 1s being marked (the map changes only with the next detection). */
+  clearMarks(): void {
+    this.setMarks([]);
   }
 
   cancelBeatMarking(): void {
     this.timeline.beatMarking.set(null);
   }
 
-  /** Ends the marking: the bar gives BPM and downbeat of the source. */
-  confirmBeatMarking(): void {
+  /**
+   * Follows the bars along the source with the 1s marked: each one is looked for on the audio
+   * near where it was put and forced to be a downbeat. The marking goes on, with the 1s where the
+   * tracking found them and the doubts it left (barDoubts).
+   */
+  async detectBars(): Promise<void> {
     const marking = this.timeline.beatMarking();
-    if (marking?.downbeat == null) return this.cancelBeatMarking();
-    const bpm = Math.round(marking.bpm * 100) / 100;
-    const bar = (60 * marking.beatsPerBar) / bpm;
-    // earliest downbeat of the grid: the bars are numbered from the start of the source
-    const offset = ((marking.downbeat % bar) + bar) % bar;
-    this.timeline.beatMarking.set(null);
-    this.montages.setSourceTempo(marking.sourceId, {
-      bpm,
-      offset,
-      confidence: 1,
-      beatsPerBar: marking.beatsPerBar,
-      // the marked bar stays pinned: a stretch of the bar map starts from there
-      anchors: [{ bar: Math.round((marking.downbeat - offset) / bar), time: marking.downbeat }],
+    if (!marking || this.trackingSource()) return;
+    const tempo: Tempo = this.tempos.sourceTempo(marking.sourceId) ?? { bpm: 120, offset: 0, confidence: 0 };
+    // numbers of the current grid, kept increasing: the tracking counts them again anyway
+    let last = -Infinity;
+    const anchors = marking.marks.map((time) => {
+      const bar = Math.max(Math.round(barAt(tempo, time)), last + 1);
+      last = bar;
+      return { bar, time };
     });
-    this.timeline.beatGrid.set(true);
+    const { anchors: _, ...rest } = tempo;
+    const result = await this.analyzeBars(marking.sourceId, marking.options, anchors.length ? { ...rest, anchors } : rest);
+    if (!result) return;
+    this.montages.setSourceTempo(marking.sourceId, result.tempo);
+    const current = this.timeline.beatMarking();
+    if (current?.sourceId !== marking.sourceId) return;
+    // the 1s where the tracking put them; those it could not place stay where the user put them
+    const found = this.handMarks(marking.sourceId);
+    const lost = marking.marks.filter((m) => !found.some((f) => Math.abs(f - m) < MARK_MIN_GAP));
+    this.timeline.beatMarking.set({ ...current, marks: [...found, ...lost].sort((a, b) => a - b), selected: null, focus: null });
+  }
+
+  /** Tracks again with another reading (meter of the whole piece, tempo of the beat). */
+  retryBars(options: TrackOptions): void {
+    const marking = this.timeline.beatMarking();
+    if (!marking) return;
+    this.timeline.beatMarking.set({ ...marking, options: { ...marking.options, ...options } });
+    void this.detectBars();
+  }
+
+  /** Doubts of the last tracking of the source being marked, still open. */
+  readonly barDoubts = computed<BarDoubt[]>(() => {
+    const marking = this.timeline.beatMarking();
+    const tempo = marking && this.tempos.sourceTempo(marking.sourceId);
+    const report = marking && this.tempos.reports()[marking.sourceId];
+    return tempo && report ? barDoubts(tempo, report) : [];
+  });
+
+  /** Shows the bars of a doubt on the timeline, highlighted on the waveform. */
+  focusDoubt(doubt: BarDoubt): void {
+    const marking = this.timeline.beatMarking();
+    const clip = marking && this.markingClip(marking.clipId);
+    const tempo = marking && this.tempos.sourceTempo(marking.sourceId);
+    if (!marking || !clip || !tempo || doubt.kind === 'bpmAlt') return;
+    const [first, end] = 'bar' in doubt ? [doubt.bar, doubt.bar + 1] : [doubt.from, doubt.to + 1];
+    const focus = { from: barTime(tempo, first), to: barTime(tempo, end) };
+    this.timeline.beatMarking.set({ ...marking, focus });
+    // a bar before and after it, to see where it sits
+    this.timeline.showSpan(toTimeline(clip, barTime(tempo, first - 1)), toTimeline(clip, barTime(tempo, end + 1)));
+  }
+
+  /** The 1s put (and those within reach of them, or of `remove`, taken away), then the tracking again. */
+  private markAndDetect(add: number[], remove: number[] = []): void {
+    const marking = this.timeline.beatMarking();
+    if (!marking) return;
+    const near = (m: number, list: number[]) => list.some((t) => Math.abs(t - m) < MARK_MIN_GAP);
+    this.setMarks([...marking.marks.filter((m) => !near(m, add) && !near(m, remove)), ...add]);
+    void this.detectBars();
+  }
+
+  /** Bar `bar` of the grid has `meter` beats: its 1 and the one `meter` beats later become marks. */
+  setBarMeter(bar: number, meter: number): void {
+    const tempo = this.markingTempo();
+    if (!tempo) return;
+    const beats = beatsFrom(tempo, bar, meter + 1);
+    this.markAndDetect([beats[0], beats[meter]]);
+  }
+
+  /** The 1 of bar `bar` is one beat later (1) or earlier (-1) than the grid puts it. */
+  shiftDownbeat(bar: number, by: 1 | -1): void {
+    const tempo = this.markingTempo();
+    if (!tempo) return;
+    const old = barTime(tempo, bar);
+    const previous = barMeter(tempo, bar - 1);
+    const at = by > 0 ? beatsFrom(tempo, bar, 2)[1] : barTime(tempo, bar - 1 + (previous - 1) / previous);
+    this.markAndDetect([at], [old]);
+  }
+
+  /** The bar is right as the tracking found it: its 1 and the next become marks. */
+  keepBar(bar: number, whole = true): void {
+    const tempo = this.markingTempo();
+    if (tempo) this.markAndDetect(whole ? [barTime(tempo, bar), barTime(tempo, bar + 1)] : [barTime(tempo, bar)]);
+  }
+
+  private markingTempo(): Tempo | undefined {
+    const marking = this.timeline.beatMarking();
+    return (marking && this.tempos.sourceTempo(marking.sourceId)) || undefined;
   }
 
   /** Source whose bars are being tracked, if any. */
@@ -427,8 +535,8 @@ export class EditService {
   }
 
   /** The tracking of the bars of a source without applying it (the map it would give, and its report). */
-  async analyzeBars(sourceId: string, options: TrackOptions = {}): Promise<{ tempo: Tempo; report: RhythmReport } | null> {
-    const tempo = this.tempos.sourceTempo(sourceId);
+  async analyzeBars(sourceId: string, options: TrackOptions = {}, base?: Tempo): Promise<{ tempo: Tempo; report: RhythmReport } | null> {
+    const tempo = base ?? this.tempos.sourceTempo(sourceId);
     const length = this.timeline.sourceLength({ sourceId });
     if (!tempo || !length || this.trackingSource()) return null;
     this.trackingSource.set(sourceId);

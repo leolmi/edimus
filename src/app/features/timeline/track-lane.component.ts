@@ -42,6 +42,9 @@ const POINT_GRAB = 7;
 /** Vertical margin (px) of the envelope area inside the lane. */
 const ENVELOPE_MARGIN = 6;
 
+/** Width (px) of the tab of a marked 1, left of its line. */
+const MARK_TAB = 16;
+
 /** Vertical gap between the channels of a stereo clip. */
 const CHANNEL_GAP = 2;
 
@@ -225,25 +228,42 @@ export class TrackLaneComponent {
     return undefined;
   }
 
-  /** Lane x of the edges of the bar being marked, when it is on this lane and placed. */
-  private markedBar(): { clip: Clip; x0: number; x1: number } | undefined {
+  /** The clip of this lane whose 1s are being marked, if any. */
+  private markingClip(): Clip | undefined {
     const marking = this.timeline.beatMarking();
-    const clip = marking && this.track().clips.find((c) => c.id === marking.clipId);
-    if (!marking || !clip || marking.downbeat === null) return undefined;
-    const rate = clipRate(clip);
-    const toX = (sourceTime: number) => this.timeline.timeToX(clip.start + (sourceTime - clip.offset) / rate);
-    const bar = (60 * marking.beatsPerBar) / marking.bpm;
-    return { clip, x0: toX(marking.downbeat), x1: toX(marking.downbeat + bar) };
+    return marking ? this.track().clips.find((c) => c.id === marking.clipId) : undefined;
   }
 
-  /** Part of the bar being marked under x on this lane, if any. */
-  markedBarAt(x: number): ClipHit['zone'] | undefined {
-    const bar = this.markedBar();
-    if (!bar) return undefined;
-    const grab = Math.min(EDGE_GRAB, (bar.x1 - bar.x0) / 3);
-    if (Math.abs(x - bar.x0) <= grab) return 'start';
-    if (Math.abs(x - bar.x1) <= grab) return 'end';
-    return x > bar.x0 && x < bar.x1 ? 'body' : undefined;
+  /** Index of the 1 being marked near x on this lane (the nearest one), if any. */
+  markAt(x: number): number | undefined {
+    const clip = this.markingClip();
+    const marks = this.timeline.beatMarking()?.marks ?? [];
+    if (!clip) return undefined;
+    let best: number | undefined;
+    let distance = EDGE_GRAB + 1;
+    marks.forEach((m, i) => {
+      // the line, and its tab on the left
+      const dx = x - this.sourceX(clip, m);
+      const d = dx < 0 && dx >= -MARK_TAB ? 0 : Math.abs(dx);
+      if (d < distance) [best, distance] = [i, d];
+    });
+    return best;
+  }
+
+  /** The clip being marked covers x on this lane. */
+  onMarkingClip(x: number): Clip | undefined {
+    const clip = this.markingClip();
+    if (!clip) return undefined;
+    const span = this.clipSpan(clip);
+    return x >= span.x0 && x <= span.x1 ? clip : undefined;
+  }
+
+  /** Bar of the grid under x on the clip being marked (number as in the map), if it has a grid. */
+  markingBarAt(x: number): number | undefined {
+    const clip = this.onMarkingClip(x);
+    const tempo = clip && this.tempos.sourceTempo(clip.sourceId);
+    if (!clip || !tempo) return undefined;
+    return Math.floor(barAt(tempo, toSource(clip, this.timeline.xToTime(x))) + 1e-6);
   }
 
   /**
@@ -358,9 +378,8 @@ export class TrackLaneComponent {
     // locked: the clips cannot be grabbed
     if (this.montages.locked()) return this.cursor.set(inRange || !this.track().clips.length ? 'grab' : null);
     if (this.timeline.beatMarking()) {
-      // precise pointer to place the 1, then move / stretch arrows on the bar
-      const zone = this.markedBarAt(x);
-      this.cursor.set(zone === 'body' ? 'grab' : zone ? 'ew-resize' : 'crosshair');
+      // a 1 is grabbed to move it, elsewhere on the clip a precise pointer puts a new one
+      this.cursor.set(this.markAt(x) !== undefined ? 'ew-resize' : this.onMarkingClip(x) ? 'crosshair' : null);
       return;
     }
     if (this.timeline.envelopeMode()) {
@@ -455,14 +474,10 @@ export class TrackLaneComponent {
       }
     }
     ctx.globalAlpha = 1;
-    const markingId = this.timeline.beatMarking()?.clipId;
-    if (this.timeline.beatGrid()) {
-      // the clip being marked shows only the grid of its marking
-      for (const clip of this.track().clips) if (clip.id !== markingId) this.drawBeats(ctx, colors, clip, size.width, size.height);
-    }
+    if (this.timeline.beatGrid()) for (const clip of this.track().clips) this.drawBeats(ctx, colors, clip, size.width, size.height);
     this.drawRecording(ctx, colors, size);
     this.drawEnvelopeGuides(ctx, colors, size.width, size.height);
-    this.drawMarkedBar(ctx, colors, size.width, size.height);
+    this.drawMarks(ctx, colors, size.width, size.height);
     this.drawEnvelope(ctx, colors, size.width);
   }
 
@@ -543,40 +558,59 @@ export class TrackLaneComponent {
   }
 
   /**
-   * Bar being marked: its columns (one per beat, numbered) between two strong edges, and the
-   * grid it implies over the rest of the clip, faded.
+   * The 1s being marked: a strong line with a tab on top holding "1" (filled when selected),
+   * and the span shown from the list of doubts, shaded.
    */
-  private drawMarkedBar(ctx: CanvasRenderingContext2D, colors: CanvasColors, width: number, height: number): void {
+  private drawMarks(ctx: CanvasRenderingContext2D, colors: CanvasColors, width: number, height: number): void {
     const marking = this.timeline.beatMarking();
-    const bar = this.markedBar();
-    if (!marking || marking.downbeat === null || !bar) return;
-    const { clip, x0, x1 } = bar;
-    const clipX0 = Math.max(0, this.timeline.timeToX(clip.start));
-    const clipX1 = Math.min(width, this.timeline.timeToX(clip.start + this.timeline.clipLength(clip)));
-    const steady: Tempo = { bpm: marking.bpm, offset: marking.downbeat, confidence: 1, beatsPerBar: marking.beatsPerBar };
-    this.drawBarGrid(ctx, colors, clip, steady, clipX0, clipX1, height, 0.6);
-    if (x1 < 0 || x0 > width) return;
-    ctx.fillStyle = colors.envelope;
-    ctx.strokeStyle = colors.envelope;
-    ctx.globalAlpha = 0.15;
-    ctx.fillRect(x0, 0, x1 - x0, height);
-    ctx.globalAlpha = 1;
-    ctx.font = `bold 12px ${colors.font.split('px ')[1]}`;
-    ctx.textBaseline = 'top';
-    const column = (x1 - x0) / marking.beatsPerBar;
-    for (let k = 0; k <= marking.beatsPerBar; k++) {
-      const x = Math.round(x0 + k * column) + 0.5;
-      const edge = k === 0 || k === marking.beatsPerBar;
-      ctx.lineWidth = edge ? 2 : 1;
-      ctx.globalAlpha = edge ? 1 : 0.6;
+    const clip = this.markingClip();
+    if (!marking || !clip) return;
+    const span = this.clipSpan(clip);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(Math.max(0, span.x0), 0, Math.min(width, span.x1) - Math.max(0, span.x0), height);
+    ctx.clip();
+    if (marking.focus) {
+      const x0 = this.sourceX(clip, marking.focus.from);
+      const x1 = this.sourceX(clip, marking.focus.to);
+      ctx.fillStyle = colors.error;
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(x0, 0, x1 - x0, height);
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = colors.error;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(Math.round(x0) + 0.5, 0.5, Math.round(x1 - x0), height - 1);
+      ctx.setLineDash([]);
+    }
+    ctx.font = `bold 11px ${colors.font.split('px ')[1]}`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    marking.marks.forEach((m, i) => {
+      const x = Math.round(this.sourceX(clip, m)) + 0.5;
+      if (x < -10 || x > width + 10) return;
+      const selected = marking.selected === i;
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = colors.envelope;
+      ctx.fillStyle = colors.envelope;
+      ctx.lineWidth = selected ? 3 : 2;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
-      if (k < marking.beatsPerBar && column >= 14) ctx.fillText(String(k + 1), x + 4, 4);
-    }
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = 1;
+      // the tab, left of the line (the bar number is on its right): filled when selected
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(x - 16, 1, 15, 15, 3);
+      if (selected) ctx.fill();
+      else {
+        ctx.fillStyle = colors.surface;
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.fillStyle = selected ? colors.surface : colors.envelope;
+      ctx.fillText('1', x - 8.5, 9);
+    });
+    ctx.restore();
   }
 
   /**

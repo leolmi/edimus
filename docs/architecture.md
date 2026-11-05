@@ -166,8 +166,8 @@ ExportService: render offline ─▶ f32le ─▶ ffmpeg encoder (wav/mp3/flac/o
 | Servizio | Ruolo |
 |---|---|
 | `MontageService` | montaggio corrente (immutabile), undo/redo (max 200 passi), `dirty`, percorso, apertura/salvataggio |
-| `TimelineService` | zoom (`pxPerSec`), scroll, larghezza vista, selezione clip/intervallo, modalità inviluppo, griglia battute, marcatura battuta; conversioni `timeToX`/`xToTime`, `clipLength` |
-| `EditService` | comandi di editing usati da UI e AI: split, delete, crop, dissolvenza incrociata, velocità/pitch, dialoghi tempo e allineamento, marcatura battuta |
+| `TimelineService` | zoom (`pxPerSec`), scroll, larghezza vista, selezione clip/intervallo, modalità inviluppo, griglia battute, marcatura degli 1; conversioni `timeToX`/`xToTime`, `clipLength` |
+| `EditService` | comandi di editing usati da UI e AI: split, delete, crop, dissolvenza incrociata, velocità/pitch, dialoghi tempo e allineamento, marcatura degli 1 (gli 1 segnati, rilevamento, dubbi del tracciamento e scelte per battuta) |
 | `DocumentService` | nuovo/apri/salva/salva con nome/rinomina/esporta/chiudi, con conferma per le modifiche non salvate; titolo della finestra |
 | `PlaybackService` | play/stop/seek, loop, punto iniziale, posizione del playhead, `AudioContext` condiviso inviato all'uscita scelta (`setSinkId`; se il dispositivo manca, la predefinita) |
 | `AudioDevicesService` | elenco delle uscite e degli ingressi audio (`enumerateDevices`). WebView2 dà i nomi solo a una pagina con permesso microfono: all'apertura delle Impostazioni, la prima volta, si apre e chiude subito un flusso dal microfono. Le scelte (id e nome) sono nelle impostazioni |

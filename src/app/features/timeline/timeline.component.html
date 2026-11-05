@@ -338,6 +338,33 @@
         <mat-icon>wrong_location</mat-icon>{{ 'marker.remove' | t }}
       </button>
     }
+  } @else if (barMenu(); as at) {
+    @if (at.bar !== null) {
+      <div class="menu-title">{{ 'tempo.barMenu' | t: { bar: at.bar + 1 } }}</div>
+      @for (n of barMeters; track n) {
+        <button mat-menu-item [disabled]="n === at.meter" (click)="edits.setBarMeter(at.bar, n)">
+          <mat-icon>{{ n === at.meter ? 'check' : 'straighten' }}</mat-icon>{{ 'tempo.barMeter' | t: { n } }}
+        </button>
+      }
+      <mat-divider />
+      <button mat-menu-item (click)="edits.shiftDownbeat(at.bar, -1)">
+        <mat-icon>west</mat-icon>{{ 'tempo.barEarlier' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.shiftDownbeat(at.bar, 1)">
+        <mat-icon>east</mat-icon>{{ 'tempo.barLater' | t }}
+      </button>
+      <button mat-menu-item (click)="edits.keepBar(at.bar)">
+        <mat-icon>done_all</mat-icon>{{ 'tempo.barKeep' | t }}
+      </button>
+    }
+    @if (at.mark !== null) {
+      @if (at.bar !== null) {
+        <mat-divider />
+      }
+      <button mat-menu-item (click)="edits.removeMark(at.mark)">
+        <mat-icon>delete</mat-icon>{{ 'tempo.markRemove' | t }}
+      </button>
+    }
   } @else if (tracksMenu(); as area) {
     @if (area.clip; as clip) {
       @let locked = edits.locked();

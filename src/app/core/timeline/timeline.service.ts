@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { AudioLibraryService } from '../audio/audio-library.service';
+import type { TrackOptions } from '../audio/rhythm';
 import { Clip, clipRate } from '../montage/montage.model';
 import { MontageService } from '../montage/montage.service';
 
@@ -7,16 +8,21 @@ const MIN_PX_PER_SEC = 0.05;
 const MAX_PX_PER_SEC = 50000;
 
 /**
- * Bar marking: the user clicks the 1 of a bar, then moves and stretches the grid of that one
- * bar (beatsPerBar columns) over the waveform. Times in source seconds.
+ * Marking of the 1s of a clip: the user puts a few downbeats on the waveform (where the piece
+ * starts, in a free intro, where the tempo changes), the bar tracking follows the rest and finds
+ * each one on the audio near where it was put. Times in source seconds.
  */
 export interface BarMarking {
   clipId: string;
   sourceId: string;
-  beatsPerBar: number;
-  bpm: number;
-  /** Start of the marked bar; null until the user clicks it. */
-  downbeat: number | null;
+  /** Downbeats put by hand, in time order. */
+  marks: number[];
+  /** Mark last put or moved: Delete removes it. */
+  selected: number | null;
+  /** Choices of the tracking (meter, tempo to stay near). */
+  options: TrackOptions;
+  /** Span shown from the list of doubts, highlighted on the waveform. */
+  focus: { from: number; to: number } | null;
 }
 
 /** Zoom and horizontal scroll of the timeline, shared by the ruler and all the tracks. */
@@ -144,6 +150,15 @@ export class TimelineService {
     const px = Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, this.pxPerSec() * factor));
     this.pxPerSec.set(px);
     this.setScroll(anchor - anchorX / px);
+  }
+
+  /** Zooms and scrolls so that a timeline span fills most of the view. */
+  showSpan(start: number, end: number): void {
+    const width = this.viewWidth();
+    if (end <= start || width <= 0) return;
+    const span = end - start;
+    this.pxPerSec.set(Math.min(MAX_PX_PER_SEC, Math.max(MIN_PX_PER_SEC, width / (span * 1.6))));
+    this.centerOn(start + span / 2);
   }
 
   /** Fits the selected range in the viewport (with a little room around it), or the whole montage when none. */

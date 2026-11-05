@@ -18,17 +18,14 @@ import { TimelineService } from '../../core/timeline/timeline.service';
   template: `
     @if (marking(); as m) {
       <mat-icon class="marking-icon">ads_click</mat-icon>
-      <span class="marking">
-        @if (m.downbeat === null) {
-          {{ 'tempo.markNext' | t }}
-        } @else {
-          {{ 'tempo.markDone' | t: { bpm: m.bpm.toFixed(2) } }}
-        }
-      </span>
+      <span class="marking">{{ 'tempo.markCount' | t: { n: m.marks.length } }}</span>
       <span class="spacer"></span>
-      <button mat-button [disabled]="m.downbeat === null" (click)="edits.undoBeatMark()">{{ 'tempo.markUndo' | t }}</button>
-      <button mat-button (click)="edits.cancelBeatMarking()">{{ 'common.cancel' | t }}</button>
-      <button mat-flat-button [disabled]="m.downbeat === null" (click)="edits.confirmBeatMarking()">{{ 'tempo.markConfirm' | t }}</button>
+      <button mat-button [disabled]="!m.marks.length" (click)="edits.clearMarks()">{{ 'tempo.markUndo' | t }}</button>
+      <button mat-button (click)="edits.cancelBeatMarking()">{{ 'tempo.markClose' | t }}</button>
+      <button mat-flat-button [disabled]="!!edits.trackingSource()" (click)="edits.detectBars()">
+        <mat-icon>timeline</mat-icon>
+        {{ 'tempo.markDetect' | t }}
+      </button>
     } @else if (selection(); as sel) {
       <span class="name">{{ sel.track.name }}</span>
       <span class="length">{{ length() }}</span>

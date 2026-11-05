@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { type Tempo, meterName } from '../../core/audio/tempo';
 import { isVariable, meanBpm } from '../../core/audio/tempo-map';
 import type { RhythmReport, TrackOptions } from '../../core/audio/rhythm';
+import { SHOW_BPM_ALTERNATIVES } from '../../core/audio/bar-doubts';
 import { formatDuration } from '../../core/format';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
@@ -38,7 +39,8 @@ export interface TempoDialogData {
  */
 export type TempoDialogResult = {
   tempo: Tempo | null;
-  mark?: { beatsPerBar: number; bpm: number };
+  /** Marks the 1s on the clip, then tracks with these choices. */
+  mark?: TrackOptions;
   track?: TrackOptions;
   steady?: boolean;
   /** Removes all the anchors, or only those of the bar tracking. */
@@ -87,7 +89,7 @@ const TAP_RESET = 2000;
           <mat-icon>ads_click</mat-icon>
           {{ 'tempo.mark' | t }}
         </button>
-        <span class="hint">{{ 'tempo.markHint' | t: { n: meter() } }}</span>
+        <span class="hint">{{ 'tempo.markHint' | t }}</span>
       </div>
 
       <div class="mark">
@@ -341,7 +343,8 @@ export class TempoDialogComponent {
   protected readonly alternatives = computed(() => {
     const report = this.data.report;
     if (!report) return [];
-    const result: { label: string; options: TrackOptions }[] = report.bpmAlternatives.map((bpm) => ({
+    const bpms = SHOW_BPM_ALTERNATIVES ? report.bpmAlternatives : [];
+    const result: { label: string; options: TrackOptions }[] = bpms.map((bpm) => ({
       label: this.i18n.t('tempo.retryBpm', { bpm: bpm.toFixed(0) }),
       options: { bpm },
     }));
@@ -391,9 +394,9 @@ export class TempoDialogComponent {
     this.dialog.close({ tempo: null });
   }
 
-  /** Closes to let the user click the beats 1, 2, … on the waveform of the clip. */
+  /** Closes to let the user put the main 1s on the waveform of the clip (tracked with the choices here). */
   protected mark(): void {
-    this.dialog.close({ tempo: null, mark: { beatsPerBar: this.meter(), bpm: this.bpm() } });
+    this.dialog.close({ tempo: null, mark: { ...this.chosenBpm(), ...(this.autoMeter() ? {} : { meter: this.meter() }) } });
   }
 
   /**

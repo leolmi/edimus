@@ -338,7 +338,7 @@ const IT: HelpContent = {
           keys: ['T'],
           text: [
             'Seleziona la clip e premi il pulsante BPM nella barra in basso: puoi scegliere il metro (2/4, 3/4, 4/4, 6/8), scrivere i BPM, dimezzarli o raddoppiarli, battere il tempo (Tap o tasto T) e spostare il primo battito.',
-            '“Segna la battuta” è il modo più preciso: clicchi sull’1 di una battuta, compare la griglia di una battuta che sposti trascinandola e allarghi dai bordi finché coincide con la musica; Invio conferma.',
+            '“Segna gli 1” è il modo più preciso: segni sulla forma d’onda solo alcuni 1, quelli fondamentali (dove inizia il brano, in un’intro dove il tempo si sente poco, dove il tempo cambia), e “Rileva le battute” trova il resto (vedi “Brani a tempo non costante”).',
           ],
         },
         {
@@ -346,8 +346,10 @@ const IT: HelpContent = {
           text: [
             'Se il brano è stato registrato senza un tempo fisso, la griglia dopo qualche battuta non coincide più con la musica. Puoi far seguire alla griglia l’audio, senza modificarlo: la mappa delle battute appartiene al file, quindi vale per tutte le sue clip.',
             'A mano: con la griglia visibile tieni premuto Maiusc e trascina una linea di battuta sul colpo giusto (si aggancia all’attacco più vicino; Alt per muoverla liberamente). Quella battuta resta fissata, segnata da un triangolino: le battute tra lei e la battuta fissata precedente si allargano o stringono in modo uniforme, quelle successive prendono la nuova durata. Maiusc+clic destro su una battuta fissata la libera.',
-            'In automatico: nel dialogo del tempo “Rileva le battute” segue i battiti uno a uno su tutto il file (la musica suonata non è mai perfettamente regolare, nemmeno dentro la battuta), riconosce le parti senza pulsazione (un’intro libera o solo cantata, un rubato, i silenzi), che restano senza griglia e appaiono tratteggiate con la scritta “tempo libero”, e mette l’1 di ogni battuta sugli accenti (cassa, cambi di accordo). Con “Metro automatico” trova 3/4 o 4/4 battuta per battuta, anche misti (il nuovo metro è scritto accanto al numero della battuta); spento, usa il metro scelto. Le battute fissate a mano restano e vi impongono un 1. Dove la griglia sbaglia ancora, fissa a mano la battuta giusta e rilancia.',
-            'Dopo il rilevamento il dialogo si riapre con il resoconto: per ogni parte l’intervallo di tempo, le battute, il metro, i BPM e l’affidabilità, e i dubbi (“forse 3/4”, “1 incerto”); le battute incerte hanno sulla griglia la linea tratteggiata. Se il battito potrebbe essere il doppio o la metà, o il metro un altro, i pulsanti “Riprova a … BPM” e “Riprova in …” rilevano di nuovo con quella lettura. Se cambi i BPM nel dialogo prima di rilevare, il rilevamento resta vicino a quel tempo.',
+            'In automatico: nel dialogo del tempo “Rileva le battute” segue i battiti uno a uno su tutto il file (la musica suonata non è mai perfettamente regolare, nemmeno dentro la battuta), riconosce le parti senza pulsazione (un’intro libera o solo cantata, un rubato, i silenzi), che restano senza griglia e appaiono tratteggiate con la scritta “tempo libero”, e mette l’1 di ogni battuta sugli accenti (cassa, cambi di accordo). Con “Metro automatico” trova 3/4 o 4/4 battuta per battuta, anche misti (il nuovo metro è scritto accanto al numero della battuta); spento, usa il metro scelto. Le battute fissate a mano restano e vi impongono un 1. Se cambi i BPM nel dialogo prima di rilevare, il rilevamento resta vicino a quel tempo.',
+            'Segnando gli 1: “Segna gli 1” nel dialogo del tempo apre la marcatura, con le istruzioni in un pannello a destra. Un clic sulla clip mette un 1, trascinandolo lo sposti, Canc lo elimina; non serve precisione, perché ogni 1 viene cercato sull’audio entro un decimo di secondo da dove l’hai messo. Con gli 1 di due battute vicine il rilevamento capisce anche quanto è lunga la battuta. “Rileva le battute” (o Invio) segue il brano a partire dai tuoi 1 e li sposta sul colpo che trova.',
+            'Dopo il rilevamento il pannello elenca i punti “Da decidere”: battute di un metro diverso dalle vicine (un 3/4 in mezzo al 4/4), battute incerte, parti dove l’1 non si distingue dagli altri movimenti, parti che potrebbero avere un altro metro. Un clic su un punto mostra la battuta sulla forma d’onda; i pulsanti accanto lo risolvono (“Va bene così”, “È in 4/4”, “L’1 è giusto”, “Riprova in …”). Le battute incerte hanno sulla griglia la linea tratteggiata.',
+            'Per quello che il rilevamento non ha visto, clic destro su una battuta della clip: puoi dire quanti movimenti ha (da 2 a 6), che l’1 è un movimento prima o dopo, o che la battuta è giusta; su un 1, eliminarlo. Ogni scelta aggiunge gli 1 che servono e rileva di nuovo. “Fine” (o Esc) chiude la marcatura.',
             'Sempre nel dialogo: “Rimuovi ancore” toglie tutte le battute fissate e torna alla griglia costante di partenza; “Rimuovi ancore automatiche” toglie solo quelle trovate da “Rileva le battute” e tiene le tue; “Tempo costante” toglie la mappa lasciando un tempo costante pari alla sua media.',
             '“Salva le battute” scrive tempo e ancore in un file accanto all’audio, con lo stesso nome e l’estensione .edimusbars (per esempio brano.mp3.edimusbars): quando riapri quell’audio, anche in un altro montaggio, edimus lo usa al posto del tempo rilevato. “Carica le battute” lo ricarica a mano. Nelle Impostazioni puoi farlo salvare da solo a ogni modifica. Nella versione web il file si salva e si apre scegliendolo, e non viene letto da solo.',
             'Allineare il tempo di più clip cambia solo la velocità: non rende costante un brano che accelera o rallenta.',
@@ -429,7 +431,7 @@ const IT: HelpContent = {
     {
       title: 'Mettere a tempo più tracce tra loro',
       steps: [
-        'Attiva la griglia (B) e controlla che le battute di ogni traccia cadano sui colpi; se una è sbagliata, correggila con il pulsante BPM della clip (meglio con “Segna la battuta”).',
+        'Attiva la griglia (B) e controlla che le battute di ogni traccia cadano sui colpi; se una è sbagliata, correggila con il pulsante BPM della clip (meglio con “Segna gli 1”).',
         'Apri “Allinea il tempo delle clip” (pulsante con le frecce in alto).',
         'Scegli la clip di riferimento e le clip da adattare; come tempo usa quello del riferimento, oppure una via di mezzo per stirare meno ogni clip.',
         'Lascia attivo l’allineamento delle battute: le clip si spostano perché i loro “1” cadano sugli “1” del riferimento.',
@@ -439,11 +441,11 @@ const IT: HelpContent = {
     {
       title: 'Far seguire la griglia a un brano che va fuori tempo',
       steps: [
-        'Attiva la griglia (B) e, se serve, segna la battuta all’inizio del brano (pulsante BPM, “Segna la battuta”).',
-        'Nel dialogo del tempo premi “Rileva le battute”: la griglia segue il brano su tutto il file.',
-        'Scorri il brano: dove una battuta non cade sul colpo, Maiusc+trascina la sua linea sul colpo giusto.',
-        'Leggi il resoconto che compare: se il tempo o il metro sono dubbi, prova la lettura proposta con “Riprova…”.',
-        'Se le correzioni sono molte, premi di nuovo “Rileva le battute”: le battute fissate a mano restano e guidano la ricerca.',
+        'Attiva la griglia (B), premi il pulsante BPM della clip e “Segna gli 1”.',
+        'Clicca sulla forma d’onda gli 1 fondamentali: dove inizia il brano, due battute vicine all’inizio, nell’intro se il tempo si sente poco, dove il tempo cambia.',
+        'Premi “Rileva le battute” (o Invio): la griglia segue il brano su tutto il file, a partire dai tuoi 1.',
+        'Nel pannello a destra scorri i punti “Da decidere”: un clic mostra la battuta, i pulsanti accanto la risolvono.',
+        'Dove una battuta è sbagliata e non è nell’elenco, clic destro sulla battuta e scegli la correzione (movimenti, 1 prima o dopo), oppure aggiungi un 1 e rileva di nuovo.',
         'Premi “Salva le battute” per ritrovarle la prossima volta che apri lo stesso audio.',
       ],
       note: 'Maiusc+clic destro su una battuta fissata la libera; “Rimuovi ancore” le toglie tutte.',
@@ -862,7 +864,7 @@ const EN: HelpContent = {
           keys: ['T'],
           text: [
             'Select the clip and press the BPM button in the bottom bar: you can choose the meter (2/4, 3/4, 4/4, 6/8), type the BPM, halve or double it, tap the tempo (Tap or T key) and move the first beat.',
-            '“Mark a bar” is the most precise way: click the 1 of a bar, a one-bar grid appears that you move by dragging and stretch from its edges until it matches the music; Enter confirms.',
+            '“Mark the 1s” is the most precise way: you mark on the waveform only a few 1s, the key ones (where the song starts, in an intro where the beat is hard to hear, where the tempo changes), and “Detect bars” finds the rest (see “Songs without a steady tempo”).',
           ],
         },
         {
@@ -870,8 +872,10 @@ const EN: HelpContent = {
           text: [
             'When a song was recorded without a steady tempo, after a few bars the grid no longer matches the music. You can make the grid follow the audio, without changing it: the bar map belongs to the file, so it holds for all its clips.',
             'By hand: with the grid shown hold Shift and drag a bar line onto the right hit (it snaps to the nearest attack; Alt to move it freely). That bar stays pinned, marked by a small triangle: the bars between it and the previous pinned bar stretch or shrink evenly, the following ones take the new length. Shift+right click on a pinned bar unpins it.',
-            'Automatically: in the tempo dialog “Detect bars” follows the beats one by one along the whole file (played music is never perfectly even, not even inside the bar), recognizes the parts with no pulse (a free or sung-only intro, a rubato, the silences), which stay without grid and are hatched with the words “free tempo”, and puts the 1 of each bar on the accents (kick, chord changes). With “Automatic meter” it finds 3/4 or 4/4 bar by bar, also mixed (the new meter is written next to the bar number); off, it uses the meter chosen. The bars pinned by hand stay and force a 1 there. Where the grid is still wrong, pin the right bar by hand and run it again.',
-            'After the detection the dialog opens again with the report: for each part its time span, bars, meter, BPM and reliability, and the doubts (“maybe 3/4”, “uncertain 1”); uncertain bars have a dashed line on the grid. When the beat could be twice or half as fast, or the meter another one, the buttons “Try again at … BPM” and “Try again in …” detect again with that reading. If you change the BPM in the dialog before detecting, the detection stays near that tempo.',
+            'Automatically: in the tempo dialog “Detect bars” follows the beats one by one along the whole file (played music is never perfectly even, not even inside the bar), recognizes the parts with no pulse (a free or sung-only intro, a rubato, the silences), which stay without grid and are hatched with the words “free tempo”, and puts the 1 of each bar on the accents (kick, chord changes). With “Automatic meter” it finds 3/4 or 4/4 bar by bar, also mixed (the new meter is written next to the bar number); off, it uses the meter chosen. The bars pinned by hand stay and force a 1 there. If you change the BPM in the dialog before detecting, the detection stays near that tempo.',
+            'Marking the 1s: “Mark the 1s” in the tempo dialog opens the marking, with the instructions in a panel on the right. A click on the clip puts a 1, dragging moves it, Del removes it; no need to be precise, since each 1 is looked for on the audio within a tenth of a second of where you put it. With the 1s of two neighbouring bars the detection also learns how long a bar is. “Detect bars” (or Enter) follows the song from your 1s and moves them onto the hit it finds.',
+            'After the detection the panel lists the points “To decide”: bars in another meter than their neighbours (a 3/4 among 4/4), uncertain bars, parts where the 1 does not stand out from the other beats, parts that may have another meter. A click on a point shows the bar on the waveform; the buttons next to it settle it (“It is right”, “It is in 4/4”, “The 1 is right”, “Try again in …”). Uncertain bars have a dashed line on the grid.',
+            'For what the detection missed, right click on a bar of the clip: you can say how many beats it has (2 to 6), that the 1 is one beat earlier or later, or that the bar is right; on a 1, remove it. Each choice adds the 1s needed and detects again. “Done” (or Esc) ends the marking.',
             'In the same dialog: “Remove anchors” removes all the pinned bars and goes back to the steady grid the map started from; “Remove automatic anchors” removes only those found by “Detect bars” and keeps yours; “Steady tempo” drops the map leaving a steady tempo equal to its average.',
             '“Save bars” writes tempo and anchors to a file next to the audio, with the same name and the .edimusbars extension (for example song.mp3.edimusbars): when you open that audio again, even in another montage, edimus uses it instead of the detected tempo. “Load bars” loads it by hand. In the Settings you can have it saved by itself at every change. In the web version the file is saved and opened by choosing it, and it is not read by itself.',
             'Aligning the tempo of several clips changes only their speed: it does not make a song that speeds up or slows down steady.',
@@ -950,7 +954,7 @@ const EN: HelpContent = {
     {
       title: 'Put several tracks in time with each other',
       steps: [
-        'Switch on the grid (B) and check that the bars of each track fall on the hits; if one is wrong, correct it with the BPM button of the clip (best with “Mark a bar”).',
+        'Switch on the grid (B) and check that the bars of each track fall on the hits; if one is wrong, correct it with the BPM button of the clip (best with “Mark the 1s”).',
         'Open “Align the tempo of the clips” (arrows button at the top).',
         'Choose the reference clip and the clips to adapt; as tempo use the reference one, or a middle one to stretch each clip less.',
         'Keep the bar alignment on: the clips move so that their “1” fall on the “1” of the reference.',
@@ -960,11 +964,11 @@ const EN: HelpContent = {
     {
       title: 'Make the grid follow a song that drifts out of time',
       steps: [
-        'Switch on the grid (B) and, if needed, mark the bar at the start of the song (BPM button, “Mark a bar”).',
-        'In the tempo dialog press “Detect bars”: the grid follows the song along the whole file.',
-        'Scroll through the song: where a bar does not fall on the hit, Shift+drag its line onto the right hit.',
-        'Read the report that appears: if tempo or meter are doubtful, try the reading offered with “Try again…”.',
-        'If there are many corrections, press “Detect bars” again: the bars pinned by hand stay and guide the search.',
+        'Switch on the grid (B), press the BPM button of the clip and “Mark the 1s”.',
+        'Click on the waveform the key 1s: where the song starts, two neighbouring bars near the start, in the intro if the beat is hard to hear, where the tempo changes.',
+        'Press “Detect bars” (or Enter): the grid follows the song along the whole file, from your 1s.',
+        'In the panel on the right go through the points “To decide”: a click shows the bar, the buttons next to it settle it.',
+        'Where a bar is wrong and not in the list, right click on the bar and choose the correction (beats, 1 earlier or later), or add a 1 and detect again.',
         'Press “Save bars” to find them again the next time you open the same audio.',
       ],
       note: 'Shift+right click on a pinned bar unpins it; “Remove anchors” removes them all.',

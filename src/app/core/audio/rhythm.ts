@@ -223,22 +223,60 @@ const BACK_BEAT = 0;
 /** Accents beyond this many standard deviations count as this: an entrance after a pause, or a
  * chord anticipated on the last beat, must not move all the bars around it. */
 const ACCENT_CLIP = 3;
-/** A bar pinned by hand forces a beat there. */
+/** A downbeat marked by hand forces a beat in its window. */
 const FORCED = 1e4;
+/**
+ * How far (seconds, each side) a downbeat marked by hand may be from the real one: the user reads
+ * it off the waveform, so the beat is looked for around it, on the attacks.
+ */
+const MARK_REACH = 0.1;
+/** Preference (in deviations of the onsets) for the marked point over the edges of its window. */
+const MARK_PULL = 2;
+/** Cost of a bar with a beat more or less, allowed only when the marks leave no other choice. */
+const MARK_ODD_BAR = 6;
 
 /**
  * Bar map of the whole source from its rhythm features: an anchor (`auto`) on every downbeat with
- * the beats of its bar, the regions with no pulse, the bars pinned by hand kept (they force a
- * downbeat and get the number counted by the tracking). Returns the map and the report.
+ * the beats of its bar, the regions with no pulse. The anchors set by hand say only "a 1 is about
+ * here": each one moves to the beat found within MARK_REACH of it, which is forced to be a
+ * downbeat, and takes the number counted by the tracking. Returns the map and the report.
  */
 export function trackRhythm(tempo: Tempo, features: RhythmFeatures, sourceLength: number, options: TrackOptions = {}): { tempo: Tempo; report: RhythmReport } {
+  const first = trackOnce(tempo, features, sourceLength, options);
+  if (!first.oddMarked || options.bpm || options.meter) return first;
+  // with the meter found bar by bar, the marks make bars of 2 or 5 beats: the beat is likely
+  // twice or half as fast (the tracking took the subdivision, or every other beat); the reading
+  // that keeps the most marks, then with the fewest odd bars, wins (with a meter imposed, a bar
+  // of another length is the music's)
+  const pulsed = first.report.regions.filter((r) => r.bpm);
+  const mean = pulsed.length ? pulsed.reduce((a, r) => a + r.bpm!.mean, 0) / pulsed.length : 0;
+  if (!mean) return first;
+  const readings = [first, ...[2, 0.5].map((f) => trackOnce(tempo, features, sourceLength, { ...options, bpm: mean * f }))];
+  const better = (r: Reading, best: Reading) =>
+    r.kept !== best.kept ? r.kept > best.kept : r.oddMarked !== best.oddMarked ? r.oddMarked < best.oddMarked : r.report.confidence > best.report.confidence;
+  return readings.reduce((best, r) => (better(r, best) ? r : best));
+}
+
+/** A tracking, with the marks it kept as downbeats and the bars of a beat more or less they forced. */
+interface Reading {
+  tempo: Tempo;
+  report: RhythmReport;
+  kept: number;
+  oddMarked: number;
+}
+
+function trackOnce(tempo: Tempo, features: RhythmFeatures, sourceLength: number, options: TrackOptions): Reading {
   const { frameRate: fr, frameOffset } = features;
   // each band on the same scale (the treble has many more bins), the hi-hat counting less: it
   // marks the subdivisions more than the beat
   const [low, mid, high] = [features.low, features.mid, features.high].map((band) => 1 / (band.reduce((a, b) => a + b, 0) / band.length || 1));
   const novelty = features.low.map((value, f) => value * low + features.mid[f] * mid + 0.25 * features.high[f] * high);
   const frames = novelty.length;
-  const manual = (tempo.anchors ?? []).filter((a) => !a.auto).sort((a, b) => a.time - b.time);
+  // marks closer than a window to the previous one say the same thing
+  const manual = (tempo.anchors ?? [])
+    .filter((a) => !a.auto)
+    .sort((a, b) => a.time - b.time)
+    .filter((a, i, all) => !i || a.time - all[i - 1].time > 2 * MARK_REACH);
   const frameOf = (time: number) => Math.max(0, Math.min(frames - 1, Math.round((time - frameOffset) * fr)));
   const timeOf = (frame: number) => frameOffset + frame / fr;
 
@@ -255,14 +293,19 @@ export function trackRhythm(tempo: Tempo, features: RhythmFeatures, sourceLength
   };
 
   // 3. beats on the whole source
-  const forcedFrames = manual.map((a) => frameOf(a.time));
-  const beatFrames = trackBeats(normalizeLocal(novelty, fr), periodAt, forcedFrames);
+  // the window of each mark: never as wide as half a beat, so it holds a single beat
+  const windows = manual.map((a) => {
+    const frame = frameOf(a.time);
+    return { frame, reach: Math.max(1, Math.min(Math.round(MARK_REACH * fr), Math.floor((periodAt(frame) / 2 - 1) / 2))) };
+  });
+  const beatFrames = trackBeats(normalizeLocal(novelty, fr), periodAt, windows);
   const beats = beatFrames.map((f) => timeOf(refinePeak(novelty, f)));
-  // the pinned bars exactly where the user put them
-  for (const anchor of manual) {
-    const i = nearest(beats, anchor.time);
-    if (i >= 0 && Math.abs(beats[i] - anchor.time) < 0.1) beats[i] = anchor.time;
-  }
+  // each mark on the beat of its window (marks the tracking did not reach stay out)
+  const marks = new Map<number, BarAnchor>();
+  windows.forEach(({ frame, reach }, k) => {
+    const i = beatFrames.findIndex((f) => Math.abs(f - frame) <= reach);
+    if (i >= 0) marks.set(beats[i], manual[k]);
+  });
   const strength = beats.map((t) => peak(novelty, frameOf(t), 2));
 
   // 4. regions with a pulse, as ranges of beats
@@ -273,11 +316,11 @@ export function trackRhythm(tempo: Tempo, features: RhythmFeatures, sourceLength
     if (!found) patterns.set(i, (found = beatPattern(novelty, frameOf(beats[i]), periodAt(frameOf(beats[i])))));
     return found;
   };
-  const ranges = beatRanges(pulsedWindows, local.hop / fr, beats, pattern);
+  const ranges = withMarkedBeats(beatRanges(pulsedWindows, local.hop / fr, beats, pattern), beats.flatMap((t, i) => (marks.has(t) ? [i] : [])));
 
   // 5. bars of each region
   const meters = options.meter ? [options.meter] : [3, 4];
-  const regions: RegionBars[] = ranges.map(([i0, i1]) => regionBars(features, beats.slice(i0, i1 + 1), strength.slice(i0, i1 + 1), meters, manual, frameOf));
+  const regions: RegionBars[] = ranges.map(([i0, i1]) => regionBars(features, beats.slice(i0, i1 + 1), strength.slice(i0, i1 + 1), meters, marks, frameOf));
 
   const { anchors, numbers } = numberBars(regions, manual, sourceLength);
   const report = buildReport(regions, numbers, local, fr, sourceLength, options);
@@ -291,7 +334,38 @@ export function trackRhythm(tempo: Tempo, features: RhythmFeatures, sourceLength
   if (anchors.length) result.anchors = anchors;
   else if (manual.length) result.anchors = manual;
   if (free.length) result.regions = free;
-  return { tempo: result, report };
+  return {
+    tempo: result,
+    report,
+    kept: regions.reduce((a, r) => a + r.bars.filter((b) => b.pinned).length, 0),
+    oddMarked: regions.reduce((a, r) => a + r.oddMarked, 0),
+  };
+}
+
+/**
+ * A marked 1 says the music has a pulse there: the ranges grow to hold every marked beat (the
+ * nearest range reaches out to it; none at all: one from the first to the last mark).
+ */
+function withMarkedBeats(ranges: [number, number][], marked: number[]): [number, number][] {
+  if (!marked.length) return ranges;
+  const result = ranges.map((r): [number, number] => [...r]);
+  if (!result.length) result.push([marked[0], marked[marked.length - 1]]);
+  for (const m of marked) {
+    if (result.some(([a, b]) => m >= a && m <= b)) continue;
+    let best = 0;
+    const distance = ([a, b]: [number, number]) => (m < a ? a - m : m - b);
+    result.forEach((r, k) => distance(r) < distance(result[best]) && (best = k));
+    result[best] = [Math.min(result[best][0], m), Math.max(result[best][1], m)];
+  }
+  // grown ranges may now touch: merged
+  result.sort((x, y) => x[0] - y[0]);
+  const merged: [number, number][] = [];
+  for (const r of result) {
+    const last = merged[merged.length - 1];
+    if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]);
+    else merged.push(r);
+  }
+  return merged;
 }
 
 interface LocalTempo {
@@ -430,12 +504,15 @@ function normalizeLocal(novelty: Float32Array, fr: number): Float32Array {
 /**
  * Beats of the whole source by dynamic programming (Ellis 2007): the best chain of beats on the
  * onsets, each about one local period after the previous. The choice is global, so a beat is
- * placed as much by the music after it as by the music before. Forced frames are always beats.
+ * placed as much by the music after it as by the music before. Each forced window holds a beat,
+ * where the onsets and the steadiness of the chain want it, a little nearer its centre.
  */
-function trackBeats(onset: Float32Array, periodAt: (frame: number) => number, forced: number[]): number[] {
+function trackBeats(onset: Float32Array, periodAt: (frame: number) => number, forced: { frame: number; reach: number }[]): number[] {
   const frames = onset.length;
   const local = Float32Array.from(onset);
-  for (const f of forced) local[f] += FORCED;
+  for (const { frame, reach } of forced) {
+    for (let f = Math.max(0, frame - reach); f <= Math.min(frames - 1, frame + reach); f++) local[f] += FORCED - MARK_PULL * ((f - frame) / reach) ** 2;
+  }
   const total = new Float64Array(frames);
   const back = new Int32Array(frames).fill(-1);
   for (let t = 0; t < frames; t++) {
@@ -479,13 +556,6 @@ function refinePeak(curve: Float32Array, frame: number): number {
 function peak(curve: Float32Array, frame: number, reach: number): number {
   let best = 0;
   for (let f = Math.max(0, frame - reach); f <= Math.min(curve.length - 1, frame + reach); f++) best = Math.max(best, curve[f]);
-  return best;
-}
-
-/** Index of the value nearest `time` in a sorted list (-1 if empty). */
-function nearest(values: number[], time: number): number {
-  let best = -1;
-  for (let i = 0; i < values.length; i++) if (best < 0 || Math.abs(values[i] - time) < Math.abs(values[best] - time)) best = i;
   return best;
 }
 
@@ -611,6 +681,8 @@ interface RegionBars {
   end: number;
   meterAlternative?: number;
   downbeatUncertain?: boolean;
+  /** Bars of a beat more or less forced by the marks. */
+  oddMarked: number;
 }
 
 /**
@@ -618,7 +690,7 @@ interface RegionBars {
  * middle band, where snares hit the back beats, counts against) and the segmentation of the
  * beats into bars of the allowed meters that puts the downbeats on the strongest accents.
  */
-function regionBars(features: RhythmFeatures, beats: number[], strength: number[], meters: number[], manual: BarAnchor[], frameOf: (t: number) => number): RegionBars {
+function regionBars(features: RhythmFeatures, beats: number[], strength: number[], meters: number[], marks: Map<number, BarAnchor>, frameOf: (t: number) => number): RegionBars {
   const n = beats.length;
   const ibi = (j: number) => (j + 1 < n ? beats[j + 1] - beats[j] : beats[j] - beats[j - 1]);
   const at = (curve: Float32Array) => beats.map((t) => peak(curve, frameOf(t), 2));
@@ -644,10 +716,27 @@ function regionBars(features: RhythmFeatures, beats: number[], strength: number[
     const back = meter === 4 ? (midAt(j + 1) + midAt(j + 3) - midAt(j) - midAt(j + 2)) / 2 : (midAt(j + 1) + midAt(j + 2)) / 2 - midAt(j);
     return accent[j] + BACK_BEAT * Math.max(-ACCENT_CLIP, Math.min(ACCENT_CLIP, back));
   };
-  const forced = beats.map((t) => manual.some((a) => Math.abs(a.time - t) < 0.06));
+  let forced = beats.map((t) => marks.has(t));
 
-  const best = segment(accentOf, meters, forced);
-  const result: RegionBars = { bars: [], first: beats[0], last: beats[n - 1], end: beats[n - 1] + ibi(n - 1) };
+  let best = segment(accentOf, meters, forced);
+  // the beats between two marks do not make whole bars (the tracking put a beat too many or
+  // too few): a bar of a beat more or less where it costs least, and failing that no marks
+  let marked = false;
+  if (!Number.isFinite(best.score)) {
+    best = segment(accentOf, meters, forced, MARK_ODD_BAR);
+    marked = Number.isFinite(best.score);
+  }
+  if (!Number.isFinite(best.score)) {
+    forced = forced.map(() => false);
+    best = segment(accentOf, meters, forced);
+  }
+  const result: RegionBars = {
+    bars: [],
+    first: beats[0],
+    last: beats[n - 1],
+    end: beats[n - 1] + ibi(n - 1),
+    oddMarked: marked ? best.meters.filter((m) => !meters.includes(m)).length : 0,
+  };
   if (meters.length > 1) {
     // a single meter all along, and the other one nearly as good: worth telling
     const used = new Set(best.meters);
@@ -680,7 +769,9 @@ function regionBars(features: RhythmFeatures, beats: number[], strength: number[
   });
   best.starts.forEach((start, k) => {
     const length = best.meters[k];
-    const odd = !meters.includes(length);
+    // where the marks forced it, a bar of another length is what the music does (a 3 in a 4,
+    // say): it keeps the beats found
+    const odd = !meters.includes(length) && !marked;
     // a bar with a beat too many or too few: the meter of the bars around, its beats evenly spread
     const meter = odd ? (best.meters.slice(0, k).reverse().find((m) => meters.includes(m)) ?? best.meters.slice(k).find((m) => meters.includes(m)) ?? meters[0]) : length;
     const stop = best.starts[k + 1] ?? Math.min(n, start + length);
@@ -695,7 +786,7 @@ function regionBars(features: RhythmFeatures, beats: number[], strength: number[
     const margin = accent[start] - (inner.length ? Math.max(...inner) : 0);
     const steadiness = mean(beatConfidence.slice(start, stop));
     const confidence = 0.65 * steadiness + 0.35 / (1 + Math.exp(-2 * margin));
-    const pinned = manual.find((a) => Math.abs(a.time - beats[start]) < 0.06);
+    const pinned = forced[start] ? marks.get(beats[start]) : undefined;
     result.bars.push({ time: beats[start], beats: own, meter, confidence, ...(pinned ? { pinned } : {}) });
   });
   return result;
@@ -707,15 +798,15 @@ function regionBars(features: RhythmFeatures, beats: number[], strength: number[
  * bar one beat longer or shorter than the meters (a tracking error) ODD_BAR; the beats before the
  * first downbeat are an upbeat. Forced beats are downbeats. Returns the length of each bar.
  */
-function segment(accentOf: (meter: number, beat: number) => number, meters: number[], forced: boolean[]): { starts: number[]; meters: number[]; score: number } {
+function segment(accentOf: (meter: number, beat: number) => number, meters: number[], forced: boolean[], oddBar = ODD_BAR): { starts: number[]; meters: number[]; score: number } {
   const n = forced.length;
-  const odd = Number.isFinite(ODD_BAR) ? [...new Set(meters.flatMap((m) => [m - 1, m + 1]))].filter((m) => m >= 2 && !meters.includes(m)) : [];
+  const odd = Number.isFinite(oddBar) ? [...new Set(meters.flatMap((m) => [m - 1, m + 1]))].filter((m) => m >= 2 && !meters.includes(m)) : [];
   const lengths = [...meters, ...odd];
   const states: [number, number][] = lengths.flatMap((m) => Array.from({ length: m }, (_, p): [number, number] => [m, p]));
   const count = states.length;
   const index = (m: number, p: number) => states.findIndex(([sm, sp]) => sm === m && sp === p);
   const back = new Int16Array(n * count);
-  const entry = (m: number, j: number) => accentOf(m, j) - (meters.includes(m) ? 0 : ODD_BAR);
+  const entry = (m: number, j: number) => accentOf(m, j) - (meters.includes(m) ? 0 : oddBar);
   let value = states.map(([m, p]) => (forced[0] && p > 0 ? -Infinity : p === 0 ? entry(m, 0) : 0));
   for (let j = 1; j < n; j++) {
     const next = new Array<number>(count);
@@ -804,11 +895,12 @@ function combine(parts: [number[], number][]): number[] {
 /**
  * Bar numbers along the source (bar 0: the first downbeat found; across a free passage the bars
  * it would hold at the tempo before it) and the anchors: one per downbeat with its beats, and one
- * closing each region. The bars pinned by hand keep their time and take the counted number.
+ * closing each region. The marks set by hand take the time of their beat and the counted number.
  */
 function numberBars(regions: RegionBars[], manual: BarAnchor[], sourceLength: number): { anchors: BarAnchor[]; numbers: number[][] } {
   const anchors: BarAnchor[] = [];
   const numbers: number[][] = [];
+  const reached = new Set<BarAnchor>();
   let bar = 0;
   let previousEnd: { time: number; length: number } | null = null;
   for (const region of regions) {
@@ -821,7 +913,11 @@ function numberBars(regions: RegionBars[], manual: BarAnchor[], sourceLength: nu
     for (const [k, found] of region.bars.entries()) {
       own.push(bar);
       const beats = found.beats.map((t) => round(t));
-      if (found.pinned) anchors.push({ bar, time: found.pinned.time, beats });
+      // a mark moves onto the beat found, and stays a mark
+      if (found.pinned) {
+        reached.add(found.pinned);
+        anchors.push({ bar, time: round(found.time), beats });
+      }
       else anchors.push({ bar, time: round(found.time), auto: true, beats, confidence: round(found.confidence, 2) });
       bar++;
       // after the last bar, its end closes the region
@@ -838,9 +934,9 @@ function numberBars(regions: RegionBars[], manual: BarAnchor[], sourceLength: nu
     numbers.push(own);
   }
   anchors.sort((a, b) => a.bar - b.bar);
-  // pinned bars the tracking did not reach stay as they were, if they still fit in between
+  // marks the tracking did not reach stay as they were, if they still fit in between
   for (const pin of manual) {
-    if (anchors.some((a) => a.time === pin.time || a.bar === pin.bar)) continue;
+    if (reached.has(pin) || anchors.some((a) => a.time === pin.time || a.bar === pin.bar)) continue;
     const before = anchors.filter((a) => a.bar < pin.bar).pop();
     const after = anchors.find((a) => a.bar > pin.bar);
     if ((!before || before.time < pin.time) && (!after || after.time > pin.time)) anchors.splice(after ? anchors.indexOf(after) : anchors.length, 0, pin);

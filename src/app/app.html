@@ -217,7 +217,9 @@
 <main class="workspace">
   <div class="work-area">
     <app-timeline />
-    @if (timeline.selectedTrackId()) {
+    @if (timeline.beatMarking()) {
+      <app-bar-marking-panel />
+    } @else if (timeline.selectedTrackId()) {
       <app-track-panel />
     }
   </div>

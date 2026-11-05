@@ -23,6 +23,7 @@ import { TimelineService } from './core/timeline/timeline.service';
 import { UpdateService } from './core/update.service';
 import { ClipBarComponent } from './features/timeline/clip-bar.component';
 import { TrackPanelComponent } from './features/track-panel/track-panel.component';
+import { BarMarkingPanelComponent } from './features/timeline/bar-marking-panel.component';
 import { HelpDialogComponent, HelpTab } from './features/help/help-dialog.component';
 import { SettingsDialogComponent } from './features/settings/settings-dialog.component';
 import { TimelineComponent } from './features/timeline/timeline.component';
@@ -49,6 +50,7 @@ const LISTENING_KEYS = new Set(['Space', 'Home', 'End', 'Backspace', 'KeyB', 'Es
     TimelineComponent,
     ClipBarComponent,
     TrackPanelComponent,
+    BarMarkingPanelComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -174,14 +176,17 @@ export class App {
     // a focused menu (e.g. the input of a track) uses Space and the arrows itself
     const editing = event.target instanceof Element && event.target.closest('input, textarea, [contenteditable], mat-select');
     if (editing) return;
+    // an open context menu takes its own keys (Escape closes it, and only it)
+    if (event.target instanceof Element && event.target.closest('.mat-mdc-menu-panel')) return;
     // any other key closes a run of arrow moves (one undo step)
     if (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') this.edits.endNudge();
     if (this.timeline.beatMarking()) {
-      // marking a bar: Enter confirms, Backspace starts again from the 1, Escape cancels
+      // marking the 1s: Enter detects the bars, Delete / Backspace removes the selected 1, Escape ends
       const actions: Record<string, () => unknown> = {
-        Enter: () => this.edits.confirmBeatMarking(),
-        NumpadEnter: () => this.edits.confirmBeatMarking(),
-        Backspace: () => this.edits.undoBeatMark(),
+        Enter: () => this.edits.detectBars(),
+        NumpadEnter: () => this.edits.detectBars(),
+        Delete: () => this.edits.removeMark(),
+        Backspace: () => this.edits.removeMark(),
         Escape: () => this.edits.cancelBeatMarking(),
       };
       const action = actions[event.code];

@@ -135,7 +135,9 @@ TempoRegion { from: number; to: number /* s sorgente */; kind: 'free' }
 - Fissare a mano una battuta (`pinBar`) toglie i `beats` della battuta prima, che non
   corrisponderebbero più.
 - Ancore a mano (senza `auto`) e ancore del tracciamento automatico (`auto: true`, una per
-  battuta, sostituite a ogni nuovo tracciamento; quelle a mano restano e lo vincolano).
+  battuta, sostituite a ogni nuovo tracciamento). Quelle a mano sono gli 1 segnati dall'utente
+  ("Segna gli 1", `set_bar_map` pin): restano e vincolano il tracciamento, che cerca ognuna
+  sull'audio entro ±0,1 s, la sposta sul battito trovato e le dà il numero contato.
 - `bpm` e `offset` restano quelli della griglia costante da cui la mappa è partita: tolte le
   ancore (`clearAnchors`) la griglia torna quella.
 

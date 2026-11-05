@@ -12,6 +12,8 @@ export interface CanvasColors {
   envelope: string;
   beat: string;
   error: string;
+  /** Background of the page: text on a filled mark. */
+  surface: string;
   font: string;
   /** The theme in use is dark. */
   dark: boolean;
@@ -27,6 +29,7 @@ const TOKENS: Record<Exclude<keyof CanvasColors, 'font' | 'dark'>, string> = {
   envelope: '--mat-sys-tertiary',
   beat: '--mat-sys-on-surface',
   error: '--mat-sys-error',
+  surface: '--mat-sys-surface',
 };
 
 /**

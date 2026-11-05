@@ -23,7 +23,7 @@ import { AudioLibraryService, SourceState } from '../../core/audio/audio-library
 import { PlaybackService } from '../../core/audio/playback.service';
 import { RecordingService } from '../../core/audio/recording.service';
 import { OnsetCurve, Tempo, beatsPerBar, snapToOnsets } from '../../core/audio/tempo';
-import { meanBpm, pinBar } from '../../core/audio/tempo-map';
+import { barMeter, meanBpm, pinBar } from '../../core/audio/tempo-map';
 import { TempoService } from '../../core/audio/tempo.service';
 import { DocumentService } from '../../core/document.service';
 import { EditService } from '../../core/edit.service';
@@ -41,7 +41,7 @@ import { TrackInputService } from '../../core/audio/track-input';
 import { MIN_TRACK_HEIGHT, SettingsService } from '../../core/settings.service';
 import { snapToBeats } from '../../core/timeline/beat-snap';
 import { snapAnchors, snapTime, snapToEdges } from '../../core/timeline/edge-snap';
-import { BarMarking, TimelineService } from '../../core/timeline/timeline.service';
+import { TimelineService } from '../../core/timeline/timeline.service';
 import { sourceColors } from '../../core/source-colors';
 import { ThemeColorsService } from '../../core/theme-colors.service';
 import { EffectChainComponent } from '../effects/effect-chain.component';
@@ -140,6 +140,8 @@ export class TimelineComponent {
    */
   protected readonly menu = signal<
     | { kind: 'ruler'; time: number; marker: Marker | null }
+    /** While marking the 1s: a bar of the grid (number as in the map) and a 1 under the pointer. */
+    | { kind: 'bar'; bar: number | null; meter: number | null; mark: number | null }
     | {
         kind: 'tracks';
         /** On a clip: `locked` the clip itself, `stuck` some clip of the selection it is in (they do not move nor go). */
@@ -152,6 +154,12 @@ export class TimelineComponent {
     const menu = this.menu();
     return menu?.kind === 'ruler' ? menu : null;
   });
+  protected readonly barMenu = computed(() => {
+    const menu = this.menu();
+    return menu?.kind === 'bar' ? menu : null;
+  });
+  /** Meters a bar can be given from its menu. */
+  protected readonly barMeters = [2, 3, 4, 5, 6];
   protected readonly tracksMenu = computed(() => {
     const menu = this.menu();
     return menu?.kind === 'tracks' ? menu : null;
@@ -221,7 +229,7 @@ export class TimelineComponent {
         /** Timeline times the point snaps to. */
         anchors: number[];
       }
-    | { kind: 'mark'; from: BarMarking; zone: ClipHit['zone']; pointerTime: number }
+    | { kind: 'mark'; from: number[]; index: number }
     | {
         kind: 'bar';
         from: Montage;
@@ -325,15 +333,15 @@ export class TimelineComponent {
     const target = event.currentTarget as HTMLElement;
     const marking = this.timeline.beatMarking();
     if (marking) {
-      // marking a bar: dragging it moves it, its edges stretch it, a click elsewhere on the clip places the 1
+      // marking the 1s: dragging a 1 moves it, a click elsewhere on the clip puts a new one
       if (event.button !== 0) return;
-      const zone = lane.markedBarAt(this.xAt(event));
-      if (zone) {
+      const index = lane.markAt(this.xAt(event));
+      if (index !== undefined) {
         target.setPointerCapture(event.pointerId);
-        if (zone === 'body') target.style.cursor = 'grabbing';
-        this.gesture = { kind: 'mark', from: marking, zone, pointerTime: this.timeAt(event) };
-      } else {
-        void this.edits.placeDownbeat(this.timeAt(event));
+        this.timeline.beatMarking.set({ ...marking, selected: index });
+        this.gesture = { kind: 'mark', from: marking.marks, index };
+      } else if (lane.onMarkingClip(this.xAt(event))) {
+        void this.edits.addMark(this.timeAt(event));
       }
       return;
     }
@@ -468,7 +476,7 @@ export class TimelineComponent {
         return this.montages.preview(withClipEnvelope(gesture.from, clip.id, points));
       }
       case 'mark':
-        return this.edits.dragBar(gesture.from, gesture.zone, time - gesture.pointerTime);
+        return this.edits.moveMark(gesture.from, gesture.index, time);
       case 'bar': {
         let at = toSource(gesture.clip, time);
         // on the nearest attack (Alt: free)
@@ -544,7 +552,8 @@ export class TimelineComponent {
       }
       return;
     }
-    if (gesture && gesture.kind !== 'range' && gesture.kind !== 'mark') this.montages.commit(gesture.from);
+    if (gesture?.kind === 'mark') return void this.edits.settleMark();
+    if (gesture && gesture.kind !== 'range') this.montages.commit(gesture.from);
   }
 
   /** Empty strips below the tracks: dragging pans the view (the browse link keeps its click). */
@@ -568,8 +577,9 @@ export class TimelineComponent {
    */
   protected onLaneContextMenu(event: MouseEvent, lane: TrackLaneComponent): void {
     event.preventDefault();
-    if (this.timeline.beatMarking() || this.gesture) return;
+    if (this.gesture) return;
     const x = event.clientX - this.lanes().nativeElement.getBoundingClientRect().left;
+    if (this.timeline.beatMarking()) return this.onMarkingContextMenu(event, lane, x);
     const y = event.clientY - (event.currentTarget as HTMLElement).getBoundingClientRect().top;
     if (this.timeline.envelopeMode() && lane.pointAt(x, y)) return;
     if (event.shiftKey && lane.barLineAt(x)) return;
@@ -588,6 +598,15 @@ export class TimelineComponent {
         stuck: this.montages.montage().tracks.some((t) => t.clips.some((c) => c.locked && this.timeline.selectedClips().has(c.id))),
       },
     });
+  }
+
+  /** Right click while marking the 1s: the choices for the bar under the pointer, and the 1 there. */
+  private onMarkingContextMenu(event: MouseEvent, lane: TrackLaneComponent, x: number): void {
+    const mark = lane.markAt(x) ?? null;
+    const bar = lane.markingBarAt(x) ?? null;
+    if (mark === null && bar === null) return;
+    const tempo = this.tempos.sourceTempo(this.timeline.beatMarking()!.sourceId);
+    this.openMenu(event, { kind: 'bar', mark, bar, meter: bar !== null && tempo ? barMeter(tempo, bar) : null });
   }
 
   /** Right click on the empty strips below the tracks: the menu of the tracks. */

@@ -173,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.11.0' },
+  { name: 'edimus', version: '1.12.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -519,7 +519,8 @@ appTool(
   'For sources whose tempo is not steady (badly recorded, no click): the bar grid follows a map of pinned bars. ' +
     'action track: follows the beats one by one along the whole source, finds the free passages (no pulse: no grid there), ' +
     'puts the downbeats on the accents (meter 3 or 4 bar by bar, or `meter` fixed; beat tempo near `bpm` if given, as heard in the clip), ' +
-    'keeps the bars pinned by hand (they force a downbeat) and returns the report (rhythm, as analyze_rhythm); ' +
+    'keeps the bars pinned by hand (each a 1 looked for on the audio within 0.1 s of its time, forced to be a downbeat and moved onto the beat found; ' +
+    'pins of two neighbouring bars also set the beat level) and returns the report (rhythm, as analyze_rhythm); ' +
     'pin: puts the start of bar `bar` (number as on the grid, from 1) at timeline second `time`, the bars between it and the pinned ones around stretch evenly; ' +
     'unpin: takes the pin away from bar `bar`; reset: removes all the pins, back to the steady grid the map started from; ' +
     'clearAuto: removes only the pins of the tracking, keeps those set by hand; steady: drops the map leaving a steady tempo equal to its average; ' +
