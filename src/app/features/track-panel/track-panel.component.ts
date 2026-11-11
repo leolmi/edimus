@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -106,6 +106,13 @@ export class TrackPanelComponent {
     const id = this.timeline.selectedTrackId();
     return this.montages.montage().tracks.find((t) => t.id === id) ?? null;
   });
+
+  constructor() {
+    // The selected track is gone (deleted, new or reopened montage): close the panel instead of leaving it empty.
+    effect(() => {
+      if (!this.track()) this.close();
+    });
+  }
 
   protected close(): void {
     this.timeline.selectedTrackId.set(null);

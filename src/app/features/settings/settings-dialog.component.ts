@@ -60,9 +60,11 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
     <h2 mat-dialog-title>{{ 'settings.title' | t }}</h2>
     <mat-dialog-content class="content">
       <h3>{{ 'settings.appearance' | t }}</h3>
-      <div class="row">
-        <span class="label">{{ 'settings.theme' | t }}</span>
-        <app-field class="choice">
+      <div class="setting">
+        <div class="text">
+          <span class="label">{{ 'settings.theme' | t }}</span>
+        </div>
+        <app-field class="value">
           <mat-select [value]="settings.theme()" (selectionChange)="settings.setTheme($event.value)">
             @for (theme of themes; track theme.mode) {
               <mat-option [value]="theme.mode">{{ theme.label | t }}</mat-option>
@@ -70,9 +72,11 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
           </mat-select>
         </app-field>
       </div>
-      <div class="row">
-        <span class="label">{{ 'settings.language' | t }}</span>
-        <app-field class="choice">
+      <div class="setting">
+        <div class="text">
+          <span class="label">{{ 'settings.language' | t }}</span>
+        </div>
+        <app-field class="value">
           <mat-select
             [value]="settings.language()"
             (selectionChange)="settings.setLanguage($event.value)"
@@ -85,11 +89,15 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
       </div>
 
       <h3>{{ 'settings.audio' | t }}</h3>
-      <div class="row">
-        <span class="label">{{ 'output.title' | t }}</span>
-        <app-field class="output">
+      <div class="setting">
+        <div class="text">
+          <span class="label">{{ 'output.title' | t }}</span>
+          <p class="hint">{{ 'settings.outputHint' | t }}</p>
+        </div>
+        <app-field class="value">
           <mat-select
             [value]="settings.audioOutput()?.id ?? ''"
+            [panelWidth]="null"
             (selectionChange)="setOutput($event.value)"
           >
             <mat-option value="">{{ 'output.default' | t }}</mat-option>
@@ -101,13 +109,16 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
           </mat-select>
         </app-field>
       </div>
-      <p class="hint">{{ 'settings.outputHint' | t }}</p>
       @if (platform.canRecord) {
-        <div class="row">
-          <span class="label">{{ 'input.defaultTitle' | t }}</span>
-          <app-field class="output">
+        <div class="setting">
+          <div class="text">
+            <span class="label">{{ 'input.defaultTitle' | t }}</span>
+            <p class="hint">{{ 'settings.inputHint' | t }}</p>
+          </div>
+          <app-field class="value">
             <mat-select
               [value]="settings.audioInput()?.id ?? ''"
+              [panelWidth]="null"
               (selectionChange)="setInput($event.value)"
             >
               <mat-option value="">{{ 'input.default' | t }}</mat-option>
@@ -119,36 +130,44 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
             </mat-select>
           </app-field>
         </div>
-        <p class="hint">{{ 'settings.inputHint' | t }}</p>
-        <div class="row">
-          <span class="label">{{ 'latency.title' | t }}</span>
-          <span class="latency">{{ latencyLabel() }}</span>
-          <button mat-stroked-button [disabled]="recorder.state() !== 'idle'" (click)="calibrate()">
-            <mat-icon>graphic_eq</mat-icon>
-            {{
-              (recorder.state() === 'calibrating' ? 'latency.calibrating' : 'latency.calibrate') | t
-            }}
-          </button>
-          @if (settings.currentLatency() !== undefined) {
-            <button
-              mat-icon-button
-              (click)="settings.setCurrentLatency(null)"
-              [matTooltip]="'latency.reset' | t"
-            >
-              <mat-icon>restart_alt</mat-icon>
-            </button>
-          }
+        <div class="setting">
+          <div class="text">
+            <span class="label">{{ 'latency.title' | t }}</span>
+            <p class="hint">{{ 'settings.latencyHint' | t }}</p>
+            @if (calibration(); as calibration) {
+              <p class="hint" [class.error]="calibration.failed">{{ calibration.text }}</p>
+            }
+          </div>
+          <div class="value stack">
+            <span class="latency">{{ latencyLabel() }}</span>
+            <div class="buttons">
+              <button mat-stroked-button [disabled]="recorder.state() !== 'idle'" (click)="calibrate()">
+                <mat-icon>graphic_eq</mat-icon>
+                {{
+                  (recorder.state() === 'calibrating' ? 'latency.calibrating' : 'latency.calibrate') | t
+                }}
+              </button>
+              @if (settings.currentLatency() !== undefined) {
+                <button
+                  mat-icon-button
+                  (click)="settings.setCurrentLatency(null)"
+                  [matTooltip]="'latency.reset' | t"
+                >
+                  <mat-icon>restart_alt</mat-icon>
+                </button>
+              }
+            </div>
+          </div>
         </div>
-        @if (calibration(); as calibration) {
-          <p class="hint" [class.error]="calibration.failed">{{ calibration.text }}</p>
-        }
-        <p class="hint">{{ 'settings.latencyHint' | t }}</p>
       }
 
       <h3>{{ 'settings.editing' | t }}</h3>
-      <div class="row">
-        <span class="label">{{ 'settings.snap' | t }}</span>
-        <app-field class="choice">
+      <div class="setting">
+        <div class="text">
+          <span class="label">{{ 'settings.snap' | t }}</span>
+          <p class="hint">{{ 'settings.snapHint' | t }}</p>
+        </div>
+        <app-field class="value">
           <mat-select
             [value]="settings.snapStep()"
             (selectionChange)="settings.setSnapStep($event.value)"
@@ -162,59 +181,83 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
           </mat-select>
         </app-field>
       </div>
-      <p class="hint">{{ 'settings.snapHint' | t }}</p>
       @if (platform.filesBesideSources) {
-        <app-switch
-          [checked]="settings.autoSaveBars()"
-          (checkedChange)="settings.setAutoSaveBars($event)"
-        >
-          {{ 'settings.autoSaveBars' | t }}
-        </app-switch>
-        <p class="hint">{{ 'settings.autoSaveBarsHint' | t }}</p>
+        <div class="setting">
+          <div class="text">
+            <span class="label">{{ 'settings.autoSaveBars' | t }}</span>
+            <p class="hint">{{ 'settings.autoSaveBarsHint' | t }}</p>
+          </div>
+          <app-switch
+            class="value"
+            [attr.aria-label]="'settings.autoSaveBars' | t"
+            [checked]="settings.autoSaveBars()"
+            (checkedChange)="settings.setAutoSaveBars($event)"
+          />
+        </div>
       }
 
       @if (platform.canUpdate) {
         <h3>{{ 'settings.updates' | t }}</h3>
-        <app-switch
-          [checked]="settings.checkUpdates()"
-          (checkedChange)="settings.setCheckUpdates($event)"
-        >
-          {{ 'settings.checkUpdates' | t }}
-        </app-switch>
-        <div class="row field-row">
-          <app-field class="repo">
-            <span fieldLabel>{{ 'settings.updateRepo' | t }}</span>
-            <input
-              #repo
-              [value]="settings.updateRepo()"
-              (change)="settings.setUpdateRepo(repo.value)"
-            />
-          </app-field>
-          <button mat-stroked-button (click)="updates.check(true)">
-            <mat-icon>update</mat-icon>
-            {{ 'settings.checkNow' | t }}
-          </button>
+        <div class="setting">
+          <div class="text">
+            <span class="label">{{ 'settings.checkUpdates' | t }}</span>
+          </div>
+          <app-switch
+            class="value"
+            [attr.aria-label]="'settings.checkUpdates' | t"
+            [checked]="settings.checkUpdates()"
+            (checkedChange)="settings.setCheckUpdates($event)"
+          />
         </div>
-        <p class="hint">{{ 'settings.updateRepoHint' | t: { repo: defaultRepo } }}</p>
+        <div class="setting">
+          <div class="text">
+            <span class="label">{{ 'settings.updateRepo' | t }}</span>
+            <p class="hint">{{ 'settings.updateRepoHint' | t: { repo: defaultRepo } }}</p>
+          </div>
+          <div class="value stack">
+            <app-field>
+              <input
+                #repo
+                [attr.aria-label]="'settings.updateRepo' | t"
+                [value]="settings.updateRepo()"
+                (change)="settings.setUpdateRepo(repo.value)"
+              />
+            </app-field>
+            <div class="buttons">
+              <button mat-stroked-button (click)="updates.check(true)">
+                <mat-icon>update</mat-icon>
+                {{ 'settings.checkNow' | t }}
+              </button>
+            </div>
+          </div>
+        </div>
       }
 
       @if (platform.hasDevTools) {
         <h3>{{ 'settings.advanced' | t }}</h3>
-        <app-switch
-          [checked]="settings.devTools()"
-          (checkedChange)="settings.setDevTools($event)"
-        >
-          {{ 'settings.devTools' | t }}
-        </app-switch>
-        @if (settings.devTools() !== devTools.active) {
-          <div class="restart">
-            <span class="hint">{{ 'settings.restartNeeded' | t }}</span>
-            <button mat-stroked-button (click)="documents.restartForDevTools()">
-              <mat-icon>restart_alt</mat-icon>
-              {{ 'settings.restartNow' | t }}
-            </button>
+        <div class="setting">
+          <div class="text">
+            <span class="label">{{ 'settings.devTools' | t }}</span>
+            @if (settings.devTools() !== devTools.active) {
+              <p class="hint">{{ 'settings.restartNeeded' | t }}</p>
+            }
           </div>
-        }
+          <div class="value stack">
+            <app-switch
+              [attr.aria-label]="'settings.devTools' | t"
+              [checked]="settings.devTools()"
+              (checkedChange)="settings.setDevTools($event)"
+            />
+            @if (settings.devTools() !== devTools.active) {
+              <div class="buttons">
+                <button mat-stroked-button (click)="documents.restartForDevTools()">
+                  <mat-icon>restart_alt</mat-icon>
+                  {{ 'settings.restartNow' | t }}
+                </button>
+              </div>
+            }
+          </div>
+        </div>
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -223,59 +266,66 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
   `,
   styles: `
     .content {
-      width: min(600px, 85vw);
+      width: min(640px, 85vw);
     }
     h3 {
       font: var(--mat-sys-title-small);
       color: var(--mat-sys-primary);
-      margin: 16px 0 8px;
+      margin: 20px 0 8px;
       &:first-child {
         margin-top: 0;
       }
     }
-    .row {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 8px;
+    /* description on the left, the value on the right in a column of fixed width: equal editors, aligned */
+    .setting {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 240px;
+      column-gap: 24px;
+      align-items: start;
+      padding: 6px 0;
     }
-    .field-row {
-      align-items: flex-end;
+    .text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      /* the label lines up with the middle of a 34px field */
+      padding-top: 7px;
     }
     .label {
-      min-width: 140px;
-    }
-    .latency {
-      flex: 1 1 auto;
-    }
-    .hint.error {
-      color: var(--mat-sys-error);
-    }
-    .output,
-    .repo {
-      flex: 1 1 260px;
+      font: var(--mat-sys-body-large);
     }
     .hint {
       color: var(--mat-sys-on-surface-variant);
       font: var(--mat-sys-body-small);
-      margin: 0 0 8px;
-    }
-    .restart {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 8px;
-      .hint {
-        margin: 0;
+      margin: 0;
+      &.error {
+        color: var(--mat-sys-error);
       }
     }
-    .choice {
-      width: 220px;
+    .value {
+      width: 100%;
     }
-    app-switch {
+    app-switch.value,
+    .stack > app-switch {
+      justify-content: flex-end;
+      padding-top: 7px;
+    }
+    .stack {
       display: flex;
-      margin: 4px 0;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .latency {
+      padding-top: 7px;
+      text-align: right;
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .buttons {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 4px;
     }
     .symbol {
       display: inline-block;
