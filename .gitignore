@@ -50,6 +50,7 @@ __screenshots__/
 .DS_Store
 Thumbs.db
 tools/ffmpeg/bin/
+tools/yt-dlp/
 .cache/
 samples/
 public/licenses.json

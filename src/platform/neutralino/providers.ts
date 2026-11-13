@@ -3,6 +3,7 @@ import { AiHostPort } from '../../app/core/platform/ai-host.port';
 import { AudioEnginePort } from '../../app/core/platform/audio-engine.port';
 import { DevToolsPort } from '../../app/core/platform/dev-tools.port';
 import { FileSystemPort } from '../../app/core/platform/file-system.port';
+import { LinkImportPort } from '../../app/core/platform/link-import.port';
 import { PlatformInfo } from '../../app/core/platform/platform-info';
 import { SettingsPort } from '../../app/core/platform/settings.port';
 import { ShellPort } from '../../app/core/platform/shell.port';
@@ -11,6 +12,7 @@ import { NeutralinoAiHost } from './neutralino-ai-host';
 import { NeutralinoAudioEngine } from './neutralino-audio-engine';
 import { NeutralinoDevTools } from './neutralino-dev-tools';
 import { NeutralinoFileSystem } from './neutralino-file-system';
+import { NeutralinoLinkImport } from './neutralino-link-import';
 import { NeutralinoSettings } from './neutralino-settings';
 import { NeutralinoShell } from './neutralino-shell';
 import { NeutralinoUpdater } from './neutralino-updater';
@@ -26,6 +28,8 @@ const desktop = (): PlatformInfo => ({
   hasDevTools: true,
   canRecord: true,
   canUpdate: window.NL_OS === 'Windows',
+  // yt-dlp.exe and curl.exe: Windows only
+  canImportLinks: window.NL_OS === 'Windows',
 });
 
 /** Desktop app: Neutralino window with access to the file system and to the processes. */
@@ -38,4 +42,5 @@ export const neutralinoProviders: Provider[] = [
   { provide: DevToolsPort, useClass: NeutralinoDevTools },
   { provide: AiHostPort, useClass: NeutralinoAiHost },
   { provide: UpdaterPort, useClass: NeutralinoUpdater },
+  { provide: LinkImportPort, useClass: NeutralinoLinkImport },
 ];

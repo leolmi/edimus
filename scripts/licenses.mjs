@@ -67,6 +67,14 @@ const native = [
     text: gpl3,
   },
   {
+    name: 'yt-dlp',
+    version: 'latest (downloaded on request)',
+    license: 'Unlicense',
+    url: 'https://github.com/yt-dlp/yt-dlp',
+    usage: 'Import of the audio of a web video from its link (yt-dlp.exe, desktop app only)',
+    text: null,
+  },
+  {
     name: 'Node.js',
     version: process.versions.node,
     license: 'MIT (and the licenses of its bundled dependencies)',

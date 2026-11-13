@@ -74,6 +74,9 @@ without leading and trailing silences; null while some audio is not ready.
 - Warm up a voice: \`set_effects\` {trackId, effects: [{type: "eq", params: {lowCut: 100, high: 3}},
   {type: "compressor"}, {type: "reverb", params: {size: 35, mix: 15}}]}. To process only part of a
   clip, move that part to a new track (\`split\`, then \`move_clip\` with newTrack) and set effects there.
+- Audio of a web video (desktop on Windows): \`import_link\` {url, path} saves it as a new file
+  (m4a or opus, as in the video) and adds it as a track. Only for content the user may download;
+  yt-dlp must have been installed by the user from the window first (Open > From a link).
 - Join two songs: \`open\` both (two tracks), \`move_clip\` the second to start where the first ends
   minus the crossfade, then \`crossfade\` {clipIds: [first, second]} over their whole overlap.
 - Show the user what you mean: \`select\` {clipIds, from, to} highlights clips and a range in the window.

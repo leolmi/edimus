@@ -1,7 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
   "applicationId": "it.leolmi.edimus",
-  "version": "1.12.0",
+  "version": "1.13.0",
+  "applicationName": "edimus",
+  "description": "edimus · editor audio multitraccia",
+  "author": "Leonardo Olmi",
   "defaultMode": "window",
   "port": 0,
   "documentRoot": "/build/web/browser/",

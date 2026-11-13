@@ -63,6 +63,14 @@ const IT: HelpContent = {
           ],
         },
         {
+          title: 'Importare l’audio da un link',
+          text: [
+            'Solo nell’app desktop: in Apri (Ctrl+O), “Da link…” chiede il link di un video (YouTube e gli altri siti supportati da yt-dlp). edimus legge il titolo, ti chiede dove salvare il file (di solito accanto al montaggio) e scarica solo l’audio, com’è nel video: m4a, oppure opus se il sito non ha m4a. Il file diventa una nuova traccia, come un file aperto.',
+            'Per scaricare edimus usa yt-dlp, che non fa parte dell’app: la prima volta propone di scaricarne l’ultima versione (licenza Unlicense). I siti cambiano spesso: se un link smette di funzionare, “Aggiorna yt-dlp” nel dialogo scarica la versione più recente.',
+            'Importa solo contenuti tuoi, liberi o che hai il permesso di usare: i termini di molti siti vietano di scaricarli. I contenuti protetti (DRM) non si possono scaricare.',
+          ],
+        },
+        {
           title: 'Nuovo, salva, salva con nome, rinomina',
           keys: ['Ctrl+N', 'Ctrl+S', 'Ctrl+Shift+S'],
           text: [
@@ -408,6 +416,15 @@ const IT: HelpContent = {
   ],
   howto: [
     {
+      title: 'Usare l’audio di un video online',
+      steps: [
+        'Apri (Ctrl+O) e scegli “Da link…”.',
+        'Incolla il link del video e premi Importa…; la prima volta conferma il download di yt-dlp.',
+        'Scegli dove salvare il file: l’audio diventa una nuova traccia.',
+      ],
+      note: 'Solo app desktop, e solo per contenuti che hai il diritto di scaricare. Se un link non funziona più, usa “Aggiorna yt-dlp” nello stesso dialogo.',
+    },
+    {
       title: 'Tagliare via un pezzo da una traccia',
       steps: [
         'Porta il cursore all’inizio del pezzo e premi S per dividere la clip; ripeti alla fine del pezzo.',
@@ -590,6 +607,14 @@ const EN: HelpContent = {
           text: [
             'Open (Ctrl+O) shows the montages opened or saved lately, the most recent at the top: click one to reopen it (it goes back to the top, without duplicates) or Browse… to choose other files.',
             'The list keeps the last 20 files. The pin keeps a file in the list however many others are opened. The X removes it; a file no longer found leaves the list when you try to reopen it, unless pinned.',
+          ],
+        },
+        {
+          title: 'Importing audio from a link',
+          text: [
+            'Desktop app only: in Open (Ctrl+O), “From a link…” asks for the link of a video (YouTube and the other sites supported by yt-dlp). edimus reads the title, asks where to save the file (usually next to the montage) and downloads only the audio, as it is in the video: m4a, or opus when the site has no m4a. The file becomes a new track, as an opened file.',
+            'To download, edimus uses yt-dlp, which is not part of the app: the first time it offers to download its latest version (Unlicense). Sites change often: when a link stops working, “Update yt-dlp” in the dialog downloads the newest version.',
+            'Import only content that is yours, free, or that you are allowed to use: the terms of many sites forbid downloading it. Protected content (DRM) cannot be downloaded.',
           ],
         },
         {
@@ -933,6 +958,15 @@ const EN: HelpContent = {
     },
   ],
   howto: [
+    {
+      title: 'Use the audio of an online video',
+      steps: [
+        'Open (Ctrl+O) and choose “From a link…”.',
+        'Paste the link of the video and press Import…; the first time, confirm the download of yt-dlp.',
+        'Choose where to save the file: the audio becomes a new track.',
+      ],
+      note: 'Desktop app only, and only for content you have the right to download. When a link no longer works, use “Update yt-dlp” in the same dialog.',
+    },
     {
       title: 'Cut a piece out of a track',
       steps: [

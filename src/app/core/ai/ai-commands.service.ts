@@ -35,6 +35,9 @@ import { MontageService } from '../montage/montage.service';
 import { EditService } from '../edit.service';
 import { SourceFilesService } from '../montage/source-files.service';
 import { FileSystemPort } from '../platform/file-system.port';
+import { LinkImportPort } from '../platform/link-import.port';
+import { PlatformInfo } from '../platform/platform-info';
+import { linkStem } from '../link-import.service';
 import { AlignOptions, alignTempo } from '../montage/tempo-align';
 import { sortedMarkers, withMarkers } from '../montage/markers';
 import { TimelineService } from '../timeline/timeline.service';
@@ -99,6 +102,8 @@ export class AiCommandsService {
   private readonly mixer = inject(MixService);
   private readonly exporter = inject(ExportService);
   private readonly devices = inject(AudioDevicesService);
+  private readonly links = inject(LinkImportPort);
+  private readonly platform = inject(PlatformInfo);
 
   private readonly length = (clip: Clip) => this.timeline.clipLength(clip);
   private stopTimer?: ReturnType<typeof setTimeout>;
@@ -136,6 +141,23 @@ export class AiCommandsService {
       await this.waitTempo();
       if (p['trackId'] !== undefined && !montagePath && paths.length) this.placeInSequence(String(p['trackId']), Number(p['start'] ?? 0), paths.length);
       return this.state();
+    },
+    import_link: async (p) => {
+      if (!this.platform.canImportLinks) throw new Error('This version of edimus cannot import links (desktop app on Windows only)');
+      if (this.montages.locked()) throw new Error('The montage is locked against edits by the user: ask the user to unlock it to add files');
+      // yt-dlp is downloaded only after the user agrees, from the window
+      if (!(await this.links.toolVersion())) {
+        throw new Error('yt-dlp is not installed: ask the user to import a link once from Open > From a link, which offers to download it');
+      }
+      const stem = linkStem(String(p['path']));
+      if (!p['overwrite']) {
+        for (const ext of ['m4a', 'opus']) {
+          if (await this.files.exists(`${stem}.${ext}`)) throw new Error(`${stem}.${ext} exists: pass overwrite true to replace it`);
+        }
+      }
+      const file = await this.links.download(String(p['url']), stem, () => undefined);
+      const state = await this.handlers['open']({ paths: [file], trackId: p['trackId'], start: p['start'] });
+      return { file, state };
     },
     save: async (p) => {
       let path = (p['path'] as string | undefined) ?? this.montages.path();

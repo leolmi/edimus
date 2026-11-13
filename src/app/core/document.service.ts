@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Injectable, Injector, computed, effect, inject, signal, untracked } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ExportDialogComponent, FORMATS } from '../features/export/export-dialog.component';
@@ -11,6 +11,7 @@ import { DropTarget, DropTargetService } from './drop-target.service';
 import { TimelineService } from './timeline/timeline.service';
 import { I18nService } from './i18n/i18n.service';
 import type { TranslationKey } from './i18n/it';
+import { LinkImportService } from './link-import.service';
 import {
   AUDIO_EXTENSIONS,
   BUNDLE_EXTENSION,
@@ -56,6 +57,8 @@ export class DocumentService {
   private readonly sourceFiles = inject(SourceFilesService);
   private readonly shell = inject(ShellPort);
   private readonly recent = inject(RecentFilesService);
+  // LinkImportService adds its files through this one: taken when needed
+  private readonly injector = inject(Injector);
   /** Options of the last export, proposed again by the next one. */
   private exportOptions?: ExportOptions;
 
@@ -105,6 +108,7 @@ export class DocumentService {
     const ref = this.dialogs.open<RecentFilesDialogComponent, void, RecentFilesChoice>(RecentFilesDialogComponent, { autoFocus: 'dialog' });
     const choice = await firstValueFrom(ref.afterClosed());
     if (choice === 'browse') return this.browse();
+    if (choice === 'link') return this.injector.get(LinkImportService).importDialog();
     if (choice) return this.openRecent(choice.path);
   }
 

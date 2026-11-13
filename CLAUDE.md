@@ -39,7 +39,8 @@ e vanno lette prima di toccare l'area corrispondente:
 | `npm run licenses` | rigenera `public/licenses.json` e `THIRD_PARTY_LICENSES.md` |
 | `npm run mcp:test` | collaudo del server MCP (con l'app aperta) |
 
-ffmpeg non è nel repository: va messo in `tools/ffmpeg/bin/` (vedi README).
+ffmpeg non è nel repository: va messo in `tools/ffmpeg/bin/` (vedi README). yt-dlp (import da
+link) lo scarica l'app su richiesta in `tools/yt-dlp/` (dai sorgenti) o nella sua cartella.
 
 ## Mappa del codice
 

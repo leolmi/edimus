@@ -12,6 +12,7 @@ interface RunningProcess {
   stdOut: string;
   stdErr: string;
   onStdOut?: (chunk: string) => void;
+  onStdErr?: (chunk: string) => void;
   done?: (result: ProcessResult) => void;
   /** Exit code received before `done` was registered. */
   exitCode?: number;
@@ -53,6 +54,16 @@ export class FfmpegService {
     return this.run((await this.locate()).ffprobe, args);
   }
 
+  /** Path of ffmpeg.exe (other tools, as yt-dlp, use it too); throws when it is missing. */
+  async ffmpegPath(): Promise<string> {
+    return (await this.locate()).ffmpeg;
+  }
+
+  /** Runs another executable as ffmpeg is run, with its output as it comes. */
+  execute(binary: string, args: string[], onStdOut?: (chunk: string) => void, onStdErr?: (chunk: string) => void): Promise<ProcessResult> {
+    return this.run(binary, args, onStdOut, onStdErr);
+  }
+
   /** ffmpeg is in one of the folders where the app looks for it. */
   available(): Promise<boolean> {
     return this.locate().then(
@@ -84,11 +95,13 @@ export class FfmpegService {
     return this.binaries;
   }
 
-  private async run(binary: string, args: string[], onStdOut?: (chunk: string) => void): Promise<ProcessResult> {
+  private async run(binary: string, args: string[], onStdOut?: (chunk: string) => void, onStdErr?: (chunk: string) => void): Promise<ProcessResult> {
     const { id } = await os.spawnProcess([binary, ...args].map(quote).join(' '));
     const process = this.processFor(id);
     process.onStdOut = onStdOut;
+    process.onStdErr = onStdErr;
     if (process.stdOut) onStdOut?.(process.stdOut);
+    if (process.stdErr) onStdErr?.(process.stdErr);
     return new Promise<ProcessResult>((resolve) => {
       process.done = resolve;
       if (process.exitCode !== undefined) this.finish(id, process.exitCode);
@@ -113,6 +126,7 @@ export class FfmpegService {
         break;
       case 'stdErr':
         process.stdErr += data;
+        process.onStdErr?.(String(data));
         break;
       case 'exit':
         process.exitCode = Number(data);

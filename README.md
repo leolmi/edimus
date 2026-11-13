@@ -49,13 +49,15 @@ La guida completa è nell'app: pulsante **?** o tasto F1, schede *Guida* e *Come
 Scaricare un eseguibile che non passa da un installatore può lasciare qualche dubbio, ed è
 giusto porselo. edimus prova a toglierlo nel modo più semplice: **tutto il codice è qui, pubblico**.
 Non ci sono parti nascoste, servizi remoti che raccolgono dati né account da creare. L'app lavora
-solo sui file che apri tu e si collega a internet soltanto per tre cose, tutte visibili nel codice
-e tutte soggette alla tua conferma o disattivabili:
+solo sui file che apri tu e si collega a internet soltanto per queste cose, tutte visibili nel
+codice e tutte soggette alla tua conferma o disattivabili:
 
 - controllare se c'è una nuova versione tra le release di questo repository;
 - scaricare l'aggiornamento, verificato con il suo SHA-256 prima di installarlo;
 - scaricare ffmpeg dalla sua distribuzione originale (il mirror GitHub ufficiale di gyan.dev),
-  anch'esso verificato con SHA-256.
+  anch'esso verificato con SHA-256;
+- se usi *Da link…*, scaricare yt-dlp dalle sue release GitHub (verificato con SHA-256) e, con
+  yt-dlp, l'audio del video di cui hai dato il link.
 
 Il collegamento con un assistente AI resta sul tuo PC: passa dall'indirizzo locale `127.0.0.1`.
 
@@ -75,6 +77,9 @@ comandi della sezione [Sviluppo](#sviluppo) e ottenere lo stesso programma.
 **Montaggio e file**
 - Apre qualsiasi formato letto da ffmpeg (wav, mp3, flac, ogg, opus, m4a, aiff, wma…), anche
   trascinando i file sulla finestra; montaggi recenti a portata di clic.
+- **Audio da un link** (solo app desktop): l'audio di un video di YouTube o di un altro sito
+  supportato da [yt-dlp](https://github.com/yt-dlp/yt-dlp) diventa una nuova traccia (per i
+  contenuti che hai il diritto di scaricare).
 - **Pacchetto `.edimuspack`**: il montaggio con i suoi file audio in un unico file da inviare.
 - **File mancanti ritrovati dal contenuto**: se un file audio è stato spostato o rinominato,
   edimus lo riconosce e lo ricollega.
@@ -121,7 +126,8 @@ comandi della sezione [Sviluppo](#sviluppo) e ottenere lo stesso programma.
 Le licenze di tutti i componenti di terze parti sono in
 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) e nella scheda *Info e licenze* dell'Aiuto
 dell'app (rigenerate da `npm run licenses`). ffmpeg non è incluso nelle release: l'app lo scarica,
-su richiesta, dalla sua distribuzione originale (licenza GPL).
+su richiesta, dalla sua distribuzione originale (licenza GPL). Lo stesso vale per yt-dlp
+(licenza Unlicense), scaricato solo se usi l'importazione da link.
 
 ## Sviluppo
 

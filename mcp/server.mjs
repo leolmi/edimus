@@ -156,14 +156,14 @@ function target(instance) {
 }
 
 /** Calls a method of the app and waits for its answer. */
-function call(method, params = {}, instance) {
+function call(method, params = {}, instance, timeout = CALL_TIMEOUT) {
   const { ws } = target(instance);
   const id = nextId++;
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pending.delete(id);
-      reject(new Error(`edimus did not answer ${method} within ${CALL_TIMEOUT / 1000} s`));
-    }, CALL_TIMEOUT);
+      reject(new Error(`edimus did not answer ${method} within ${timeout / 1000} s`));
+    }, timeout);
     pending.set(id, { resolve, reject, timer });
     ws.send(JSON.stringify({ type: 'request', id, method, params }));
   });
@@ -173,7 +173,7 @@ function call(method, params = {}, instance) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.12.0' },
+  { name: 'edimus', version: '1.13.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +
@@ -187,15 +187,15 @@ const failure = (err) => ({ content: [{ type: 'text', text: `Error: ${err.messag
 
 const instanceParam = { instance: z.string().optional().describe('Instance id (see list_instances); default: the selected one') };
 
-/** Registers a tool executed by the app. */
-function appTool(name, title, description, input, annotations = {}) {
+/** Registers a tool executed by the app; `timeout` (ms) for the ones that take long (downloads). */
+function appTool(name, title, description, input, annotations = {}, timeout = CALL_TIMEOUT) {
   server.registerTool(
     name,
     { title, description, inputSchema: { ...input, ...instanceParam }, annotations },
     async (args) => {
       try {
         const { instance, ...params } = args ?? {};
-        const result = await call(name, params, instance);
+        const result = await call(name, params, instance, timeout);
         if (result && typeof result === 'object' && result.image) {
           return {
             content: [
@@ -314,6 +314,22 @@ appTool(
     start: z.number().min(0).optional().describe('Timeline time (s) of the first added file, with trackId'),
     discard: z.boolean().optional(),
   },
+);
+appTool(
+  'import_link',
+  'Import from a link',
+  'Downloads the audio of a web video (YouTube and the other sites of yt-dlp) to a new file and adds it as a new track (or to trackId from start). ' +
+    'The audio is kept as it is in the video: the file gets the extension of its format (m4a or opus). Desktop app on Windows only; ' +
+    'yt-dlp must have been installed by the user from the window (Open > From a link). Only for content the user may download.',
+  {
+    url: z.string().url().describe('Link of the video'),
+    path: z.string().describe('Absolute path of the new file; the extension is set by the format downloaded'),
+    trackId: z.string().optional().describe('Add the audio to this track'),
+    start: z.number().min(0).optional().describe('Timeline time (s) of the audio, with trackId'),
+    overwrite: z.boolean().optional(),
+  },
+  {},
+  15 * 60_000,
 );
 appTool(
   'save',

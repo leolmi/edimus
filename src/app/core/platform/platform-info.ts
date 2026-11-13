@@ -20,4 +20,6 @@ export abstract class PlatformInfo {
   abstract readonly canRecord: boolean;
   /** The app can update itself from the releases published on GitHub (`UpdaterPort`). */
   abstract readonly canUpdate: boolean;
+  /** The audio of a web video can be imported from its link (`LinkImportPort`). */
+  abstract readonly canImportLinks: boolean;
 }

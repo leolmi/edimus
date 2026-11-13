@@ -16,6 +16,7 @@
   | `DevToolsPort` | strumenti per sviluppatori della finestra (solo desktop) |
   | `AiHostPort` | indirizzo del server MCP e configurazione dei client AI installati |
   | `UpdaterPort` | aggiornamento dell'app dalle release GitHub (solo desktop Windows) |
+  | `LinkImportPort` | audio di un video web scaricato dal suo link con yt-dlp (solo desktop Windows) |
 
   Le implementazioni stanno in `src/platform/<piattaforma>/`; `src/platform/platform.providers.ts`
   sceglie quella della build (`neutralino`) e fornisce `initPlatform()`, chiamata da `main.ts`
@@ -265,6 +266,30 @@ funziona ma l'installazione è bloccata.
   dialogo di aggiornamento offre prima la build di ffmpeg della release (dal suo manifest), poi
   ripete il controllo. `package.mjs` verifica che la build fissata non sia sotto il minimo.
 - La prima versione con l'aggiornamento va installata a mano.
+
+## Importazione da link
+
+Solo app desktop su Windows (`PlatformInfo.canImportLinks`): nel web i siti non permettono a
+un'altra pagina di leggere i loro video.
+
+- **Comando**: *Da link…* nel dialog di Apri (`RecentFilesDialogComponent`, scelta `link`) apre
+  `LinkImportDialogComponent`; il flusso è in `LinkImportService`. Con `LinkImportPort.info` legge
+  titolo e durata, chiede dove salvare (dialog di salvataggio, accanto al montaggio come una
+  registrazione, nome dal titolo), scarica con `download` mostrando l'avanzamento nella barra di
+  stato e aggiunge il file come una nuova traccia (`DocumentService.open`). Con il montaggio
+  bloccato il comando è rifiutato.
+- **yt-dlp** (`platform/neutralino/neutralino-link-import.ts`): `yt-dlp.exe` cercato nella
+  cartella dell'app o in `tools/yt-dlp/` (dai sorgenti, fuori da git) e lanciato come processo
+  figlio tramite `FfmpegService.execute`. Non è nelle release né fissato a una versione: i siti
+  cambiano spesso, quindi si prende sempre l'ultima release di `yt-dlp/yt-dlp` (API GitHub), con
+  `curl.exe`, verificata con lo SHA-256 di `SHA2-256SUMS` della stessa release. La prima volta
+  l'app chiede se scaricarlo; *Aggiorna yt-dlp* nel dialogo lo riscarica.
+- **Audio**: `-f bestaudio[ext=m4a]/bestaudio -x` con l'ffmpeg dell'app (`--ffmpeg-location`):
+  la traccia audio del video com'è, senza ricodifica (m4a, altrimenti opus). Il percorso scelto
+  perde l'estensione e yt-dlp aggiunge quella del formato; il file finale arriva da
+  `--print after_move:filepath`. Avanzamento dalle righe di `--progress-template`.
+- **AI**: strumento MCP `import_link` (timeout di 15 minuti); rifiutato se yt-dlp non è ancora
+  installato: l'installazione la decide l'utente dalla finestra.
 
 ## Aiuto
 

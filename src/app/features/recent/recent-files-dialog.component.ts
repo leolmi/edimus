@@ -9,8 +9,8 @@ import { dirName, fileName } from '../../core/montage/montage.model';
 import { PlatformInfo } from '../../core/platform/platform-info';
 import { RECENT_LIMIT, RecentFilesService } from '../../core/recent-files.service';
 
-/** What to open: a file of the list, or `browse` for the system dialog. */
-export type RecentFilesChoice = { path: string } | 'browse';
+/** What to open: a file of the list, `browse` for the system dialog, `link` for the audio of a web video. */
+export type RecentFilesChoice = { path: string } | 'browse' | 'link';
 
 /**
  * Open dialog: the montages opened lately (pin, remove, reopen) and the button to choose other
@@ -54,6 +54,12 @@ export type RecentFilesChoice = { path: string } | 'browse';
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button mat-dialog-close>{{ 'common.cancel' | t }}</button>
+      @if (canImportLinks) {
+        <button mat-stroked-button (click)="dialog.close('link')" [matTooltip]="'link.tooltip' | t">
+          <mat-icon>link</mat-icon>
+          {{ 'recent.link' | t }}
+        </button>
+      }
       <button mat-flat-button (click)="dialog.close('browse')">
         <mat-icon>folder_open</mat-icon>
         {{ 'recent.browse' | t }}
@@ -119,6 +125,7 @@ export class RecentFilesDialogComponent {
   private readonly platform = inject(PlatformInfo);
 
   protected readonly limit = RECENT_LIMIT;
+  protected readonly canImportLinks = this.platform.canImportLinks;
   /** Name and folder of each file (the browser has no real folders to show). */
   protected readonly files = computed(() =>
     this.recent.files().map((file) => ({
