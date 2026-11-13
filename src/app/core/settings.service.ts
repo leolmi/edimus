@@ -7,6 +7,8 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export type Language = 'it' | 'en';
 /** Step of a clip dragged on the beat grid: a whole bar, a beat (quarter note) or half a beat (eighth). */
 export type SnapStep = 'bar' | 'beat' | 'half';
+/** Solo of a track: `exclusive` switches off the solo of the others, `additive` adds the track to the soloed ones. */
+export type SoloMode = 'exclusive' | 'additive';
 
 /** Height (px) of the tracks: the initial one is also the smallest, up to three times as much. */
 export const MIN_TRACK_HEIGHT = 120;
@@ -25,6 +27,7 @@ interface Settings {
   /** Measured round-trip latency (s) of the recording, by input and output (see `latencyKey`). */
   recordingLatency: Record<string, number>;
   snapStep: SnapStep;
+  soloMode: SoloMode;
   /** Height of the tracks of the timeline (px), the same for all. */
   trackHeight: number;
   /** Opens the developer tools of the window at startup. */
@@ -54,6 +57,7 @@ const DEFAULTS: Settings = {
   audioInput: null,
   recordingLatency: {},
   snapStep: 'beat',
+  soloMode: 'exclusive',
   trackHeight: MIN_TRACK_HEIGHT,
   autoSaveBars: false,
   devTools: false,
@@ -80,6 +84,7 @@ export class SettingsService {
   readonly audioInput = signal<AudioDevice | null>(DEFAULTS.audioInput);
   readonly recordingLatency = signal<Record<string, number>>(DEFAULTS.recordingLatency);
   readonly snapStep = signal<SnapStep>(DEFAULTS.snapStep);
+  readonly soloMode = signal<SoloMode>(DEFAULTS.soloMode);
   readonly trackHeight = signal(DEFAULTS.trackHeight);
   readonly autoSaveBars = signal(DEFAULTS.autoSaveBars);
   readonly devTools = signal(DEFAULTS.devTools);
@@ -110,6 +115,7 @@ export class SettingsService {
       if (saved.audioInput?.id) this.audioInput.set(saved.audioInput);
       if (saved.recordingLatency && typeof saved.recordingLatency === 'object') this.recordingLatency.set(saved.recordingLatency);
       if (saved.snapStep === 'bar' || saved.snapStep === 'beat' || saved.snapStep === 'half') this.snapStep.set(saved.snapStep);
+      if (saved.soloMode === 'exclusive' || saved.soloMode === 'additive') this.soloMode.set(saved.soloMode);
       if (typeof saved.trackHeight === 'number') this.setTrackHeight(saved.trackHeight, false);
       if (typeof saved.autoSaveBars === 'boolean') this.autoSaveBars.set(saved.autoSaveBars);
       if (typeof saved.devTools === 'boolean') this.devTools.set(saved.devTools);
@@ -185,6 +191,11 @@ export class SettingsService {
     void this.save();
   }
 
+  setSoloMode(mode: SoloMode): void {
+    this.soloMode.set(mode);
+    void this.save();
+  }
+
   /** Sets the height of the tracks (kept in range); `persist` false while dragging (saved on release). */
   setTrackHeight(height: number, persist = true): void {
     this.trackHeight.set(Math.round(Math.min(MAX_TRACK_HEIGHT, Math.max(MIN_TRACK_HEIGHT, height))));
@@ -232,6 +243,7 @@ export class SettingsService {
       audioInput: this.audioInput(),
       recordingLatency: this.recordingLatency(),
       snapStep: this.snapStep(),
+      soloMode: this.soloMode(),
       trackHeight: this.trackHeight(),
       autoSaveBars: this.autoSaveBars(),
       devTools: this.devTools(),

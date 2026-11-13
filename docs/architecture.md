@@ -69,7 +69,7 @@
 - **Una istanza = un montaggio.** Il file da aprire all'avvio arriva da riga di comando
   (`ShellPort.startupFiles`, su desktop da `NL_ARGS`). Più montaggi = più finestre/processi.
 - **Cartella dell'app** (`appPath()` in `platform/neutralino/app-paths.ts`, da `NL_PATH`): contiene `.cache/` per i file PCM
-  temporanei; le impostazioni (tema, lingua, volume d’ascolto, uscita e ingresso audio, latenza di registrazione, passo di aggancio, salvataggio automatico delle battute)
+  temporanei; le impostazioni (tema, lingua, volume d’ascolto, uscita e ingresso audio, latenza di registrazione, passo di aggancio, modo del solo, salvataggio automatico delle battute)
   si cambiano dal dialog Impostazioni (`features/settings`, Ctrl+,; il volume dalla toolbar) e stanno nello storage di
   Neutralino (`SettingsService` tramite `SettingsPort`).
 - **Montaggi recenti** (`RecentFilesService`, mostrati dal dialog di Apri `RecentFilesDialogComponent`): file `.edimus`/`.edimuspack` aperti o salvati, nella

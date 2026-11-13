@@ -5,7 +5,9 @@ Componenti in `src/app/features/timeline/`; stato di vista in `TimelineService`.
 ## Struttura
 
 - `TimelineComponent`: righello, intestazioni delle tracce (nome → dettagli e × per eliminarla;
-  mute, solo, effetti, info, registrazione; pan, misuratore, volume), una `TrackLaneComponent`
+  mute, solo, effetti, info, registrazione; pan, misuratore, volume; mute e solo si escludono, e
+  il solo è esclusivo o additivo secondo l'impostazione `soloMode`, esclusivo per default: acceso
+  spegne il solo delle altre tracce), una `TrackLaneComponent`
   per traccia, scrollbar nativa, area di drop.
   Gestisce tutti i gesti del puntatore sulle lane (`onLaneDown/Move/Up`).
   Caricamento dei file trascinati: dal rilascio (`DocumentService.pendingDrop`, che copre la

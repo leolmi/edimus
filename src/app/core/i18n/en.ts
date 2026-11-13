@@ -436,6 +436,11 @@ export const en: Record<TranslationKey, string> = {
   'settings.snap.bar': 'Bar',
   'settings.snap.beat': 'Quarter note',
   'settings.snap.half': 'Eighth note',
+  'settings.solo': 'Solo',
+  'settings.solo.exclusive': 'Exclusive',
+  'settings.solo.additive': 'Additive',
+  'settings.soloHint':
+    'Exclusive: the Solo of a track switches off the one of the others, only that track is heard. Additive: each Solo adds to the others, all the soloed tracks are heard. To hear several tracks, Mute works too.',
   'settings.advanced': 'Advanced',
   'settings.autoSaveBars': 'Save the bars at every change',
   'settings.autoSaveBarsHint': 'Updates by itself the bar file next to the audio (song.mp3.edimusbars) when you change tempo or anchors; otherwise it is saved with “Save bars” in the tempo dialog.',

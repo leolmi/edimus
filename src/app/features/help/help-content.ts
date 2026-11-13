@@ -211,7 +211,7 @@ const IT: HelpContent = {
         {
           title: 'Tracce',
           text: [
-            'Nell’intestazione di ogni traccia: muto, solo (se una traccia è in solo si sentono solo quelle in solo), il pulsante i dei dettagli e la × in fondo al nome per eliminare la traccia.',
+            'Nell’intestazione di ogni traccia: muto, solo (se una traccia è in solo si sentono solo quelle in solo; di base il Solo è esclusivo e spegne quello delle altre tracce, nelle Impostazioni si può rendere additivo), il pulsante i dei dettagli e la × in fondo al nome per eliminare la traccia.',
             'Il pulsante i (o un clic sul nome) apre a destra il pannello della traccia sulla scheda Info: nome (Invio per confermare), ingresso audio da cui registra (solo app desktop: dispositivo, canali se la scheda ne ha più di uno, livello dal vivo con Prova l’ingresso (il microfono resta aperto solo finché è acceso), misura della latenza per quel dispositivo; senza scelta vale quello predefinito delle Impostazioni), contenuto della traccia e il pulsante File della traccia…, che apre l’elenco dei file usati con formato, durata, dimensione, tempo e il pulsante per mostrarli in Esplora risorse. La scheda Effetti dello stesso pannello ha la catena degli effetti.',
             'Ogni clip mostra in basso a sinistra il nome del suo file; passandoci sopra, un suggerimento ne riporta le caratteristiche (formato, frequenza, canali, bitrate, durata, tempo). Quando la clip esce a sinistra dalla vista il nome scorre restando dentro la clip.',
             'Trascinando il bordo inferiore di un’intestazione cambia l’altezza di tutte le tracce (fino a tre volte quella iniziale); un doppio clic sul bordo torna all’altezza iniziale.',
@@ -756,7 +756,7 @@ const EN: HelpContent = {
         {
           title: 'Tracks',
           text: [
-            'In the header of each track: mute, solo (when a track is soloed only the soloed tracks are heard), the i button of the details and the × at the end of the name to remove the track.',
+            'In the header of each track: mute, solo (when a track is soloed only the soloed tracks are heard; by default Solo is exclusive and switches off the one of the other tracks, the Settings can make it additive), the i button of the details and the × at the end of the name to remove the track.',
             'The i button (or a click on the name) opens the track panel on the right on its Info tab: name (Enter to confirm), audio input it records from (desktop app only: device, channels when the card has more than one, live level with Test the input (the microphone stays open only while it is on), latency measure for that device; with no choice the default one of the Settings applies), contents of the track and the Track files… button, which lists the files used with format, length, size, tempo and the button to show them in File Explorer. The Effects tab of the same panel holds the effect chain.',
             'Each clip shows the name of its file at the bottom left; hovering it, a tooltip gives the details of the file (format, rate, channels, bitrate, length, tempo). When the clip runs out of the view on the left the name slides along, staying inside the clip.',
             'Dragging the bottom edge of a header changes the height of all the tracks (up to three times the initial one); a double click on the edge goes back to the initial height.',

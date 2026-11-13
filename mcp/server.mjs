@@ -173,7 +173,7 @@ function call(method, params = {}, instance, timeout = CALL_TIMEOUT) {
 // MCP server
 
 const server = new McpServer(
-  { name: 'edimus', version: '1.13.0' },
+  { name: 'edimus', version: '1.14.0' },
   {
     instructions:
       'edimus is a non-destructive audio montage editor running on this PC. Read the resource ' +

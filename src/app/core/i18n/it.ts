@@ -435,6 +435,11 @@ export const it = {
   'settings.snap.bar': 'Battuta',
   'settings.snap.beat': 'Semiminima',
   'settings.snap.half': 'Croma',
+  'settings.solo': 'Solo',
+  'settings.solo.exclusive': 'Esclusivo',
+  'settings.solo.additive': 'Additivo',
+  'settings.soloHint':
+    'Esclusivo: il Solo su una traccia spegne quello delle altre, si ascolta solo lei. Additivo: ogni Solo si aggiunge agli altri, si ascoltano tutte le tracce in solo. Per ascoltarne più di una restano anche i Mute.',
   'settings.advanced': 'Avanzate',
   'settings.autoSaveBars': 'Salva le battute a ogni modifica',
   'settings.autoSaveBarsHint': 'Aggiorna da solo il file delle battute accanto all’audio (brano.mp3.edimusbars) quando cambi tempo o ancore; altrimenti si salva con “Salva le battute” nel dialogo del tempo.',

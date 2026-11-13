@@ -17,6 +17,7 @@ import {
   Language,
   SettingsService,
   SnapStep,
+  SoloMode,
   ThemeMode,
 } from '../../core/settings.service';
 import { UpdateService } from '../../core/update.service';
@@ -38,6 +39,11 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
   { step: 'bar', symbol: '𝅝', label: 'settings.snap.bar' },
   { step: 'beat', symbol: '♩', label: 'settings.snap.beat' },
   { step: 'half', symbol: '♪', label: 'settings.snap.half' },
+];
+
+const SOLO_MODES: { mode: SoloMode; label: TranslationKey }[] = [
+  { mode: 'exclusive', label: 'settings.solo.exclusive' },
+  { mode: 'additive', label: 'settings.solo.additive' },
 ];
 
 /**
@@ -177,6 +183,19 @@ const SNAP_STEPS: { step: SnapStep; symbol: string; label: TranslationKey }[] = 
                 <span class="symbol">{{ snap.symbol }}</span>
                 {{ snap.label | t }}
               </mat-option>
+            }
+          </mat-select>
+        </app-field>
+      </div>
+      <div class="setting">
+        <div class="text">
+          <span class="label">{{ 'settings.solo' | t }}</span>
+          <p class="hint">{{ 'settings.soloHint' | t }}</p>
+        </div>
+        <app-field class="value">
+          <mat-select [value]="settings.soloMode()" (selectionChange)="settings.setSoloMode($event.value)">
+            @for (mode of soloModes; track mode.mode) {
+              <mat-option [value]="mode.mode">{{ mode.label | t }}</mat-option>
             }
           </mat-select>
         </app-field>
@@ -349,6 +368,7 @@ export class SettingsDialogComponent {
   protected readonly themes = THEMES;
   protected readonly languages = LANGUAGES;
   protected readonly snapSteps = SNAP_STEPS;
+  protected readonly soloModes = SOLO_MODES;
 
   /** Output devices; the chosen one, when no longer connected, is listed as missing. */
   protected readonly menuOutputs = computed(() =>

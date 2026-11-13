@@ -860,8 +860,17 @@ export class TimelineComponent {
     this.montages.updateTrack(track.id, (t) => ({ ...t, muted: !t.muted, solo: t.muted ? t.solo : false }), true);
   }
 
+  /** Exclusive solo (setting): switching it on switches off the solo of the other tracks; switching it off touches only this one. */
   protected toggleSolo(track: Track): void {
-    this.montages.updateTrack(track.id, (t) => ({ ...t, solo: !t.solo, muted: t.solo ? t.muted : false }), true);
+    const on = !track.solo;
+    const exclusive = on && this.settings.soloMode() === 'exclusive';
+    this.montages.update(
+      (m) => ({
+        ...m,
+        tracks: m.tracks.map((t) => (t.id === track.id ? { ...t, solo: on, muted: on ? false : t.muted } : exclusive && t.solo ? { ...t, solo: false } : t)),
+      }),
+      true,
+    );
   }
 
   /**
